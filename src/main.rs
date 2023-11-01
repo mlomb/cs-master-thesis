@@ -1,22 +1,17 @@
 pub mod core;
 pub mod games;
 
-use core::eval::Eval;
-
-use crate::core::minimax::minimax;
-use crate::core::position::Position;
-use crate::games::connect4::Connect4;
-use crate::games::mnk::TicTacToe;
+use core::evaluator::Evaluator;
+use core::minimax::minimax;
+use core::position::Position;
+use games::connect4::Connect4;
+use games::mnk::TicTacToe;
 
 struct NaiveEvaluator;
 
-impl<A, P: Position<A>> Eval<A, P, i32> for NaiveEvaluator {
-    fn eval(state: P) -> i32 {
+impl Evaluator<usize, TicTacToe, i32> for NaiveEvaluator {
+    fn eval(&self, state: &TicTacToe) -> i32 {
         return 0;
-    }
-
-    fn terminal_value(&self) -> i32 {
-        todo!()
     }
 }
 
@@ -27,7 +22,7 @@ fn main() {
     // TicTacToe::from_string("XX O  X O", 'O');
     println!("{:?}", c4);
 
-    let res = minimax(&c4, 7);
+    let res = minimax(&c4, 7, &NaiveEvaluator);
     dbg!(res);
 
     /*

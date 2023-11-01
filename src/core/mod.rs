@@ -1,3 +1,3 @@
-pub mod eval;
+pub mod evaluator;
 pub mod minimax;
 pub mod position;
