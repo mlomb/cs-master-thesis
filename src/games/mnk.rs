@@ -52,7 +52,7 @@ impl<const M: usize, const N: usize, const K: usize> Position<usize> for MNK<M, 
         }
     }
 
-    fn status(&self) -> Status {
+    fn status(&self) -> Outcome {
         // TODO: make const or smth
         let winning_sets: Vec<u64> = mnk_winning_sets(M, N, K);
 
@@ -60,18 +60,18 @@ impl<const M: usize, const N: usize, const K: usize> Position<usize> for MNK<M, 
             for &set in &winning_sets {
                 if (self.board[player] as u64 & set) == set {
                     return if player as u8 == self.who_plays {
-                        Status::WIN
+                        Outcome::WIN
                     } else {
-                        Status::LOSS
+                        Outcome::LOSS
                     };
                 }
             }
         }
 
         if (self.board[0] | self.board[1]) == Self::FULL_BOARD {
-            Status::DRAW
+            Outcome::DRAW
         } else {
-            Status::PLAYING
+            Outcome::PLAYING
         }
     }
 }

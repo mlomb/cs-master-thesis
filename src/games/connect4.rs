@@ -1,5 +1,5 @@
 use super::mnk::MNK;
-use crate::core::position::{Position, Status};
+use crate::core::position::{Outcome, Position};
 
 const ROWS: usize = 6;
 const COLS: usize = 7;
@@ -48,7 +48,7 @@ impl Position<usize> for Connect4 {
         })
     }
 
-    fn status(&self) -> Status {
+    fn status(&self) -> Outcome {
         self.0.status()
     }
 }

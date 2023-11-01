@@ -22,8 +22,8 @@ fn main() {
     // TicTacToe::from_string("XX O  X O", 'O');
     println!("{:?}", c4);
 
-    let res = minimax(&c4, 7, &NaiveEvaluator);
-    dbg!(res);
+    //let res = minimax(&c4, 7, &NaiveEvaluator);
+    //dbg!(res);
 
     /*
     println!("{:?}", c4.status());

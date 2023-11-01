@@ -1,10 +1,25 @@
+use std::ops::Neg;
+
 /// Status of the position from the POV of the player to move
-#[derive(Debug)]
-pub enum Status {
-    PLAYING,
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub enum Outcome {
     LOSS,
     DRAW,
     WIN,
+}
+
+/// Negation of the status. Swaps WIN <--> LOSS
+impl Neg for Outcome {
+    type Output = Outcome;
+
+    fn neg(self) -> Outcome {
+        match self {
+            Outcome::PLAYING => Outcome::PLAYING,
+            Outcome::LOSS => Outcome::WIN,
+            Outcome::DRAW => Outcome::DRAW,
+            Outcome::WIN => Outcome::LOSS,
+        }
+    }
 }
 
 /// A game position. It must contain all the information needed to continue playing. (i.e. the board, the player to move, etc.)
@@ -22,5 +37,5 @@ pub trait Position<Action> {
     fn apply_action(&self, action: Action) -> Self;
 
     /// Returns the status of the position from the POV of the player to move
-    fn status(&self) -> Status;
+    fn status(&self) -> Outcome;
 }
