@@ -1,11 +1,16 @@
 use super::outcome::Outcome;
 
 /// A game position. It must contain all the information needed to continue playing. (i.e. the board, the player to move, etc.)
-pub trait Position<Action> {
+pub trait Position<Action>: Clone
+where
+    Action: Clone,
+{
     /// Generates an initial position for the game
     fn initial() -> Self;
 
     /// Lists all valid actions from the current position
+    ///
+    /// Note that this function must be deterministic; it must always return the same actions in the same order.
     fn valid_actions(&self) -> Vec<Action>;
 
     /// Returns a new position after the given action is applied

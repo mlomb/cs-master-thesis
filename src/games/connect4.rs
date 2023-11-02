@@ -5,7 +5,7 @@ use crate::core::position::Position;
 const ROWS: usize = 6;
 const COLS: usize = 7;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Connect4(MNK<ROWS, COLS, 4>);
 
 impl Position<usize> for Connect4 {

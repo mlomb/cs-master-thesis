@@ -3,5 +3,14 @@
 version = 3
 
 [[package]]
+name = "smallvec"
+version = "1.11.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "942b4a808e05215192e39f4ab80813e599068285906cc91aa64f923db842bd5a"
+
+[[package]]
 name = "thesis"
 version = "0.1.0"
+dependencies = [
+ "smallvec",
+]
