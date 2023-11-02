@@ -3,17 +3,10 @@ pub mod core;
 pub mod games;
 
 use algos::minimax::minimax;
-use core::evaluator::Evaluator;
 use core::position::Position;
+use core::result::SearchResult;
 use games::mnk::TicTacToe;
-
-struct NaiveEvaluator;
-
-impl Evaluator<usize, TicTacToe, i32> for NaiveEvaluator {
-    fn eval(&self, state: &TicTacToe) -> i32 {
-        return state.board[0] as i32 - state.board[1] as i32;
-    }
-}
+use thesis::evaluators::null::NullEvaluator;
 
 #[allow(unused_variables)]
 #[allow(unused_mut)]
@@ -24,7 +17,7 @@ fn main() {
     // TicTacToe::from_string("XX O  X O", 'O');
     println!("{:?}", c4);
 
-    let res = minimax(&c4, 150, &NaiveEvaluator);
+    let res: SearchResult<i32> = minimax(&c4, 150, &NullEvaluator);
     dbg!(res);
 
     /*

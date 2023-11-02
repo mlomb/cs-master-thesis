@@ -10,11 +10,16 @@ pub struct MNK<const M: usize, const N: usize, const K: usize> {
 }
 
 impl<const M: usize, const N: usize, const K: usize> MNK<M, N, K> {
-    pub fn from_str(s: &str) -> Self {
+    /// Creates a new position from a string of the form "XO.XO.XO."
+    pub fn from_str(board_str: &str, who_plays: char) -> Self {
         let mut board = [0, 0];
-        let mut who_plays = 0;
+        let mut who_plays = match who_plays {
+            'X' => 0,
+            'O' => 1,
+            _ => panic!("Invalid character for who_plays"),
+        };
 
-        for (i, c) in s.chars().enumerate() {
+        for (i, c) in board_str.chars().enumerate() {
             match c {
                 'X' => board[0] |= 1 << i,
                 'O' => board[1] |= 1 << i,

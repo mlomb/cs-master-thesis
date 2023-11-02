@@ -42,4 +42,3 @@ pub fn minimax<
 
     best.expect("should have at least one valid action")
 }
-

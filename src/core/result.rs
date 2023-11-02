@@ -2,7 +2,7 @@ use crate::core::outcome::*;
 use crate::core::value;
 use std::cmp::Ordering;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum SearchResult<Value> {
     /// The game is over, and the true outcome is known
     True(Outcome),
