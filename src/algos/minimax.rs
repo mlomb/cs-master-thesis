@@ -1,14 +1,18 @@
-use std::ops::Neg;
-
-use crate::core::evaluator::Evaluator;
-use crate::core::position::*;
+use crate::core::evaluator;
+use crate::core::position;
 use crate::core::result::SearchResult;
+use crate::core::value;
 
-pub fn minimax<A, P: Position<A>, V: Ord + Neg, E: Evaluator<A, P, V>>(
-    position: &P,
+pub fn minimax<
+    Action,
+    Position: position::Position<Action>,
+    Value: value::Value,
+    Evaluator: evaluator::Evaluator<Action, Position, Value>,
+>(
+    position: &Position,
     max_depth: usize,
-    evaluator: &E,
-) -> SearchResult<V> {
+    evaluator: &Evaluator,
+) -> SearchResult<Value> {
     // If the game is over, return the true outcome
     if let Some(outcome) = position.status() {
         return SearchResult::True(outcome);
@@ -19,7 +23,7 @@ pub fn minimax<A, P: Position<A>, V: Ord + Neg, E: Evaluator<A, P, V>>(
         return SearchResult::Eval(evaluator.eval(&position));
     }
 
-    let mut best: Option<SearchResult<V>> = None;
+    let mut best: Option<SearchResult<Value>> = None;
 
     for action in position.valid_actions() {
         let branch_result = minimax(&position.apply_action(&action), max_depth - 1, evaluator);

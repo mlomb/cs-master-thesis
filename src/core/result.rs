@@ -1,11 +1,9 @@
-use std::cmp::Ordering;
-use std::ops::Neg;
-
 use crate::core::outcome::*;
-use crate::core::position::*;
+use crate::core::value;
+use std::cmp::Ordering;
 
 #[derive(Debug)]
-pub enum SearchResult<Value: Neg> {
+pub enum SearchResult<Value> {
     /// The game is over, and the true outcome is known
     True(Outcome),
     /// The game is not over, and the value is returned
@@ -16,21 +14,21 @@ use Ordering::*;
 use Outcome::*;
 use SearchResult::*;
 
-impl<Value: Ord + Neg> SearchResult<Value> {
+impl<Value: value::Value> SearchResult<Value> {
     /// Custom comparison function for search results
     pub fn compare(&self, other: &Self) -> Ordering {
         match (self, other) {
             // Compare Status
             (True(left), True(right)) => left.cmp(right),
             // Compare Value
-            (Eval(left), Eval(right)) => left.cmp(right),
+            (Eval(left), Eval(right)) => left.compare(right),
 
             // Prefer true Win over Eval
-            (True(Outcome::Win), Eval(_)) => Greater,
+            (True(Win), Eval(_)) => Greater,
             (True(_), Eval(_)) => Less,
 
             // same as above
-            (Eval(_), True(Outcome::Win)) => Less,
+            (Eval(_), True(Win)) => Less,
             (Eval(_), True(_)) => Greater,
         }
     }
@@ -42,9 +40,9 @@ mod tests {
 
     #[test]
     fn orders() {
-        type R = SearchResult<i32>;
+        type R = SearchResult<i32>; // need a type for A
 
-        // WIN > eval > DRAW > LOSS
+        // Win > Eval > Draw > Loss
         assert_eq!(Equal, R::True(Win).compare(&R::True(Win)));
         assert_eq!(Greater, R::True(Win).compare(&R::Eval(-1)));
         assert_eq!(Greater, R::Eval(5).compare(&R::Eval(0)));

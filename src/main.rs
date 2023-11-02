@@ -1,20 +1,22 @@
+pub mod algos;
 pub mod core;
 pub mod games;
 
+use algos::minimax::minimax;
 use core::evaluator::Evaluator;
-use core::minimax::minimax;
 use core::position::Position;
-use games::connect4::Connect4;
 use games::mnk::TicTacToe;
 
 struct NaiveEvaluator;
 
 impl Evaluator<usize, TicTacToe, i32> for NaiveEvaluator {
     fn eval(&self, state: &TicTacToe) -> i32 {
-        return 0;
+        return state.board[0] as i32 - state.board[1] as i32;
     }
 }
 
+#[allow(unused_variables)]
+#[allow(unused_mut)]
 fn main() {
     println!("Hello, world!");
 
