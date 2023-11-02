@@ -1,4 +1,4 @@
-use crate::algos::mcts::MCTS;
+use crate::algos::mcts::mcts::MCTS;
 
 pub mod algos;
 pub mod core;
@@ -13,6 +13,7 @@ fn main() {
     use core::position::Position;
     use core::result::SearchResult;
     use games::mnk::TicTacToe;
+    use thesis::algos::mcts::strategy::DefaultStrategy;
     use thesis::evaluators::null::NullEvaluator;
 
     println!("Hello, world!");
@@ -21,8 +22,9 @@ fn main() {
     // TicTacToe::from_string("XX O  X O", 'O');
     println!("{:?}", c4);
 
-    let mut mcts = MCTS::new(&c4);
-    mcts.run_iteration();
+    //type M = MCTS<usize, TicTacToe, DefaultStrategy>;
+    //let mut mcts = M::new(&c4, &DefaultStrategy);
+    //mcts.run_iteration();
 
     //let res: SearchResult<i32> = minimax(&c4, 150, &NullEvaluator);
     //dbg!(res);
