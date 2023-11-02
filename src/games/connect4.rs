@@ -1,5 +1,6 @@
 use super::mnk::MNK;
-use crate::core::position::{Outcome, Position};
+use crate::core::outcome::Outcome;
+use crate::core::position::Position;
 
 const ROWS: usize = 6;
 const COLS: usize = 7;
@@ -25,8 +26,8 @@ impl Position<usize> for Connect4 {
         actions
     }
 
-    fn apply_action(&self, action: usize) -> Self {
-        assert!(action < COLS);
+    fn apply_action(&self, action: &usize) -> Self {
+        assert!(action < &COLS);
 
         let occupied = self.0.occupied_board();
 
@@ -48,7 +49,7 @@ impl Position<usize> for Connect4 {
         })
     }
 
-    fn status(&self) -> Outcome {
+    fn status(&self) -> Option<Outcome> {
         self.0.status()
     }
 }

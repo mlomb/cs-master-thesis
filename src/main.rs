@@ -18,12 +18,12 @@ impl Evaluator<usize, TicTacToe, i32> for NaiveEvaluator {
 fn main() {
     println!("Hello, world!");
 
-    let mut c4 = Connect4::initial();
+    let mut c4 = TicTacToe::initial();
     // TicTacToe::from_string("XX O  X O", 'O');
     println!("{:?}", c4);
 
-    //let res = minimax(&c4, 7, &NaiveEvaluator);
-    //dbg!(res);
+    let res = minimax(&c4, 150, &NaiveEvaluator);
+    dbg!(res);
 
     /*
     println!("{:?}", c4.status());

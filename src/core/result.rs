@@ -1,10 +1,14 @@
 use std::cmp::Ordering;
 use std::ops::Neg;
 
+use crate::core::outcome::*;
 use crate::core::position::*;
 
+#[derive(Debug)]
 pub enum SearchResult<Value: Neg> {
-    Outcome(Outcome),
+    /// The game is over, and the true outcome is known
+    True(Outcome),
+    /// The game is not over, and the value is returned
     Eval(Value),
 }
 
@@ -16,25 +20,18 @@ impl<Value: Ord + Neg> SearchResult<Value> {
     /// Custom comparison function for search results
     pub fn compare(&self, other: &Self) -> Ordering {
         match (self, other) {
-            // Directly compare Status
-            (Outcome(left), Outcome(right)) => left.cmp(right),
-            // Directly compare Value
+            // Compare Status
+            (True(left), True(right)) => left.cmp(right),
+            // Compare Value
             (Eval(left), Eval(right)) => left.cmp(right),
 
-            (Outcome(status), Eval(_)) => {
-                if status >= &PLAYING {
-                    Greater
-                } else {
-                    Less
-                }
-            }
-            (Eval(_), Outcome(status)) => {
-                if status >= &PLAYING {
-                    Less
-                } else {
-                    Greater
-                }
-            }
+            // Prefer true Win over Eval
+            (True(Outcome::Win), Eval(_)) => Greater,
+            (True(_), Eval(_)) => Less,
+
+            // same as above
+            (Eval(_), True(Outcome::Win)) => Less,
+            (Eval(_), True(_)) => Greater,
         }
     }
 }
@@ -47,13 +44,12 @@ mod tests {
     fn orders() {
         type R = SearchResult<i32>;
 
-        // WIN > PLAYING > eval > DRAW > LOSS
-        assert_eq!(Equal, R::Outcome(WIN).compare(&R::Outcome(WIN)));
-        assert_eq!(Greater, R::Outcome(WIN).compare(&R::Outcome(PLAYING)));
-        assert_eq!(Greater, R::Outcome(PLAYING).compare(&R::Eval(-1)));
+        // WIN > eval > DRAW > LOSS
+        assert_eq!(Equal, R::True(Win).compare(&R::True(Win)));
+        assert_eq!(Greater, R::True(Win).compare(&R::Eval(-1)));
         assert_eq!(Greater, R::Eval(5).compare(&R::Eval(0)));
         assert_eq!(Greater, R::Eval(0).compare(&R::Eval(-5)));
-        assert_eq!(Greater, R::Eval(-5).compare(&R::Outcome(DRAW)));
-        assert_eq!(Greater, R::Outcome(DRAW).compare(&R::Outcome(LOSS)));
+        assert_eq!(Greater, R::Eval(-5).compare(&R::True(Draw)));
+        assert_eq!(Greater, R::True(Draw).compare(&R::True(Loss)));
     }
 }

@@ -1,3 +1,4 @@
+use crate::core::outcome::*;
 use crate::core::position::*;
 
 /// Position for m-n-k games, such as TicTacToe and Connect4.
@@ -42,7 +43,7 @@ impl<const M: usize, const N: usize, const K: usize> Position<usize> for MNK<M, 
         actions
     }
 
-    fn apply_action(&self, action: usize) -> Self {
+    fn apply_action(&self, action: &usize) -> Self {
         let mut new_board = self.board;
         new_board[self.who_plays as usize] |= 1 << action;
 
@@ -52,7 +53,7 @@ impl<const M: usize, const N: usize, const K: usize> Position<usize> for MNK<M, 
         }
     }
 
-    fn status(&self) -> Outcome {
+    fn status(&self) -> Option<Outcome> {
         // TODO: make const or smth
         let winning_sets: Vec<u64> = mnk_winning_sets(M, N, K);
 
@@ -60,18 +61,18 @@ impl<const M: usize, const N: usize, const K: usize> Position<usize> for MNK<M, 
             for &set in &winning_sets {
                 if (self.board[player] as u64 & set) == set {
                     return if player as u8 == self.who_plays {
-                        Outcome::WIN
+                        Some(Outcome::Win)
                     } else {
-                        Outcome::LOSS
+                        Some(Outcome::Loss)
                     };
                 }
             }
         }
 
         if (self.board[0] | self.board[1]) == Self::FULL_BOARD {
-            Outcome::DRAW
+            Some(Outcome::Draw)
         } else {
-            Outcome::PLAYING
+            None
         }
     }
 }
