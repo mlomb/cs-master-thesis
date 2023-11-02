@@ -14,9 +14,9 @@ use Ordering::*;
 use Outcome::*;
 use SearchResult::*;
 
-impl<Value: value::Value> SearchResult<Value> {
+impl<Value: value::Value> value::Value for SearchResult<Value> {
     /// Custom comparison function for search results
-    pub fn compare(&self, other: &Self) -> Ordering {
+    fn compare(&self, other: &Self) -> Ordering {
         match (self, other) {
             // Compare Status
             (True(left), True(right)) => left.cmp(right),
@@ -32,11 +32,23 @@ impl<Value: value::Value> SearchResult<Value> {
             (Eval(_), True(_)) => Greater,
         }
     }
+
+    fn negate(&self) -> Self {
+        match self {
+            True(outcome) => True(match outcome {
+                Win => Loss,
+                Draw => Draw,
+                Loss => Win,
+            }),
+            Eval(value) => Eval(value.negate()),
+        }
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::core::value::Value;
 
     #[test]
     fn orders() {
@@ -44,10 +56,9 @@ mod tests {
 
         // Win > Eval > Draw > Loss
         assert_eq!(Equal, R::True(Win).compare(&R::True(Win)));
-        assert_eq!(Greater, R::True(Win).compare(&R::Eval(-1)));
-        assert_eq!(Greater, R::Eval(5).compare(&R::Eval(0)));
-        assert_eq!(Greater, R::Eval(0).compare(&R::Eval(-5)));
-        assert_eq!(Greater, R::Eval(-5).compare(&R::True(Draw)));
+        assert_eq!(Greater, R::True(Win).compare(&R::Eval(1)));
+        assert_eq!(Greater, R::Eval(1).compare(&R::Eval(-1)));
+        assert_eq!(Greater, R::Eval(-1).compare(&R::True(Draw)));
         assert_eq!(Greater, R::True(Draw).compare(&R::True(Loss)));
     }
 }

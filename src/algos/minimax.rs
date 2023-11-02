@@ -2,6 +2,8 @@ use crate::core::evaluator;
 use crate::core::position;
 use crate::core::result::SearchResult;
 use crate::core::value;
+use crate::core::value::Value;
+use std::cmp::Ordering;
 
 pub fn minimax<
     Action,
@@ -26,13 +28,12 @@ pub fn minimax<
     let mut best: Option<SearchResult<Value>> = None;
 
     for action in position.valid_actions() {
-        let branch_result = minimax(&position.apply_action(&action), max_depth - 1, evaluator);
+        let branch_result =
+            minimax(&position.apply_action(&action), max_depth - 1, evaluator).negate();
 
         best = match best {
             None => Some(branch_result),
-            Some(current_best)
-                if branch_result.compare(&current_best) == std::cmp::Ordering::Greater =>
-            {
+            Some(current_best) if branch_result.compare(&current_best) == Ordering::Greater => {
                 Some(branch_result)
             }
             _ => best,
@@ -41,3 +42,4 @@ pub fn minimax<
 
     best.expect("should have at least one valid action")
 }
+
