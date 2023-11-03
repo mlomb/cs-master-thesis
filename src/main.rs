@@ -1,5 +1,3 @@
-use crate::algos::mcts::mcts::{MCTSSpec, MCTS};
-
 pub mod algos;
 pub mod core;
 pub mod games;
@@ -8,6 +6,7 @@ pub mod games;
 #[allow(unused_mut)]
 #[allow(unused_imports)]
 fn main() {
+    use crate::algos::mcts::mcts::{MCTSSpec, MCTS};
     use crate::core::outcome::Outcome;
     use algos::minimax::minimax;
     use core::position::Position;
@@ -16,11 +15,9 @@ fn main() {
     use thesis::algos::mcts::strategy::DefaultStrategy;
     use thesis::evaluators::null::NullEvaluator;
 
-    println!("Hello, world!");
-
     let c4 = TicTacToe::initial();
     // TicTacToe::from_string("XX O  X O", 'O');
-    println!("{:?}", c4);
+    println!("{:}", c4);
 
     /*
     struct YourType;

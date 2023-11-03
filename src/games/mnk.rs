@@ -1,9 +1,11 @@
+use std::fmt;
+
 use super::mnk_sets::mnk_winning_sets;
 use crate::core::outcome::*;
 use crate::core::position::*;
 
 /// Position for m-n-k games, such as TicTacToe and Connect4.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct MNK<const M: usize, const N: usize, const K: usize> {
     pub(crate) board: [u64; 2],
     pub(crate) who_plays: u8,
@@ -102,6 +104,28 @@ impl<const M: usize, const N: usize, const K: usize> Position for MNK<M, N, K> {
         } else {
             None
         }
+    }
+}
+
+impl<const M: usize, const N: usize, const K: usize> fmt::Display for MNK<M, N, K> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let mut board_str = String::new();
+
+        for i in 0..M * N {
+            if (self.board[0] & (1 << i)) != 0 {
+                board_str.push('X');
+            } else if (self.board[1] & (1 << i)) != 0 {
+                board_str.push('O');
+            } else {
+                board_str.push('.');
+            }
+
+            if (i + 1) % N == 0 {
+                board_str.push('\n');
+            }
+        }
+
+        write!(f, "{}", board_str)
     }
 }
 

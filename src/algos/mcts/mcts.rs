@@ -1,5 +1,5 @@
 use crate::core::{
-    outcome::{self, Outcome},
+    outcome::Outcome,
     position::{self, Position},
 };
 use smallvec::SmallVec;
@@ -147,6 +147,52 @@ impl<Spec: MCTSSpec> MCTS<Spec> {
             current_index = self.nodes[index].parent;
             value = -value;
         }
+    }
+
+    /// Changes the root node to the child corresponding to the given action.
+    pub fn move_root(
+        &mut self,
+        action: <<Spec as MCTSSpec>::Position as position::Position>::Action,
+    ) {
+        let root = &self.nodes[self.root_index];
+        let child_index = root
+            .children
+            .iter()
+            .find(|&&idx| self.nodes[idx].action.as_ref() == Some(&action));
+
+        match child_index {
+            None => todo!(),
+            Some(index) => self.root_index = *index,
+        }
+    }
+
+    pub fn get_action_distribution(
+        &self,
+    ) -> Vec<(
+        // TODO: change for something nicer
+        <<Spec as MCTSSpec>::Position as position::Position>::Action,
+        f64,
+    )> {
+        let root = &self.nodes[self.root_index];
+        root.children
+            .iter()
+            .map(|&idx| {
+                let node = &self.nodes[idx];
+                (
+                    node.action.clone().unwrap(),
+                    (node.n as f64) / (root.n as f64),
+                )
+            })
+            .collect()
+    }
+
+    pub fn get_best_action(
+        &self,
+    ) -> Option<<<Spec as MCTSSpec>::Position as position::Position>::Action> {
+        self.get_action_distribution()
+            .into_iter()
+            .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap())
+            .map(|(action, _)| action)
     }
 }
 

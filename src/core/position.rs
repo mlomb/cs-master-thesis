@@ -3,7 +3,7 @@ use super::outcome::Outcome;
 /// A game position. It must contain all the information needed to continue playing. (i.e. the board, the player to move, etc.)
 pub trait Position: Clone {
     /// The type of actions that can be applied to the position
-    type Action: Clone;
+    type Action: Clone + Eq;
 
     /// Generates an initial position for the game
     fn initial() -> Self;
