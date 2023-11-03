@@ -4,10 +4,9 @@ use crate::core::value::Value;
 
 pub struct NullEvaluator;
 
-impl<A, P, V> Evaluator<A, P, V> for NullEvaluator
+impl<P, V> Evaluator<P, V> for NullEvaluator
 where
-    A: Clone,
-    P: Position<A>,
+    P: Position,
     V: Value,
 {
     fn eval(&self, _: &P) -> V {

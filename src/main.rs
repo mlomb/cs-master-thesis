@@ -1,4 +1,4 @@
-use crate::algos::mcts::mcts::MCTS;
+use crate::algos::mcts::mcts::{MCTSSpec, MCTS};
 
 pub mod algos;
 pub mod core;
@@ -22,9 +22,16 @@ fn main() {
     // TicTacToe::from_string("XX O  X O", 'O');
     println!("{:?}", c4);
 
-    //type M = MCTS<usize, TicTacToe, DefaultStrategy>;
-    //let mut mcts = M::new(&c4, &DefaultStrategy);
-    //mcts.run_iteration();
+    /*
+    struct YourType;
+    impl MCTSSpec for YourType {
+        type Position = TicTacToe;
+        type Strategy = DefaultStrategy;
+    }
+    type R = MCTS<YourType>;
+    let mut mcts = R::new(&c4, &DefaultStrategy);
+    mcts.run_iteration();
+    */
 
     //let res: SearchResult<i32> = minimax(&c4, 150, &NullEvaluator);
     //dbg!(res);

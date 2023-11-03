@@ -1,14 +1,19 @@
 use crate::core::{
     outcome::{self, Outcome},
-    position,
+    position::{self, Position},
 };
 use smallvec::SmallVec;
 
-use super::strategy;
+use super::strategy::{self, Strategy};
 
-struct Node<Action: Clone, Position: position::Position<Action>> {
+pub trait MCTSSpec: Sized {
+    type Position: Position;
+    type Strategy: strategy::Strategy<Self::Position> + Clone;
+}
+
+struct Node<Position: position::Position> {
     /// Action that led to this state
-    action: Option<Action>,
+    action: Option<Position::Action>,
     /// Game state
     position: Position,
     /// Parent node
@@ -27,12 +32,7 @@ struct Node<Action: Clone, Position: position::Position<Action>> {
 }
 
 /// Monte Carlo Tree Search
-pub struct MCTS<Action, Position, Strategy>
-where
-    Action: Clone,
-    Position: position::Position<Action>,
-    Strategy: strategy::Strategy<Action, Position>,
-{
+pub struct MCTS<Spec: MCTSSpec> {
     /// Root node index
     ///
     /// It is useful to change the root to reuse previous iterations.
@@ -41,19 +41,14 @@ where
     root_index: usize,
 
     /// The list of nodes in the tree
-    nodes: Vec<Node<Action, Position>>,
+    nodes: Vec<Node<Spec::Position>>,
 
     /// TODO: change name
-    strategy: Strategy,
+    strategy: Spec::Strategy,
 }
 
-impl<Action, Position, Strategy> MCTS<Action, Position, Strategy>
-where
-    Action: Clone,
-    Position: position::Position<Action>,
-    Strategy: strategy::Strategy<Action, Position> + Clone,
-{
-    pub fn new(position: &Position, strategy: &Strategy) -> Self {
+impl<Spec: MCTSSpec> MCTS<Spec> {
+    pub fn new(position: &Spec::Position, strategy: &Spec::Strategy) -> Self {
         let root = Node {
             action: None,
             position: position.clone(),
@@ -155,7 +150,7 @@ where
     }
 }
 
-impl<Action: Clone, Position: position::Position<Action>> Node<Action, Position> {
+impl<Position: position::Position> Node<Position> {
     fn ucb1(&self, parent_n: u32) -> f64 {
         let c = 1.0;
         let n = self.n as f64;

@@ -6,10 +6,9 @@ use crate::core::value::Value;
 use std::cmp::Ordering;
 
 pub fn minimax<
-    Action: Clone,
-    Position: position::Position<Action>,
+    Position: position::Position,
     Value: value::Value,
-    Evaluator: evaluator::Evaluator<Action, Position, Value>,
+    Evaluator: evaluator::Evaluator<Position, Value>,
 >(
     position: &Position,
     max_depth: usize,

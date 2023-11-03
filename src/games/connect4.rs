@@ -8,7 +8,9 @@ const COLS: usize = 7;
 #[derive(Debug, Clone)]
 pub struct Connect4(MNK<ROWS, COLS, 4>);
 
-impl Position<usize> for Connect4 {
+impl Position for Connect4 {
+    type Action = usize;
+
     fn initial() -> Self {
         Connect4(MNK::initial())
     }

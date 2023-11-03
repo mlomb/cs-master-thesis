@@ -48,7 +48,9 @@ impl<const M: usize, const N: usize, const K: usize> MNK<M, N, K> {
     }
 }
 
-impl<const M: usize, const N: usize, const K: usize> Position<usize> for MNK<M, N, K> {
+impl<const M: usize, const N: usize, const K: usize> Position for MNK<M, N, K> {
+    type Action = usize;
+
     fn initial() -> Self {
         MNK {
             board: [0, 0],

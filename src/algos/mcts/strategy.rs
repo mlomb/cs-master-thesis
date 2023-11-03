@@ -2,11 +2,7 @@ use rand::seq::SliceRandom;
 
 use crate::core::{outcome::Outcome, position};
 
-pub trait Strategy<Action, Position>
-where
-    Action: Clone,
-    Position: position::Position<Action>,
-{
+pub trait Strategy<Position: position::Position> {
     /// --
     fn rollout(&self, position: &Position) -> f64;
 }
@@ -14,10 +10,9 @@ where
 #[derive(Clone)]
 pub struct DefaultStrategy;
 
-impl<Action, Position> Strategy<Action, Position> for DefaultStrategy
+impl<Position> Strategy<Position> for DefaultStrategy
 where
-    Action: Clone,
-    Position: position::Position<Action>,
+    Position: position::Position,
 {
     fn rollout(&self, position: &Position) -> f64 {
         let mut pos = position.clone();
