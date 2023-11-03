@@ -9,9 +9,6 @@ where
 {
     /// --
     fn rollout(&self, position: &Position) -> f64;
-
-    /// Defines the strategy for backpropagating the value
-    fn backprop(&self, old_value: f64, new_value: f64) -> f64;
 }
 
 #[derive(Clone)]
@@ -39,9 +36,5 @@ where
             Some(Outcome::Draw) => 0.0,
             None => unreachable!(),
         }
-    }
-
-    fn backprop(&self, old_value: f64, new_value: f64) -> f64 {
-        old_value + new_value
     }
 }

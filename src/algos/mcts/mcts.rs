@@ -1,8 +1,6 @@
-use std::marker::PhantomData;
-
 use crate::core::{
+    outcome::{self, Outcome},
     position,
-    value::{self, Value},
 };
 use smallvec::SmallVec;
 
@@ -17,6 +15,8 @@ struct Node<Action: Clone, Position: position::Position<Action>> {
     parent: Option<usize>,
     /// Child nodes
     children: SmallVec<[usize; 1]>,
+    /// Position status
+    status: Option<Outcome>,
     /// Fully expanded
     fully_expanded: bool,
 
@@ -26,14 +26,24 @@ struct Node<Action: Clone, Position: position::Position<Action>> {
     n: u32,
 }
 
+/// Monte Carlo Tree Search
 pub struct MCTS<Action, Position, Strategy>
 where
     Action: Clone,
     Position: position::Position<Action>,
     Strategy: strategy::Strategy<Action, Position>,
 {
+    /// Root node index
+    ///
+    /// It is useful to change the root to reuse previous iterations.
+    /// This could be changed to also prune the tree and keep the root at 0,
+    /// but that would require readjusting the indices of all nodes.
+    root_index: usize,
+
+    /// The list of nodes in the tree
     nodes: Vec<Node<Action, Position>>,
 
+    /// TODO: change name
     strategy: Strategy,
 }
 
@@ -49,26 +59,41 @@ where
             position: position.clone(),
             parent: None,
             children: SmallVec::new(),
+            status: position.status(),
             fully_expanded: position.valid_actions().is_empty(),
             w: 0.0,
             n: 0,
         };
 
         MCTS {
+            root_index: 0,
             nodes: vec![root],
             strategy: strategy.clone(),
         }
     }
 
     pub fn run_iteration(&mut self) {
-        let selected_index = self.select(0); // start at the root
-        let expanded_index = self.expand(selected_index);
-        let rollout_value = self.strategy.rollout(&self.nodes[expanded_index].position);
-        self.backprop(expanded_index, rollout_value);
+        let selected_index = self.select(self.root_index);
+        let index: usize;
+
+        if self.nodes[selected_index].status.is_some() {
+            // the node is terminal
+            index = selected_index;
+        } else {
+            // the node is not terminal, so expand it first
+            index = self.expand(selected_index);
+        }
+
+        self.backprop(index, self.strategy.rollout(&self.nodes[index].position));
     }
 
     fn select(&self, index: usize) -> usize {
         let node = &self.nodes[index];
+
+        if node.status.is_some() {
+            // the node is terminal, so return it
+            return index;
+        }
 
         if node.fully_expanded {
             // select the child with the highest UCB1 value
@@ -96,13 +121,15 @@ where
         let action = actions.get(node.children.len()).unwrap().clone();
 
         let new_position = node.position.apply_action(&action);
-        let new_is_fully_expanded = new_position.valid_actions().is_empty();
+        let new_status = new_position.status();
+        let new_fully_expanded = new_position.valid_actions().is_empty();
         let new_node = Node {
             action: Some(action.clone()),
             position: new_position,
             parent: Some(index),
             children: SmallVec::new(),
-            fully_expanded: new_is_fully_expanded,
+            status: new_status,
+            fully_expanded: new_fully_expanded,
             w: 0.0,
             n: 0,
         };
@@ -115,14 +142,15 @@ where
     }
 
     fn backprop(&mut self, from_index: usize, new_value: f64) {
-        let mut index = from_index;
+        let mut current_index = Some(from_index);
         let mut value = new_value;
 
-        while let Some(parent_index) = self.nodes[index].parent {
+        while let Some(index) = current_index {
             self.nodes[index].n += 1;
-            self.nodes[index].w = self.strategy.backprop(self.nodes[index].w, value);
-            index = parent_index;
-            value *= -1.0;
+            self.nodes[index].w += value;
+
+            current_index = self.nodes[index].parent;
+            value = -value;
         }
     }
 }
