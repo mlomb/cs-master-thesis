@@ -1,7 +1,9 @@
-use crate::core::position;
-use crate::core::value;
+pub trait ValueComparator<Value> {
+    /// Custom comparison function for values
+    fn is_better(&self, candidate: &Value, actual_best: &Value) -> bool;
+}
 
-pub trait Evaluator<Position: position::Position, Value: value::Value> {
+pub trait PositionEvaluator<Position, Value> {
     /// Evaluates a position into a Value
     fn eval(&self, state: &Position) -> Value;
 }

@@ -1,18 +1,16 @@
 use crate::core::evaluator;
 use crate::core::position;
 use crate::core::result::SearchResult;
-use crate::core::value;
-use crate::core::value::Value;
-use std::cmp::Ordering;
 
 pub fn minimax<
     Position: position::Position,
-    Value: value::Value,
-    Evaluator: evaluator::Evaluator<Position, Value>,
+    Value,
+    Evaluator: evaluator::PositionEvaluator<Position, Value> + evaluator::ValueComparator<Value>,
 >(
     position: &Position,
     max_depth: usize,
     evaluator: &Evaluator,
+    maximizing: bool,
 ) -> SearchResult<Value> {
     // If the game is over, return the true outcome
     if let Some(outcome) = position.status() {
@@ -27,12 +25,18 @@ pub fn minimax<
     let mut best: Option<SearchResult<Value>> = None;
 
     for action in position.valid_actions() {
-        let branch_result =
-            minimax(&position.apply_action(&action), max_depth - 1, evaluator).negate();
+        let branch_result = minimax(
+            &position.apply_action(&action),
+            max_depth - 1,
+            evaluator,
+            !maximizing,
+        );
 
         best = match best {
             None => Some(branch_result),
-            Some(current_best) if branch_result.compare(&current_best) == Ordering::Greater => {
+            Some(current_best)
+                if maximizing && branch_result.is_better_than(&current_best, evaluator) =>
+            {
                 Some(branch_result)
             }
             _ => best,

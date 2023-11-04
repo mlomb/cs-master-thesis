@@ -1,6 +1,4 @@
 use crate::core::outcome::*;
-use crate::core::value;
-use std::cmp::Ordering;
 
 #[derive(Debug, PartialEq)]
 pub enum SearchResult<Value> {
@@ -10,37 +8,30 @@ pub enum SearchResult<Value> {
     Eval(Value),
 }
 
-use Ordering::*;
 use Outcome::*;
 use SearchResult::*;
 
-impl<Value: value::Value> value::Value for SearchResult<Value> {
-    /// Custom comparison function for search results
-    fn compare(&self, other: &Self) -> Ordering {
+use super::evaluator::ValueComparator;
+
+impl<Value> SearchResult<Value> {
+    /// Returns whether this SearchResult is better than the other
+    /// If both are Eval, they are compared with the provided function
+    pub fn is_better_than(
+        &self,
+        other: &Self,
+        value_comparator: &dyn ValueComparator<Value>,
+    ) -> bool {
         match (self, other) {
-            // Compare Status
-            (True(left), True(right)) => left.cmp(right),
-            // Compare Value
-            (Eval(left), Eval(right)) => left.compare(right),
+            (True(left), True(right)) => left > right, // compare status
+            (Eval(left), Eval(right)) => value_comparator.is_better(left, right), // compare value
 
             // Prefer true Win over Eval
-            (True(Win), Eval(_)) => Greater,
-            (True(_), Eval(_)) => Less,
+            (True(Win), Eval(_)) => true,
+            (True(_), Eval(_)) => false,
 
             // same as above
-            (Eval(_), True(Win)) => Less,
-            (Eval(_), True(_)) => Greater,
-        }
-    }
-
-    fn negate(&self) -> Self {
-        match self {
-            True(outcome) => True(match outcome {
-                Win => Loss,
-                Draw => Draw,
-                Loss => Win,
-            }),
-            Eval(value) => Eval(value.negate()),
+            (Eval(_), True(Win)) => false,
+            (Eval(_), True(_)) => true,
         }
     }
 }
@@ -48,17 +39,21 @@ impl<Value: value::Value> value::Value for SearchResult<Value> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::value::Value;
 
     #[test]
     fn orders() {
-        type R = SearchResult<i32>; // need a type for A
+        struct DefaultComparator;
+
+        impl ValueComparator<i32> for DefaultComparator {
+            fn is_better(&self, candidate: &i32, actual_best: &i32) -> bool {
+                candidate > actual_best
+            }
+        }
 
         // Win > Eval > Draw > Loss
-        assert_eq!(Equal, R::True(Win).compare(&R::True(Win)));
-        assert_eq!(Greater, R::True(Win).compare(&R::Eval(1)));
-        assert_eq!(Greater, R::Eval(1).compare(&R::Eval(-1)));
-        assert_eq!(Greater, R::Eval(-1).compare(&R::True(Draw)));
-        assert_eq!(Greater, R::True(Draw).compare(&R::True(Loss)));
+        assert!(True(Win).is_better_than(&Eval(1), &DefaultComparator));
+        assert!(Eval(1).is_better_than(&Eval(-1), &DefaultComparator));
+        assert!(Eval(-1).is_better_than(&True(Draw), &DefaultComparator));
+        assert!(True(Draw).is_better_than(&True(Loss), &DefaultComparator));
     }
 }
