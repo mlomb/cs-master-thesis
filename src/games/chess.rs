@@ -1,10 +1,14 @@
 use crate::core::{outcome, position};
 use shakmaty::Position;
 
+// TODO: remove this
+pub static mut NODES_CREATED: usize = 0;
+
 impl position::Position for shakmaty::Chess {
     type Action = shakmaty::Move;
 
     fn initial() -> Self {
+        unsafe { NODES_CREATED = NODES_CREATED + 1 };
         shakmaty::Chess::default()
     }
 
@@ -13,6 +17,7 @@ impl position::Position for shakmaty::Chess {
     }
 
     fn apply_action(&self, action: &Self::Action) -> Self {
+        unsafe { NODES_CREATED = NODES_CREATED + 1 };
         let mut next = self.clone();
         next.play_unchecked(action);
         next
