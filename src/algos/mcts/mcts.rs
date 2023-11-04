@@ -152,7 +152,7 @@ impl<Spec: MCTSSpec> MCTS<Spec> {
     /// Changes the root node to the child corresponding to the given action.
     pub fn move_root(
         &mut self,
-        action: <<Spec as MCTSSpec>::Position as position::Position>::Action,
+        action: &<<Spec as MCTSSpec>::Position as position::Position>::Action,
     ) {
         let root = &self.nodes[self.root_index];
         let child_index = root

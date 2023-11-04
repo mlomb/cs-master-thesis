@@ -5,4 +5,5 @@ edition = "2021"
 
 [dependencies]
 rand = "0.8.5"
+shakmaty = "0.26.0"
 smallvec = "1.11.1"
