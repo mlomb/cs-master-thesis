@@ -1,37 +1,54 @@
-use crate::core::outcome::*;
+use super::outcome::Outcome;
+use std::{cmp::Ordering, ops::Neg};
 
-#[derive(Debug, PartialEq)]
-pub enum SearchResult<Value> {
-    /// The game is over, and the true outcome is known
-    True(Outcome),
-    /// The game is not over, and the value is returned
-    Eval(Value),
+/// The result of a search
+#[derive(Debug, PartialEq, Eq)]
+pub enum SearchResult<Value>
+where
+    Value: PartialOrd + Neg<Output = Value>,
+{
+    /// The search has reached a terminal state. The true outcome of the game is known
+    Terminal(Outcome),
+    /// The search has reached a non-terminal state
+    NonTerminal(Value),
 }
 
+use Ordering::*;
 use Outcome::*;
 use SearchResult::*;
 
-use super::evaluator::ValueComparator;
-
-impl<Value> SearchResult<Value> {
-    /// Returns whether this SearchResult is better than the other
-    /// If both are Eval, they are compared with the provided function
-    pub fn is_better_than(
-        &self,
-        other: &Self,
-        value_comparator: &dyn ValueComparator<Value>,
-    ) -> bool {
+impl<Value> PartialOrd for SearchResult<Value>
+where
+    Value: PartialOrd + Neg<Output = Value>,
+{
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         match (self, other) {
-            (True(left), True(right)) => left > right, // compare status
-            (Eval(left), Eval(right)) => value_comparator.is_better(left, right), // compare value
+            (Terminal(left), Terminal(right)) => left.partial_cmp(right), // compare status
+            (NonTerminal(left), NonTerminal(right)) => left.partial_cmp(right), // compare value
 
-            // Prefer true Win over Eval
-            (True(Win), Eval(_)) => true,
-            (True(_), Eval(_)) => false,
+            // Prefer true Win over eval
+            (Terminal(Win), NonTerminal(_)) => Some(Greater),
+            (Terminal(_), NonTerminal(_)) => Some(Less),
 
             // same as above
-            (Eval(_), True(Win)) => false,
-            (Eval(_), True(_)) => true,
+            (NonTerminal(_), Terminal(Win)) => Some(Less),
+            (NonTerminal(_), Terminal(_)) => Some(Greater),
+        }
+    }
+}
+
+impl<Value> Neg for SearchResult<Value>
+where
+    Value: PartialOrd + Neg<Output = Value>,
+{
+    type Output = Self;
+
+    fn neg(self) -> Self::Output {
+        match self {
+            Terminal(Win) => Terminal(Loss),
+            Terminal(Loss) => Terminal(Win),
+            Terminal(Draw) => Terminal(Draw),
+            NonTerminal(value) => NonTerminal(-value),
         }
     }
 }
@@ -42,18 +59,12 @@ mod tests {
 
     #[test]
     fn orders() {
-        struct DefaultComparator;
+        type R = SearchResult<i32>;
 
-        impl ValueComparator<i32> for DefaultComparator {
-            fn is_better(&self, candidate: &i32, actual_best: &i32) -> bool {
-                candidate > actual_best
-            }
-        }
-
-        // Win > Eval > Draw > Loss
-        assert!(True(Win).is_better_than(&Eval(1), &DefaultComparator));
-        assert!(Eval(1).is_better_than(&Eval(-1), &DefaultComparator));
-        assert!(Eval(-1).is_better_than(&True(Draw), &DefaultComparator));
-        assert!(True(Draw).is_better_than(&True(Loss), &DefaultComparator));
+        // Win > eval > Draw > Loss
+        assert!(R::Terminal(Win) > R::NonTerminal(1));
+        assert!(R::NonTerminal(1) > R::NonTerminal(-1));
+        assert!(R::NonTerminal(-1) > R::Terminal(Draw));
+        assert!(R::Terminal(Draw) > R::Terminal(Loss));
     }
 }

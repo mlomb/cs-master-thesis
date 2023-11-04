@@ -1,5 +1,5 @@
 use thesis::algos::minimax::minimax;
-use thesis::core::evaluator::{PositionEvaluator, ValueComparator};
+use thesis::core::evaluator::PositionEvaluator;
 use thesis::core::outcome::Outcome::*;
 use thesis::core::position::Position;
 use thesis::core::result::SearchResult;
@@ -12,8 +12,8 @@ type R = SearchResult<i32>;
 #[test]
 fn draw_on_initial_tictactoe() {
     assert_eq!(
-        minimax(&TicTacToe::initial(), 9, &NullEvaluator, true),
-        R::True(Draw)
+        minimax(&TicTacToe::initial(), 9, &NullEvaluator),
+        R::Terminal(Draw)
     );
 }
 
@@ -23,19 +23,13 @@ fn custom_board_tictactoe() {
     let win_for_x = TicTacToe::from_str(board, 'X');
     let draw_for_o = TicTacToe::from_str(board, 'O');
 
-    assert_eq!(minimax(&win_for_x, 9, &NullEvaluator, true), R::True(Win));
-    assert_eq!(minimax(&draw_for_o, 9, &NullEvaluator, true), R::True(Draw));
+    assert_eq!(minimax(&win_for_x, 9, &NullEvaluator), R::Terminal(Win));
+    assert_eq!(minimax(&draw_for_o, 9, &NullEvaluator), R::Terminal(Draw));
 }
 
 #[test]
 fn asd() {
     struct BoardEvaluator;
-
-    impl ValueComparator<TicTacToe> for BoardEvaluator {
-        fn is_better(&self, _: &TicTacToe, _: &TicTacToe) -> bool {
-            panic!("NullEvaluator should never compare values")
-        }
-    }
 
     impl PositionEvaluator<TicTacToe, TicTacToe> for BoardEvaluator {
         fn eval(&self, state: &TicTacToe) -> TicTacToe {
@@ -47,6 +41,6 @@ fn asd() {
     let win_for_x = TicTacToe::from_str(board, 'X');
     let draw_for_o = TicTacToe::from_str(board, 'O');
 
-    assert_eq!(minimax(&win_for_x, 9, &NullEvaluator, true), R::True(Win));
-    assert_eq!(minimax(&draw_for_o, 9, &NullEvaluator, true), R::True(Draw));
+    assert_eq!(minimax(&win_for_x, 9, &NullEvaluator), R::Terminal(Win));
+    assert_eq!(minimax(&draw_for_o, 9, &NullEvaluator), R::Terminal(Draw));
 }
