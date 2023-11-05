@@ -4,6 +4,12 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+ndarray = "0.15.6"
+ort = { git = "https://github.com/pykeio/ort", branch = "v2", default-features = false }
 rand = "0.8.5"
 shakmaty = "0.26.0"
 smallvec = "1.11.1"
+tracing-subscriber = "0.3.17"
+
+[dev-dependencies]
+ort = {  git = "https://github.com/pykeio/ort", branch = "v2", features = ["download-binaries", "cuda"] }

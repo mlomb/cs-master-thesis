@@ -3,6 +3,7 @@ use thesis::core::evaluator::PositionEvaluator;
 use thesis::core::outcome::Outcome::*;
 use thesis::core::position::Position;
 use thesis::core::result::SearchResult;
+use thesis::core::value::DefaultValuePolicy;
 use thesis::evaluators::null::NullEvaluator;
 use thesis::games::mnk::TicTacToe;
 
@@ -12,7 +13,12 @@ type R = SearchResult<i32>;
 #[test]
 fn draw_on_initial_tictactoe() {
     assert_eq!(
-        minimax(&TicTacToe::initial(), 9, &NullEvaluator),
+        minimax(
+            &TicTacToe::initial(),
+            9,
+            &mut DefaultValuePolicy,
+            &NullEvaluator
+        ),
         R::Terminal(Draw)
     );
 }
@@ -23,8 +29,14 @@ fn custom_board_tictactoe() {
     let win_for_x = TicTacToe::from_str(board, 'X');
     let draw_for_o = TicTacToe::from_str(board, 'O');
 
-    assert_eq!(minimax(&win_for_x, 9, &NullEvaluator), R::Terminal(Win));
-    assert_eq!(minimax(&draw_for_o, 9, &NullEvaluator), R::Terminal(Draw));
+    assert_eq!(
+        minimax(&win_for_x, 9, &mut DefaultValuePolicy, &NullEvaluator),
+        R::Terminal(Win)
+    );
+    assert_eq!(
+        minimax(&draw_for_o, 9, &mut DefaultValuePolicy, &NullEvaluator),
+        R::Terminal(Draw)
+    );
 }
 
 #[test]
@@ -41,6 +53,12 @@ fn asd() {
     let win_for_x = TicTacToe::from_str(board, 'X');
     let draw_for_o = TicTacToe::from_str(board, 'O');
 
-    assert_eq!(minimax(&win_for_x, 9, &NullEvaluator), R::Terminal(Win));
-    assert_eq!(minimax(&draw_for_o, 9, &NullEvaluator), R::Terminal(Draw));
+    assert_eq!(
+        minimax(&win_for_x, 9, &mut DefaultValuePolicy, &NullEvaluator),
+        R::Terminal(Win)
+    );
+    assert_eq!(
+        minimax(&draw_for_o, 9, &mut DefaultValuePolicy, &NullEvaluator),
+        R::Terminal(Draw)
+    );
 }

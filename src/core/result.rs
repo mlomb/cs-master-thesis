@@ -1,12 +1,12 @@
-use super::outcome::Outcome;
-use std::{cmp::Ordering, ops::Neg};
+use super::{
+    outcome::Outcome,
+    value::{self, ValuePolicy},
+};
+use std::cmp::Ordering;
 
 /// The result of a search
 #[derive(Debug, PartialEq, Eq)]
-pub enum SearchResult<Value>
-where
-    Value: PartialOrd + Neg<Output = Value>,
-{
+pub enum SearchResult<Value> {
     /// The search has reached a terminal state. The true outcome of the game is known
     Terminal(Outcome),
     /// The search has reached a non-terminal state
@@ -17,54 +17,51 @@ use Ordering::*;
 use Outcome::*;
 use SearchResult::*;
 
-impl<Value> PartialOrd for SearchResult<Value>
-where
-    Value: PartialOrd + Neg<Output = Value>,
-{
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+impl<Value> SearchResult<Value> {
+    /// Compare two search results
+    /// It uses the value policy to compare non-terminal states
+    pub fn compare(&self, other: &Self, value_policy: &mut dyn ValuePolicy<Value>) -> Ordering {
         match (self, other) {
-            (Terminal(left), Terminal(right)) => left.partial_cmp(right), // compare status
-            (NonTerminal(left), NonTerminal(right)) => left.partial_cmp(right), // compare value
+            (Terminal(left), Terminal(right)) => left.cmp(right), // compare status
+            (NonTerminal(left), NonTerminal(right)) => value_policy.compare(left, right), // compare values
 
             // Prefer true Win over eval
-            (Terminal(Win), NonTerminal(_)) => Some(Greater),
-            (Terminal(_), NonTerminal(_)) => Some(Less),
+            (Terminal(Win), NonTerminal(_)) => Greater,
+            (Terminal(_), NonTerminal(_)) => Less,
 
             // same as above
-            (NonTerminal(_), Terminal(Win)) => Some(Less),
-            (NonTerminal(_), Terminal(_)) => Some(Greater),
+            (NonTerminal(_), Terminal(Win)) => Less,
+            (NonTerminal(_), Terminal(_)) => Greater,
         }
     }
-}
 
-impl<Value> Neg for SearchResult<Value>
-where
-    Value: PartialOrd + Neg<Output = Value>,
-{
-    type Output = Self;
-
-    fn neg(self) -> Self::Output {
+    /// Computes the opposite of a search result
+    /// It uses the value policy to compute the opposite of non-terminal states
+    pub fn opposite(&self, value_policy: &mut dyn ValuePolicy<Value>) -> Self {
         match self {
             Terminal(Win) => Terminal(Loss),
             Terminal(Loss) => Terminal(Win),
             Terminal(Draw) => Terminal(Draw),
-            NonTerminal(value) => NonTerminal(-value),
+            NonTerminal(value) => NonTerminal(value_policy.opposite(value)),
         }
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use crate::core::value::DefaultValuePolicy;
+
     use super::*;
 
     #[test]
     fn orders() {
         type R = SearchResult<i32>;
+        let mut p = DefaultValuePolicy;
 
         // Win > eval > Draw > Loss
-        assert!(R::Terminal(Win) > R::NonTerminal(1));
-        assert!(R::NonTerminal(1) > R::NonTerminal(-1));
-        assert!(R::NonTerminal(-1) > R::Terminal(Draw));
-        assert!(R::Terminal(Draw) > R::Terminal(Loss));
+        assert_eq!(Greater, R::Terminal(Win).compare(&NonTerminal(1), &mut p));
+        assert_eq!(Greater, R::NonTerminal(1).compare(&NonTerminal(-1), &mut p));
+        assert_eq!(Greater, R::NonTerminal(-1).compare(&Terminal(Draw), &mut p));
+        assert_eq!(Greater, R::Terminal(Draw).compare(&Terminal(Loss), &mut p));
     }
 }
