@@ -26,8 +26,6 @@ fn main() -> ort::Result<()> {
 
     println!("Model loaded {:?}", session);
 
-    let c4 = Connect4::initial();
-
     #[derive(Debug)]
     struct NNValue {
         pos: Connect4,
@@ -51,16 +49,7 @@ fn main() -> ort::Result<()> {
     impl value::ValuePolicy<NNValue> for NNValuePolicy {
         fn compare(&mut self, left: &NNValue, right: &NNValue) -> std::cmp::Ordering {
             let input = Array5::<f32>::zeros((1, 7, 6, 2, 2));
-            let output = Array2::<f32>::zeros((1, 2));
-
-            let in_value = Value::from_array(input).unwrap();
-            let out_value = Value::from_array(output).unwrap();
-
-            let mut binding = self.session.create_binding().unwrap();
-            binding.bind_input("input", in_value).unwrap();
-            binding.bind_output("output", out_value).unwrap();
-            let outputs = binding.run().unwrap();
-
+            let outputs = self.session.run(ort::inputs![input].unwrap()).unwrap();
             let data = outputs[0]
                 .extract_tensor::<f32>()
                 .unwrap()
@@ -92,14 +81,30 @@ fn main() -> ort::Result<()> {
 
     let now = std::time::Instant::now();
 
-    let (r, a) = minimax(&c4, 5, &mut spec, &NNEvaluator);
+    //let (r, a) = minimax(&c4, 5, &mut spec, &NNEvaluator);
 
-    println!("Result: {:?}", r);
-    println!("Action: {:?}", a);
+    // loop minimax
+
+    let mut position = Connect4::initial();
+
+    loop {
+        let (result, best_action) = minimax(&position, 5, &mut spec, &NNEvaluator);
+
+        // println!("Position:\n{:}", position);
+        // println!("Result: {:?}", result);
+        // println!("Best action: {:?}", best_action);
+        // println!("Inferences: {}", spec.inferences);
+        // println!("--------------------------");
+        spec.inferences = 0;
+
+        if let Some(action) = best_action {
+            position = position.apply_action(&action);
+        } else {
+            break;
+        }
+    }
 
     println!("Elapsed: {:?}", now.elapsed());
-
-    println!("Inferences: {}", spec.inferences);
 
     Ok(())
 }

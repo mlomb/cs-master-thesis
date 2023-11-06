@@ -15,7 +15,7 @@ fn main() -> ort::Result<()> {
         .into_arc();
 
     let session = SessionBuilder::new(&environment)?
-        .with_intra_threads(8)?
+        .with_intra_threads(1)?
         .with_model_from_file("models/best/onnx_model.onnx")?;
 
     println!("Model loaded {:?}", session);
@@ -25,15 +25,8 @@ fn main() -> ort::Result<()> {
             let now = std::time::Instant::now();
             for _ in 0..1000 {
                 let input = Array5::<f32>::zeros((100, 7, 6, 2, 2));
-                let output = Array2::<f32>::zeros((100, 2));
-
-                let in_value = Value::from_array(input)?;
-                let out_value = Value::from_array(output)?;
-
-                let mut binding = session.create_binding()?;
-                binding.bind_input("input", in_value)?;
-                binding.bind_output("output", out_value)?;
-                binding.run()?;
+                let outputs = session.run(ort::inputs![input]?)?;
+                let data = outputs[0].extract_tensor::<f32>()?.view().t().into_owned();
             }
             println!("Elapsed: {:?}", now.elapsed());
         }
@@ -44,15 +37,8 @@ fn main() -> ort::Result<()> {
             let now = std::time::Instant::now();
             for _ in 0..100000 {
                 let input = Array5::<f32>::zeros((1, 7, 6, 2, 2));
-                let output = Array2::<f32>::zeros((1, 2));
-
-                let in_value = Value::from_array(input)?;
-                let out_value = Value::from_array(output)?;
-
-                let mut binding = session.create_binding()?;
-                binding.bind_input("input", in_value)?;
-                binding.bind_output("output", out_value)?;
-                binding.run()?;
+                let outputs = session.run(ort::inputs![input]?)?;
+                let data = outputs[0].extract_tensor::<f32>()?.view().t().into_owned();
             }
             println!("Elapsed: {:?}", now.elapsed());
         }

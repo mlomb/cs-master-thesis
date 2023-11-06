@@ -1,6 +1,7 @@
 use super::mnk::MNK;
 use crate::core::outcome::Outcome;
 use crate::core::position::Position;
+use core::fmt;
 
 const ROWS: usize = 6;
 const COLS: usize = 7;
@@ -53,5 +54,11 @@ impl Position for Connect4 {
 
     fn status(&self) -> Option<Outcome> {
         self.0.status()
+    }
+}
+
+impl fmt::Display for Connect4 {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.fmt(f)
     }
 }
