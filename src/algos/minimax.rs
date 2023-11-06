@@ -13,35 +13,35 @@ pub fn minimax<
     max_depth: usize,
     value_policy: &mut ValuePolicy,
     evaluator: &Evaluator,
-) -> SearchResult<Value> {
+) -> (SearchResult<Value>, Option<Position::Action>) {
     // If the game is over, return the true outcome
     if let Some(outcome) = position.status() {
-        return SearchResult::Terminal(outcome);
+        return (SearchResult::Terminal(outcome), None);
     }
 
     // If we've reached the maximum depth, return the evaluation
     if max_depth == 0 {
-        return SearchResult::NonTerminal(evaluator.eval(&position));
+        return (SearchResult::NonTerminal(evaluator.eval(&position)), None);
     }
 
-    let mut best: Option<SearchResult<Value>> = None;
+    let mut best: Option<(SearchResult<Value>, Option<Position::Action>)> = None;
 
     for action in position.valid_actions() {
-        let branch_result = minimax(
+        let (mut branch_result, _) = minimax(
             &position.apply_action(&action),
             max_depth - 1,
             value_policy,
             evaluator,
-        )
-        .opposite(value_policy);
+        );
+        branch_result = branch_result.opposite(value_policy);
 
         best = match best {
-            None => Some(branch_result),
-            Some(current_best)
+            None => Some((branch_result, Some(action))),
+            Some((current_best, _))
                 if branch_result.compare(&current_best, value_policy)
                     == std::cmp::Ordering::Greater =>
             {
-                Some(branch_result)
+                Some((branch_result, Some(action)))
             }
             _ => best,
         };

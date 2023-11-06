@@ -15,8 +15,7 @@ fn main() -> ort::Result<()> {
         .into_arc();
 
     let session = SessionBuilder::new(&environment)?
-        .with_optimization_level(GraphOptimizationLevel::Level1)?
-        .with_intra_threads(1)?
+        .with_intra_threads(8)?
         .with_model_from_file("models/best/onnx_model.onnx")?;
 
     println!("Model loaded {:?}", session);
@@ -32,8 +31,8 @@ fn main() -> ort::Result<()> {
                 let out_value = Value::from_array(output)?;
 
                 let mut binding = session.create_binding()?;
-                binding.bind_input("input_1", in_value)?;
-                binding.bind_output("dense_4", out_value)?;
+                binding.bind_input("input", in_value)?;
+                binding.bind_output("output", out_value)?;
                 binding.run()?;
             }
             println!("Elapsed: {:?}", now.elapsed());
@@ -51,8 +50,8 @@ fn main() -> ort::Result<()> {
                 let out_value = Value::from_array(output)?;
 
                 let mut binding = session.create_binding()?;
-                binding.bind_input("input_1", in_value)?;
-                binding.bind_output("dense_4", out_value)?;
+                binding.bind_input("input", in_value)?;
+                binding.bind_output("output", out_value)?;
                 binding.run()?;
             }
             println!("Elapsed: {:?}", now.elapsed());

@@ -28,6 +28,7 @@ fn main() -> ort::Result<()> {
 
     let c4 = Connect4::initial();
 
+    #[derive(Debug)]
     struct NNValue {
         pos: Connect4,
         pov: bool, // should flip POV?
@@ -56,8 +57,8 @@ fn main() -> ort::Result<()> {
             let out_value = Value::from_array(output).unwrap();
 
             let mut binding = self.session.create_binding().unwrap();
-            binding.bind_input("input_1", in_value).unwrap();
-            binding.bind_output("dense_4", out_value).unwrap();
+            binding.bind_input("input", in_value).unwrap();
+            binding.bind_output("output", out_value).unwrap();
             let outputs = binding.run().unwrap();
 
             let data = outputs[0]
@@ -90,7 +91,12 @@ fn main() -> ort::Result<()> {
     };
 
     let now = std::time::Instant::now();
-    minimax(&c4, 6, &mut spec, &NNEvaluator);
+
+    let (r, a) = minimax(&c4, 5, &mut spec, &NNEvaluator);
+
+    println!("Result: {:?}", r);
+    println!("Action: {:?}", a);
+
     println!("Elapsed: {:?}", now.elapsed());
 
     println!("Inferences: {}", spec.inferences);

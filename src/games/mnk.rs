@@ -5,7 +5,7 @@ use crate::core::outcome::*;
 use crate::core::position::*;
 
 /// Position for m-n-k games, such as TicTacToe and Connect4.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct MNK<const M: usize, const N: usize, const K: usize> {
     pub(crate) board: [u64; 2],
     pub(crate) who_plays: u8,
