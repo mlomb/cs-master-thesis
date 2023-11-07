@@ -1,3 +1,8 @@
+use std::{
+    cmp::Ordering,
+    collections::{HashMap, HashSet},
+};
+
 use ndarray::*;
 use ort::{Environment, ExecutionProvider, GraphOptimizationLevel, Session, SessionBuilder, Value};
 use thesis::{
@@ -29,15 +34,23 @@ fn main() -> ort::Result<()> {
 
     println!("Model loaded {:?}", session);
 
-    #[derive(Debug, Clone)]
+    #[derive(Debug, Clone, PartialEq, Eq, Hash)]
     struct NNValue {
         pos: Connect4,
         pov: bool, // should flip POV?
     }
+
+    #[derive(Debug, Clone, PartialEq, Eq, Hash)]
+    struct Pair(NNValue, NNValue);
+
     struct NNEvaluator;
     struct NNValuePolicy {
         session: Session,
         inferences: usize,
+        hs: HashMap<Pair, Ordering>,
+
+        hits: usize,
+        misses: usize,
     }
 
     impl thesis::core::evaluator::PositionEvaluator<Connect4, NNValue> for NNEvaluator {
@@ -51,6 +64,14 @@ fn main() -> ort::Result<()> {
 
     impl value::ValuePolicy<NNValue> for NNValuePolicy {
         fn compare(&mut self, left: &NNValue, right: &NNValue) -> std::cmp::Ordering {
+            let pair = Pair(left.clone(), right.clone());
+
+            if let Some(ordering) = self.hs.get(&pair) {
+                self.hits += 1;
+                return *ordering;
+            }
+            self.misses += 1;
+
             let input = Array5::<f32>::zeros((1, 7, 6, 2, 2));
             let outputs = self.session.run(ort::inputs![input].unwrap()).unwrap();
             let data = outputs[0]
@@ -62,11 +83,14 @@ fn main() -> ort::Result<()> {
 
             self.inferences += 1;
 
-            if data[[0, 0]] < data[[1, 0]] {
+            let res = if data[[0, 0]] < data[[1, 0]] {
                 std::cmp::Ordering::Greater
             } else {
                 std::cmp::Ordering::Less
-            }
+            };
+
+            self.hs.insert(pair, res);
+            res
         }
 
         fn opposite(&mut self, value: &NNValue) -> NNValue {
@@ -80,6 +104,9 @@ fn main() -> ort::Result<()> {
     let mut spec = NNValuePolicy {
         session,
         inferences: 0,
+        hs: HashMap::new(),
+        hits: 0,
+        misses: 0,
     };
 
     let now = std::time::Instant::now();
@@ -91,17 +118,13 @@ fn main() -> ort::Result<()> {
     let mut position = Connect4::initial();
 
     loop {
-        let (result, best_action) = alphabeta(
-            &position,
-            8,
-            &mut DefaultValuePolicy,
-            &Connect4BasicEvaluator,
-        );
+        let (result, best_action) = alphabeta(&position, 6, &mut spec, &NNEvaluator);
 
         println!("Position:\n{:}", position);
         println!("Result: {:?}", result);
         println!("Best action: {:?}", best_action);
         println!("Inferences: {}", spec.inferences);
+        println!("Hits: {} / {}", spec.hits, spec.hits + spec.misses);
         println!("--------------------------");
         spec.inferences = 0;
 
