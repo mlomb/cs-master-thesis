@@ -6,7 +6,7 @@ use core::fmt;
 pub const ROWS: usize = 6;
 pub const COLS: usize = 7;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Connect4(pub MNK<ROWS, COLS, 4>);
 
 impl Position for Connect4 {
