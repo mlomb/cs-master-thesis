@@ -5,7 +5,7 @@ use super::{
 use std::cmp::Ordering;
 
 /// The result of a search
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum SearchResult<Value> {
     /// The search has reached a terminal state. The true outcome of the game is known
     Terminal(Outcome),
@@ -63,5 +63,11 @@ mod tests {
         assert_eq!(Greater, R::NonTerminal(1).compare(&NonTerminal(-1), &mut p));
         assert_eq!(Greater, R::NonTerminal(-1).compare(&Terminal(Draw), &mut p));
         assert_eq!(Greater, R::Terminal(Draw).compare(&Terminal(Loss), &mut p));
+
+        // Loss < Draw < eval < Win
+        assert_eq!(Less, R::Terminal(Loss).compare(&Terminal(Draw), &mut p));
+        assert_eq!(Less, R::Terminal(Draw).compare(&NonTerminal(-1), &mut p));
+        assert_eq!(Less, R::NonTerminal(-1).compare(&NonTerminal(1), &mut p));
+        assert_eq!(Less, R::NonTerminal(1).compare(&Terminal(Win), &mut p));
     }
 }

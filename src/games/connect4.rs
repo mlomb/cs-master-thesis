@@ -3,11 +3,11 @@ use crate::core::outcome::Outcome;
 use crate::core::position::Position;
 use core::fmt;
 
-const ROWS: usize = 6;
-const COLS: usize = 7;
+pub const ROWS: usize = 6;
+pub const COLS: usize = 7;
 
 #[derive(Clone, Debug)]
-pub struct Connect4(MNK<ROWS, COLS, 4>);
+pub struct Connect4(pub MNK<ROWS, COLS, 4>);
 
 impl Position for Connect4 {
     type Action = usize;

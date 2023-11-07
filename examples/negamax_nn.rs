@@ -1,9 +1,12 @@
 use ndarray::*;
 use ort::{Environment, ExecutionProvider, GraphOptimizationLevel, Session, SessionBuilder, Value};
 use thesis::{
-    algos::minimax::minimax,
-    core::{position::Position, value},
-    games::connect4::Connect4,
+    algos::{alphabeta::alphabeta, negamax::negamax},
+    core::{
+        position::Position,
+        value::{self, DefaultValuePolicy},
+    },
+    games::{connect4::Connect4, connect4_strat::Connect4BasicEvaluator},
 };
 
 fn main() -> ort::Result<()> {
@@ -26,7 +29,7 @@ fn main() -> ort::Result<()> {
 
     println!("Model loaded {:?}", session);
 
-    #[derive(Debug)]
+    #[derive(Debug, Clone)]
     struct NNValue {
         pos: Connect4,
         pov: bool, // should flip POV?
@@ -59,7 +62,7 @@ fn main() -> ort::Result<()> {
 
             self.inferences += 1;
 
-            if data[[0, 0]] > data[[1, 0]] {
+            if data[[0, 0]] < data[[1, 0]] {
                 std::cmp::Ordering::Greater
             } else {
                 std::cmp::Ordering::Less
@@ -88,13 +91,18 @@ fn main() -> ort::Result<()> {
     let mut position = Connect4::initial();
 
     loop {
-        let (result, best_action) = minimax(&position, 5, &mut spec, &NNEvaluator);
+        let (result, best_action) = alphabeta(
+            &position,
+            8,
+            &mut DefaultValuePolicy,
+            &Connect4BasicEvaluator,
+        );
 
-        // println!("Position:\n{:}", position);
-        // println!("Result: {:?}", result);
-        // println!("Best action: {:?}", best_action);
-        // println!("Inferences: {}", spec.inferences);
-        // println!("--------------------------");
+        println!("Position:\n{:}", position);
+        println!("Result: {:?}", result);
+        println!("Best action: {:?}", best_action);
+        println!("Inferences: {}", spec.inferences);
+        println!("--------------------------");
         spec.inferences = 0;
 
         if let Some(action) = best_action {
