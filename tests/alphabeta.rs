@@ -10,7 +10,6 @@ use thesis::games::connect4::Connect4;
 use thesis::games::connect4_strat::Connect4BasicEvaluator;
 use thesis::games::mnk::TicTacToe;
 
-// this will generate lots of redundant boards
 fn generate_boards<P: Position + Sized + Eq + Hash>(
     from: &P,
     depth: usize,
