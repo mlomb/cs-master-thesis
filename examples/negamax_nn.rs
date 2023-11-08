@@ -70,6 +70,7 @@ fn main() -> ort::Result<()> {
                 self.hits += 1;
                 return *ordering;
             }
+
             self.misses += 1;
 
             let input = Array5::<f32>::zeros((1, 7, 6, 2, 2));
@@ -127,6 +128,11 @@ fn main() -> ort::Result<()> {
         println!("Hits: {} / {}", spec.hits, spec.hits + spec.misses);
         println!("--------------------------");
         spec.inferences = 0;
+        /*
+        spec.hits = 0;
+        spec.misses = 0;
+        spec.hs.clear();
+        */
 
         if let Some(action) = best_action {
             position = position.apply_action(&action);
