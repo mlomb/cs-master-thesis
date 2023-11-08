@@ -1,4 +1,5 @@
 mod nn;
+mod nn_encoding;
 mod ringbuffer_set;
 mod trainer;
 
@@ -6,7 +7,7 @@ use crate::{
     nn::{NNEvaluator, NNValuePolicy},
     trainer::Trainer,
 };
-use ort::{Environment, ExecutionProvider, GraphOptimizationLevel, SessionBuilder};
+use ort::{Environment, ExecutionProvider, SessionBuilder};
 use thesis::games::connect4::Connect4;
 
 fn main() -> ort::Result<()> {

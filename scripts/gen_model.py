@@ -5,7 +5,7 @@ from tensorflow.keras.layers import Dense, Flatten
 import onnx
 import tf2onnx
 
-input = Input(shape=(7,6,2,2), name='input')
+input = Input(shape=(7,6,4), name='input')
 
 x = Flatten()(input)
 x = Dense(128, activation='relu')(x)

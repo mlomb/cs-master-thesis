@@ -1,13 +1,35 @@
 use std::{cmp::Ordering, collections::HashMap};
 
-use ndarray::Array5;
+use ndarray::{Array4, Array5, ArrayD, Axis, IxDyn};
 use ort::Session;
-use thesis::{core::value, games::connect4::Connect4};
+use thesis::{
+    core::{position::Position, value},
+    games::connect4::{Connect4, COLS, ROWS},
+};
+
+use crate::nn_encoding::TensorEncodeable;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct NNValue {
     pos: Connect4,
     pov: bool, // should flip POV?
+}
+
+impl TensorEncodeable for Connect4 {
+    fn encode(&self) -> ArrayD<f32> {
+        let mut tensor = ArrayD::zeros(IxDyn(&[7, 6, 2]));
+        let who_plays = self.0.who_plays();
+
+        for row in 0..ROWS {
+            for col in 0..COLS {
+                if let Some(at) = self.0.get_at(row, col) {
+                    tensor[[col, row, if at == who_plays { 0 } else { 1 }]] = 1.0;
+                }
+            }
+        }
+
+        tensor
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -56,7 +78,15 @@ impl value::ValuePolicy<NNValue> for NNValuePolicy {
 
         self.misses += 1;
 
-        let input = Array5::<f32>::zeros((1, 7, 6, 2, 2));
+        // insert one axis: batch size
+        let b1 = left.pos.encode().insert_axis(Axis(0));
+        let b2 = right.pos.encode().insert_axis(Axis(0));
+
+        let mut input = b1;
+        input
+            .append(Axis(3), b2.view().into_shape(b2.shape()).unwrap())
+            .unwrap();
+
         let outputs = self.session.run(ort::inputs![input].unwrap()).unwrap();
         let data = outputs[0]
             .extract_tensor::<f32>()
@@ -64,6 +94,8 @@ impl value::ValuePolicy<NNValue> for NNValuePolicy {
             .view()
             .t()
             .into_owned();
+
+        println!("{}", data);
 
         self.inferences += 1;
 

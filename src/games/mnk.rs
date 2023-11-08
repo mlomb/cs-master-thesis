@@ -48,6 +48,21 @@ impl<const M: usize, const N: usize, const K: usize> MNK<M, N, K> {
     pub fn occupied_board(&self) -> u64 {
         self.board[0] | self.board[1]
     }
+
+    pub fn get_at(&self, row: usize, col: usize) -> Option<u8> {
+        let bit = 1 << (row * N + col);
+        if (self.board[0] & bit) != 0 {
+            Some(0)
+        } else if (self.board[1] & bit) != 0 {
+            Some(1)
+        } else {
+            None
+        }
+    }
+
+    pub fn who_plays(&self) -> u8 {
+        self.who_plays
+    }
 }
 
 impl<const M: usize, const N: usize, const K: usize> Position for MNK<M, N, K> {
