@@ -28,7 +28,6 @@ fn main() -> ort::Result<()> {
         .into_arc();
 
     let session = SessionBuilder::new(&environment)?
-        .with_optimization_level(GraphOptimizationLevel::Level1)?
         .with_intra_threads(1)?
         .with_model_from_file("models/best/onnx_model.onnx")?;
 
