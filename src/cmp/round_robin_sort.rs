@@ -27,20 +27,17 @@ where
 
         let mut scores = vec![0; n]; // square :(
 
-        for i in 0..indexes.len() {
-            for j in 0..indexes.len() {
+        for i in indexes.iter() {
+            for j in indexes.iter() {
                 if i != j {
-                    let true_i = indexes[i];
-                    let true_j = indexes[j];
-
                     // lookup, dont compute again
-                    let ord = matrix[true_i * n + true_j];
-                    scores[true_i] += match ord {
+                    let ord = matrix[*i * n + *j];
+                    scores[*i] += match ord {
                         Ordering::Less => 2,
                         Ordering::Equal => 1,
                         Ordering::Greater => 0,
                     };
-                    scores[true_j] += match ord {
+                    scores[*j] += match ord {
                         Ordering::Less => 0,
                         Ordering::Equal => 1,
                         Ordering::Greater => 2,
