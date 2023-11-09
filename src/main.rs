@@ -1,3 +1,4 @@
+mod cmp;
 mod nn;
 mod nn_encoding;
 mod ringbuffer_set;

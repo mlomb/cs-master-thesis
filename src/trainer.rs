@@ -34,6 +34,7 @@ where
         NNEvaluator: PositionEvaluator<P, NNValue>,
     {
         let mut history = Vec::new();
+        let sample_size = vec![8, 8, 8, 8, 8, 8, 4, 4, 3, 3, 2, 2].iter();
 
         let mut position = P::initial();
         loop {
