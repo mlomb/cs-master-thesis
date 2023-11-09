@@ -1,3 +1,5 @@
+#![feature(slice_group_by)]
+
 mod cmp;
 mod nn;
 mod nn_encoding;
