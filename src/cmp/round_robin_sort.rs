@@ -15,8 +15,7 @@ where
     for i in 0..n {
         for j in 0..n {
             if i != j {
-                let ord = vec[i].loose_cmp(&vec[j]);
-                matrix[i * n + j] = ord;
+                matrix[i * n + j] = vec[i].loose_cmp(&vec[j]);
             }
         }
     }
@@ -26,7 +25,7 @@ where
             return;
         }
 
-        let mut scores = vec![0; n];
+        let mut scores = vec![0; n]; // square :(
 
         for i in 0..indexes.len() {
             for j in 0..indexes.len() {
