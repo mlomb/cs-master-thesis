@@ -30,6 +30,10 @@ where
         }
     }
 
+    pub fn len(&self) -> usize {
+        self.set.len()
+    }
+
     pub fn to_vec(&self) -> Vec<&T> {
         self.ring.iter().collect()
     }

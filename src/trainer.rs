@@ -66,5 +66,11 @@ where
                 self.win_positions.insert(pos.clone());
             }
         }
+
+        println!(
+            "win: {}, loss: {}",
+            self.win_positions.len(),
+            self.loss_positions.len()
+        );
     }
 }
