@@ -1,11 +1,6 @@
-use ort::Session;
+use super::nn::NNEvaluator;
+use crate::core::{agent::Agent, position, result::SearchResult};
 use std::{collections::VecDeque, rc::Rc};
-use thesis::{
-    algos::alphabeta::alphabeta,
-    core::{agent::Agent, position, result::SearchResult},
-};
-
-use crate::{cmp::round_robin_sort::rr_sort, nn::NNEvaluator};
 
 pub struct NNAgent {
     evaluator: Rc<NNEvaluator>,

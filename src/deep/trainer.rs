@@ -1,6 +1,6 @@
-use ort::Session;
-use std::{hash::Hash, rc::Rc};
-use thesis::{
+use super::nn::*;
+use super::ringbuffer_set::RingBufferSet;
+use crate::{
     algos::alphabeta::alphabeta,
     core::{
         agent::Agent,
@@ -9,35 +9,34 @@ use thesis::{
         position::{self, Position},
         result::SearchResult,
     },
+    deep::nn_agent::NNAgent,
 };
-
-use crate::{
-    nn::{NNEvaluator, NNValue},
-    nn_agent::NNAgent,
-    ringbuffer_set::RingBufferSet,
-};
+use ort::Session;
+use std::{hash::Hash, rc::Rc};
 
 pub struct Trainer<P> {
     win_positions: RingBufferSet<P>,
     loss_positions: RingBufferSet<P>,
+    evaluator: Rc<NNEvaluator>,
 }
 
 impl<P> Trainer<P>
 where
     P: Position + Eq + Hash,
 {
-    pub fn new(capacity: usize) -> Self {
+    pub fn new(capacity: usize, session: Session) -> Self {
         Trainer {
             win_positions: RingBufferSet::new(capacity),
             loss_positions: RingBufferSet::new(capacity),
+            evaluator: Rc::new(NNEvaluator::new(session)),
         }
     }
 
-    pub fn generate_samples(&mut self, session: Rc<NNEvaluator>)
+    pub fn generate_samples(&mut self)
     where
         NNEvaluator: PositionEvaluator<P, NNValue>,
     {
-        let mut agent = NNAgent::new(session.clone());
+        let mut agent = NNAgent::new(self.evaluator.clone());
         let mut position = P::initial();
         let mut history = vec![position.clone()];
 

@@ -1,8 +1,5 @@
-use crate::nn_encoding::TensorEncodeable;
-use ndarray::{Array4, Array5, ArrayD, Axis, IxDyn};
-use ort::Session;
-use std::{cell::RefCell, cmp::Ordering, collections::HashMap, rc::Rc};
-use thesis::{
+use super::nn_encoding::TensorEncodeable;
+use crate::{
     core::{
         agent::Agent,
         evaluator::PositionEvaluator,
@@ -11,6 +8,9 @@ use thesis::{
     },
     games::connect4::{Connect4, COLS, ROWS},
 };
+use ndarray::{Array4, Array5, ArrayD, Axis, IxDyn};
+use ort::Session;
+use std::{cell::RefCell, cmp::Ordering, collections::HashMap, rc::Rc};
 
 impl TensorEncodeable for Connect4 {
     fn encode(&self) -> ArrayD<f32> {
