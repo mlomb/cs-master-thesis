@@ -1,9 +1,13 @@
-use std::{cmp::Ordering, collections::HashMap};
+use std::{cmp::Ordering, collections::HashMap, rc::Rc};
 
 use ndarray::{Array4, Array5, ArrayD, Axis, IxDyn};
 use ort::Session;
 use thesis::{
-    core::{position::Position, value},
+    core::{
+        agent::Agent,
+        position::{self, Position},
+        value,
+    },
     games::connect4::{Connect4, COLS, ROWS},
 };
 
@@ -37,7 +41,7 @@ pub struct Pair(NNValue, NNValue);
 
 pub struct NNEvaluator;
 pub struct NNValuePolicy {
-    session: Session,
+    pub session: Rc<Session>,
     inferences: usize,
     hs: HashMap<Pair, Ordering>,
 
@@ -46,7 +50,7 @@ pub struct NNValuePolicy {
 }
 
 impl NNValuePolicy {
-    pub fn new(session: Session) -> Self {
+    pub fn new(session: Rc<Session>) -> Self {
         NNValuePolicy {
             session,
             inferences: 0,

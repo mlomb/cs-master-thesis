@@ -1,3 +1,4 @@
+pub mod agent;
 pub mod evaluator;
 pub mod outcome;
 pub mod position;

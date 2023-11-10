@@ -2,14 +2,17 @@ use std::hash::Hash;
 use thesis::{
     algos::alphabeta::alphabeta,
     core::{
+        agent::Agent,
         evaluator::PositionEvaluator,
         outcome::Outcome,
         position::{self, Position},
+        result::SearchResult,
     },
 };
 
 use crate::{
     nn::{NNEvaluator, NNValue, NNValuePolicy},
+    nn_agent::NNAgent,
     ringbuffer_set::RingBufferSet,
 };
 
@@ -33,20 +36,17 @@ where
     where
         NNEvaluator: PositionEvaluator<P, NNValue>,
     {
-        let mut history = Vec::new();
-        let sample_size = vec![8, 8, 8, 8, 8, 8, 4, 4, 3, 3, 2, 2].iter();
-
+        let mut agent = NNAgent::new(spec.session.clone());
         let mut position = P::initial();
-        loop {
+        let mut history = vec![position.clone()];
+
+        while let None = position.status() {
+            let chosen_action = agent
+                .next_action(&position)
+                .expect("agent to return action");
+
+            position = position.apply_action(&chosen_action);
             history.push(position.clone());
-
-            let (_, best_action) = alphabeta(&position, 3, spec, evaluator);
-
-            if let Some(action) = best_action {
-                position = position.apply_action(&action);
-            } else {
-                break;
-            }
         }
 
         // WLWLWLWL

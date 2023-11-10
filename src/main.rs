@@ -2,9 +2,12 @@
 
 mod cmp;
 mod nn;
+mod nn_agent;
 mod nn_encoding;
 mod ringbuffer_set;
 mod trainer;
+
+use std::rc::Rc;
 
 use crate::{
     nn::{NNEvaluator, NNValuePolicy},
@@ -25,7 +28,7 @@ fn main() -> ort::Result<()> {
         .with_intra_threads(1)?
         .with_model_from_file("models/best/onnx_model.onnx")?;
 
-    let mut spec = NNValuePolicy::new(session);
+    let mut spec = NNValuePolicy::new(Rc::new(session));
 
     let mut trainer = Trainer::<Connect4>::new(10000);
 
