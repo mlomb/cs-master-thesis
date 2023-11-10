@@ -1,23 +1,16 @@
-use std::{cmp::Ordering, collections::HashMap, rc::Rc};
-
+use crate::nn_encoding::TensorEncodeable;
 use ndarray::{Array4, Array5, ArrayD, Axis, IxDyn};
 use ort::Session;
+use std::{cell::RefCell, cmp::Ordering, collections::HashMap, rc::Rc};
 use thesis::{
     core::{
         agent::Agent,
+        evaluator::PositionEvaluator,
         position::{self, Position},
         value,
     },
     games::connect4::{Connect4, COLS, ROWS},
 };
-
-use crate::nn_encoding::TensorEncodeable;
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct NNValue {
-    pos: Connect4,
-    pov: bool, // should flip POV?
-}
 
 impl TensorEncodeable for Connect4 {
     fn encode(&self) -> ArrayD<f32> {
@@ -36,12 +29,11 @@ impl TensorEncodeable for Connect4 {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct Pair(NNValue, NNValue);
+#[derive(Clone, PartialEq, Eq, Hash)]
+pub struct Pair(Connect4, Connect4);
 
-pub struct NNEvaluator;
-pub struct NNValuePolicy {
-    pub session: Rc<Session>,
+pub struct NNEvaluator {
+    session: Session,
     inferences: usize,
     hs: HashMap<Pair, Ordering>,
 
@@ -49,31 +41,41 @@ pub struct NNValuePolicy {
     misses: usize,
 }
 
-impl NNValuePolicy {
-    pub fn new(session: Rc<Session>) -> Self {
-        NNValuePolicy {
-            session,
+impl NNEvaluator {
+    pub fn new(session: Session) -> Self {
+        Self {
+            session: session,
             inferences: 0,
             hs: HashMap::new(),
-
             hits: 0,
             misses: 0,
         }
     }
 }
 
-impl thesis::core::evaluator::PositionEvaluator<Connect4, NNValue> for NNEvaluator {
+#[derive(Clone)]
+pub struct NNValue {
+    // evaluator: Rc<NNEvaluator>,
+    pos: Connect4,
+    pov: bool, // should flip POV?
+}
+
+impl PositionEvaluator<Connect4, NNValue> for NNEvaluator {
     fn eval(&self, state: &Connect4) -> NNValue {
         NNValue {
+            // TODO: change, this is incorrect
+            //evaluator: Rc::clone(&self),
             pos: state.clone(),
             pov: false,
         }
     }
 }
 
-impl value::ValuePolicy<NNValue> for NNValuePolicy {
-    fn compare(&mut self, left: &NNValue, right: &NNValue) -> std::cmp::Ordering {
-        let pair = Pair(left.clone(), right.clone());
+impl value::Value for NNValue {
+    fn compare(&self, other: &NNValue) -> Ordering {
+        Ordering::Equal
+        /*
+        let pair = Pair(self, other.clone());
 
         if let Some(ordering) = self.hs.get(&pair) {
             self.hits += 1;
@@ -111,12 +113,13 @@ impl value::ValuePolicy<NNValue> for NNValuePolicy {
 
         self.hs.insert(pair, res);
         res
+        */
     }
 
-    fn opposite(&mut self, value: &NNValue) -> NNValue {
+    fn opposite(&self) -> NNValue {
         NNValue {
-            pos: value.pos.clone(),
-            pov: !value.pov,
+            pos: self.pos.clone(),
+            pov: !self.pov,
         }
     }
 }

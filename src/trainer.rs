@@ -1,4 +1,5 @@
-use std::hash::Hash;
+use ort::Session;
+use std::{hash::Hash, rc::Rc};
 use thesis::{
     algos::alphabeta::alphabeta,
     core::{
@@ -11,7 +12,7 @@ use thesis::{
 };
 
 use crate::{
-    nn::{NNEvaluator, NNValue, NNValuePolicy},
+    nn::{NNEvaluator, NNValue},
     nn_agent::NNAgent,
     ringbuffer_set::RingBufferSet,
 };
@@ -32,11 +33,11 @@ where
         }
     }
 
-    pub fn generate_samples(&mut self, spec: &mut NNValuePolicy, evaluator: &NNEvaluator)
+    pub fn generate_samples(&mut self, session: Rc<NNEvaluator>)
     where
         NNEvaluator: PositionEvaluator<P, NNValue>,
     {
-        let mut agent = NNAgent::new(spec.session.clone());
+        let mut agent = NNAgent::new(session.clone());
         let mut position = P::initial();
         let mut history = vec![position.clone()];
 

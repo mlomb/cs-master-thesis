@@ -1,22 +1,20 @@
 use std::{cmp::Ordering, ops::Neg};
 
-pub trait ValuePolicy<Value> {
-    fn compare(&mut self, left: &Value, right: &Value) -> Ordering;
-    fn opposite(&mut self, value: &Value) -> Value;
+pub trait Value: Clone {
+    fn compare(&self, other: &Self) -> Ordering;
+    fn opposite(&self) -> Self;
 }
 
-pub struct DefaultValuePolicy;
-
 /// Implementation for all types all signed numeric types
-impl<V> ValuePolicy<V> for DefaultValuePolicy
+impl<T> Value for T
 where
-    V: Copy + Ord + Neg<Output = V>,
+    T: Clone + Ord + Neg<Output = Self>,
 {
-    fn compare(&mut self, left: &V, right: &V) -> Ordering {
-        left.cmp(right)
+    fn compare(&self, other: &Self) -> Ordering {
+        self.cmp(other)
     }
 
-    fn opposite(&mut self, value: &V) -> V {
-        value.neg()
+    fn opposite(&self) -> Self {
+        self.clone().neg()
     }
 }

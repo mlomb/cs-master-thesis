@@ -1,6 +1,8 @@
+use crate::cmp::loose_ord::LooseOrd;
+
 use super::{
     outcome::Outcome,
-    value::{self, ValuePolicy},
+    value::{self, Value},
 };
 use std::cmp::Ordering;
 
@@ -17,13 +19,16 @@ use Ordering::*;
 use Outcome::*;
 use SearchResult::*;
 
-impl<Value> SearchResult<Value> {
+impl<V> Value for SearchResult<V>
+where
+    V: value::Value,
+{
     /// Compare two search results
     /// It uses the value policy to compare non-terminal states
-    pub fn compare(&self, other: &Self, value_policy: &mut dyn ValuePolicy<Value>) -> Ordering {
+    fn compare(&self, other: &Self) -> Ordering {
         match (self, other) {
             (Terminal(left), Terminal(right)) => left.cmp(right), // compare status
-            (NonTerminal(left), NonTerminal(right)) => value_policy.compare(left, right), // compare values
+            (NonTerminal(left), NonTerminal(right)) => left.compare(right), // compare values
 
             // Prefer true Win over eval
             (Terminal(Win), NonTerminal(_)) => Greater,
@@ -37,37 +42,44 @@ impl<Value> SearchResult<Value> {
 
     /// Computes the opposite of a search result
     /// It uses the value policy to compute the opposite of non-terminal states
-    pub fn opposite(&self, value_policy: &mut dyn ValuePolicy<Value>) -> Self {
+    fn opposite(&self) -> Self {
         match self {
             Terminal(Win) => Terminal(Loss),
             Terminal(Loss) => Terminal(Win),
             Terminal(Draw) => Terminal(Draw),
-            NonTerminal(value) => NonTerminal(value_policy.opposite(value)),
+            NonTerminal(value) => NonTerminal(value.opposite()),
         }
+    }
+}
+
+impl<V> LooseOrd for SearchResult<V>
+where
+    V: value::Value,
+{
+    fn loose_cmp(&self, other: &Self) -> Ordering {
+        self.compare(other)
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::core::value::DefaultValuePolicy;
-
     use super::*;
 
     #[test]
     fn orders() {
+        // need to defined type for Value
         type R = SearchResult<i32>;
-        let mut p = DefaultValuePolicy;
 
         // Win > eval > Draw > Loss
-        assert_eq!(Greater, R::Terminal(Win).compare(&NonTerminal(1), &mut p));
-        assert_eq!(Greater, R::NonTerminal(1).compare(&NonTerminal(-1), &mut p));
-        assert_eq!(Greater, R::NonTerminal(-1).compare(&Terminal(Draw), &mut p));
-        assert_eq!(Greater, R::Terminal(Draw).compare(&Terminal(Loss), &mut p));
+        assert_eq!(Greater, Terminal(Win).compare(&NonTerminal(1)));
+        assert_eq!(Greater, NonTerminal(1).compare(&NonTerminal(-1)));
+        assert_eq!(Greater, NonTerminal(-1).compare(&Terminal(Draw)));
+        assert_eq!(Greater, R::Terminal(Draw).compare(&Terminal(Loss)));
 
         // Loss < Draw < eval < Win
-        assert_eq!(Less, R::Terminal(Loss).compare(&Terminal(Draw), &mut p));
-        assert_eq!(Less, R::Terminal(Draw).compare(&NonTerminal(-1), &mut p));
-        assert_eq!(Less, R::NonTerminal(-1).compare(&NonTerminal(1), &mut p));
-        assert_eq!(Less, R::NonTerminal(1).compare(&Terminal(Win), &mut p));
+        assert_eq!(Less, R::Terminal(Loss).compare(&Terminal(Draw)));
+        assert_eq!(Less, Terminal(Draw).compare(&NonTerminal(-1)));
+        assert_eq!(Less, NonTerminal(-1).compare(&NonTerminal(1)));
+        assert_eq!(Less, NonTerminal(1).compare(&Terminal(Win)));
     }
 }

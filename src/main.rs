@@ -9,10 +9,7 @@ mod trainer;
 
 use std::rc::Rc;
 
-use crate::{
-    nn::{NNEvaluator, NNValuePolicy},
-    trainer::Trainer,
-};
+use crate::{nn::NNEvaluator, trainer::Trainer};
 use ort::{Environment, ExecutionProvider, SessionBuilder};
 use thesis::games::connect4::Connect4;
 
@@ -28,11 +25,10 @@ fn main() -> ort::Result<()> {
         .with_intra_threads(1)?
         .with_model_from_file("models/best/onnx_model.onnx")?;
 
-    let mut spec = NNValuePolicy::new(Rc::new(session));
-
     let mut trainer = Trainer::<Connect4>::new(10000);
+    let mut evaluator = Rc::new(NNEvaluator::new(session));
 
     loop {
-        trainer.generate_samples(&mut spec, &NNEvaluator);
+        trainer.generate_samples(evaluator.clone());
     }
 }

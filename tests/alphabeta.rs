@@ -4,7 +4,6 @@ use thesis::algos::alphabeta::alphabeta;
 use thesis::algos::negamax::negamax;
 use thesis::core::position::Position;
 use thesis::core::result::SearchResult;
-use thesis::core::value::DefaultValuePolicy;
 use thesis::evaluators::null::NullEvaluator;
 use thesis::games::connect4::Connect4;
 use thesis::games::connect4_strat::Connect4BasicEvaluator;
@@ -41,14 +40,13 @@ fn compare_with_negamax_ttt() {
     // https://math.stackexchange.com/a/486548
     assert_eq!(boards.len(), 5478);
 
-    let mut dvp = DefaultValuePolicy;
     let ne = NullEvaluator;
 
     type R = (SearchResult<i32>, Option<usize>);
 
     for board in boards {
-        let (nega_res, _): R = negamax(&board, 10, &mut dvp, &ne);
-        let (alphabeta_res, _): R = alphabeta(&board, 10, &mut dvp, &ne);
+        let (nega_res, _): R = negamax(&board, 10, &ne);
+        let (alphabeta_res, _): R = alphabeta(&board, 10, &ne);
 
         assert_eq!(nega_res, alphabeta_res);
     }
@@ -60,14 +58,13 @@ fn compare_with_negamax_c4() {
     let mut hs = HashSet::<Connect4>::new();
     generate_boards(&Connect4::initial(), 2, &mut boards, &mut hs);
 
-    let mut dvp = DefaultValuePolicy;
     let be = Connect4BasicEvaluator;
 
     type R = (SearchResult<i32>, Option<usize>);
 
     for board in boards {
-        let (nega_res, _): R = negamax(&board, 4, &mut dvp, &be);
-        let (alphabeta_res, _): R = alphabeta(&board, 4, &mut dvp, &be);
+        let (nega_res, _): R = negamax(&board, 4, &be);
+        let (alphabeta_res, _): R = alphabeta(&board, 4, &be);
 
         assert_eq!(nega_res, alphabeta_res);
     }

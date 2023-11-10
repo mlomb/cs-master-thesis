@@ -5,17 +5,17 @@ use thesis::{
     core::{agent::Agent, position, result::SearchResult},
 };
 
-use crate::cmp::round_robin_sort::rr_sort;
+use crate::{cmp::round_robin_sort::rr_sort, nn::NNEvaluator};
 
 pub struct NNAgent {
-    session: Rc<Session>,
+    evaluator: Rc<NNEvaluator>,
     random_wiggle: VecDeque<usize>,
 }
 
 impl NNAgent {
-    pub fn new(session: Rc<Session>) -> Self {
+    pub fn new(evaluator: Rc<NNEvaluator>) -> Self {
         NNAgent {
-            session,
+            evaluator,
             random_wiggle: VecDeque::from([8, 8, 8, 4, 3, 2]),
         }
     }
