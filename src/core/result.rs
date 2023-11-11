@@ -42,12 +42,12 @@ where
 
     /// Computes the opposite of a search result
     /// It uses the value policy to compute the opposite of non-terminal states
-    fn opposite(&self) -> Self {
+    fn reverse(&self) -> Self {
         match self {
             Terminal(Win) => Terminal(Loss),
             Terminal(Loss) => Terminal(Win),
             Terminal(Draw) => Terminal(Draw),
-            NonTerminal(value) => NonTerminal(value.opposite()),
+            NonTerminal(value) => NonTerminal(value.reverse()),
         }
     }
 }

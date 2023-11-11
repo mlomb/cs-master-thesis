@@ -1,24 +1,17 @@
-use super::evaluator::DeepCmpEvaluator;
 use super::ringbuffer_set::RingBufferSet;
+use super::service::DeepCmpService;
 use crate::{
-    algos::alphabeta::alphabeta,
-    core::{
-        agent::Agent,
-        evaluator::PositionEvaluator,
-        outcome::Outcome,
-        position::{self, Position},
-        result::SearchResult,
-    },
+    core::{agent::Agent, outcome::Outcome, position::Position},
     nn::{deep_cmp::agent::DeepCmpAgent, nn_encoding::TensorEncodeable},
 };
 use ort::Session;
-use std::{collections::HashSet, hash::Hash, rc::Rc};
+use std::{cell::RefCell, collections::HashSet, hash::Hash, rc::Rc};
 
 pub struct DeepCmpTrainer<P> {
     win_positions: RingBufferSet<P>,
     loss_positions: RingBufferSet<P>,
     all_positions: HashSet<P>,
-    evaluator: Rc<DeepCmpEvaluator<P>>,
+    service: Rc<RefCell<DeepCmpService<P>>>,
 }
 
 impl<P> DeepCmpTrainer<P>
@@ -30,12 +23,12 @@ where
             win_positions: RingBufferSet::new(capacity),
             loss_positions: RingBufferSet::new(capacity),
             all_positions: HashSet::new(),
-            evaluator: Rc::new(DeepCmpEvaluator::new(session)),
+            service: Rc::new(RefCell::new(DeepCmpService::new(session))),
         }
     }
 
     pub fn generate_samples(&mut self) {
-        let mut agent = DeepCmpAgent::new(self.evaluator.clone());
+        let mut agent = DeepCmpAgent::new(self.service.clone());
         let mut position = P::initial();
         let mut history = vec![position.clone()];
 

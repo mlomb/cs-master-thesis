@@ -35,11 +35,11 @@ where
             &position.apply_action(&action),
             max_depth - 1,
             // intentionally swapped
-            &beta.as_ref().and_then(|a| Some(a.opposite())),
-            &alpha.as_ref().and_then(|a| Some(a.opposite())),
+            &beta.as_ref().and_then(|a| Some(a.reverse())),
+            &alpha.as_ref().and_then(|a| Some(a.reverse())),
             evaluator,
         );
-        let branch_result = opp_branch_result.opposite();
+        let branch_result = opp_branch_result.reverse();
 
         if match alpha {
             None => true,

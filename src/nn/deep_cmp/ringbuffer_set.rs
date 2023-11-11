@@ -34,10 +34,12 @@ where
         self.set.len()
     }
 
+    #[allow(dead_code)]
     pub fn to_vec(&self) -> Vec<&T> {
         self.ring.iter().collect()
     }
 
+    #[allow(dead_code)]
     pub fn sample<R: Rng>(&self, rng: &mut R, amount: usize) -> Vec<&T> {
         let mut vec = self.ring.iter().choose_multiple(rng, amount);
         // choose_multiple picks random elements

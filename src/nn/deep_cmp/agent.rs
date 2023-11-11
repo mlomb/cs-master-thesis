@@ -1,23 +1,32 @@
-use rand::seq::SliceRandom;
-
+use super::{evaluator::DeepCmpEvaluator, service::DeepCmpService, value::DeepCmpValue};
 use crate::{
     algos::alphabeta::alphabeta,
-    core::{agent::Agent, position, result::SearchResult},
+    core::{agent::Agent, position},
     nn::nn_encoding::TensorEncodeable,
 };
-use std::{collections::VecDeque, rc::Rc};
+use rand::seq::SliceRandom;
+use std::{cell::RefCell, collections::VecDeque, rc::Rc};
 
-use super::evaluator::DeepCmpEvaluator;
-
+/// The agent for the DeepCompare algorithm
+///
+/// It will use `alphabeta` up to a fixed depth to evaluate all possible actions;
+/// then choose a random action from the top-k actions given by the wiggle.
+/// The wiggle is a queue of integers that will be used as the k in the top-k actions.
+/// If the wiggle is empty it will default to 1, i.e. it will choose the best action.
 pub struct DeepCmpAgent<Position> {
-    evaluator: Rc<DeepCmpEvaluator<Position>>,
+    /// Reference back to the service
+    service: Rc<RefCell<DeepCmpService<Position>>>,
+    /// The depth to use for the search
+    target_depth: usize,
+    /// Queue of integers to use as the k in the top-k actions, consumed each turn
     random_wiggle: VecDeque<usize>,
 }
 
 impl<Position> DeepCmpAgent<Position> {
-    pub fn new(evaluator: Rc<DeepCmpEvaluator<Position>>) -> Self {
+    pub fn new(service: Rc<RefCell<DeepCmpService<Position>>>) -> Self {
         DeepCmpAgent {
-            evaluator,
+            service,
+            target_depth: 3,
             random_wiggle: VecDeque::from([8, 8, 8, 4, 3, 2]),
         }
     }
@@ -26,8 +35,10 @@ impl<Position> DeepCmpAgent<Position> {
 impl<Position> Agent<Position> for DeepCmpAgent<Position>
 where
     Position: position::Position + TensorEncodeable,
+    DeepCmpValue<Position>: crate::core::value::Value,
 {
     fn next_action(&mut self, position: &Position) -> Option<Position::Action> {
+        let mut evaluator = DeepCmpEvaluator::new(self.service.clone());
         let actions = position.valid_actions();
 
         // we will sample an action from the top-k actions
@@ -37,12 +48,11 @@ where
         let mut results = Vec::new();
 
         for action in actions {
-            // let (value, _) = alphabeta::<_, _, NNEvaluator>(
-            //     &position.apply_action(&action),
-            //     3,
-            //     self.evaluator.as_ref(),
-            // );
-            let value = SearchResult::NonTerminal(0.0);
+            let (value, _) = alphabeta(
+                &position.apply_action(&action),
+                self.target_depth,
+                &mut evaluator,
+            );
 
             results.push((value, action));
         }

@@ -1,6 +1,8 @@
 use super::outcome::Outcome;
 
 /// A game position. It must contain all the information needed to continue playing. (i.e. the board, the player to move, etc.)
+///
+/// It is expected to be cheap to clone
 pub trait Position: Clone {
     /// The type of actions that can be applied to the position
     type Action: Clone + Eq;
@@ -19,7 +21,7 @@ pub trait Position: Clone {
     /// It means that if the player that just played won, the resulting position's `status()` will report a LOSS, since the POV changed.
     fn apply_action(&self, action: &Self::Action) -> Self;
 
-    /// Returns the status of the position from the POV of the player to move
+    /// Returns the status of the position from the POV of the player to move.
     /// None if the game is not over
     fn status(&self) -> Option<Outcome>;
 }

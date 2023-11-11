@@ -1,68 +1,37 @@
-use super::evaluator::DeepCmpEvaluator;
-use crate::core::value::Value;
-use std::cmp::Ordering;
-
-#[derive(Clone, PartialEq, Eq, Hash)]
-pub struct Pair<P>(P, P);
+use super::service::DeepCmpService;
+use crate::{
+    core::{position::Position, value::Value},
+    nn::nn_encoding::TensorEncodeable,
+};
+use core::hash::Hash;
+use std::{cell::RefCell, cmp::Ordering, rc::Rc};
 
 #[derive(Clone)]
-pub struct DeepCmpValue<P> {
-    pub evaluator: *const DeepCmpEvaluator<P>,
-    pub position: P,
+pub struct DeepCmpValue<Position> {
+    pub service: Rc<RefCell<DeepCmpService<Position>>>,
+    pub position: Position,
     pub point_of_view: bool,
 }
 
 impl<P> Value for DeepCmpValue<P>
 where
-    P: Clone,
+    P: Position + TensorEncodeable + Hash + Clone + PartialEq + Eq + Hash,
 {
     fn compare(&self, other: &DeepCmpValue<P>) -> Ordering {
-        Ordering::Equal
-        /*
-        let pair = Pair(self, other.clone());
+        // We should only be comparing values from the same model
+        assert_eq!(self.service.as_ptr(), other.service.as_ptr());
 
-        if let Some(ordering) = self.hs.get(&pair) {
-            self.hits += 1;
-            return *ordering;
-        }
+        // This is a theory, not sure if it's true
+        assert_eq!(self.point_of_view, other.point_of_view);
 
-        self.misses += 1;
-
-        // insert one axis: batch size
-        let b1 = left.pos.encode().insert_axis(Axis(0));
-        let b2 = right.pos.encode().insert_axis(Axis(0));
-
-        let mut input = b1;
-        input
-            .append(Axis(3), b2.view().into_shape(b2.shape()).unwrap())
-            .unwrap();
-
-        let outputs = self.session.run(ort::inputs![input].unwrap()).unwrap();
-        let data = outputs[0]
-            .extract_tensor::<f32>()
-            .unwrap()
-            .view()
-            .t()
-            .into_owned();
-
-        println!("{}", data);
-
-        self.inferences += 1;
-
-        let res = if data[[0, 0]] < data[[1, 0]] {
-            std::cmp::Ordering::Greater
-        } else {
-            std::cmp::Ordering::Less
-        };
-
-        self.hs.insert(pair, res);
-        res
-        */
+        self.service
+            .borrow_mut()
+            .compare(&self.position, &other.position)
     }
 
-    fn opposite(&self) -> DeepCmpValue<P> {
+    fn reverse(&self) -> DeepCmpValue<P> {
         DeepCmpValue {
-            evaluator: self.evaluator,
+            service: self.service.clone(),
             position: self.position.clone(),
             point_of_view: !self.point_of_view,
         }

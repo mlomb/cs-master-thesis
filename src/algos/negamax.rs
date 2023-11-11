@@ -30,7 +30,7 @@ where
     for action in position.valid_actions() {
         let (opp_branch_result, _) =
             negamax(&position.apply_action(&action), max_depth - 1, evaluator);
-        let branch_result = opp_branch_result.opposite();
+        let branch_result = opp_branch_result.reverse();
 
         if match best {
             None => true,

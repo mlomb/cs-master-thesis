@@ -2,7 +2,7 @@ use std::{cmp::Ordering, ops::Neg};
 
 pub trait Value: Clone {
     fn compare(&self, other: &Self) -> Ordering;
-    fn opposite(&self) -> Self;
+    fn reverse(&self) -> Self;
 }
 
 /// Implementation for all types all signed numeric types
@@ -14,7 +14,7 @@ where
         self.cmp(other)
     }
 
-    fn opposite(&self) -> Self {
+    fn reverse(&self) -> Self {
         self.clone().neg()
     }
 }

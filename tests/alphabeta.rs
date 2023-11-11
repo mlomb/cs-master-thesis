@@ -40,13 +40,13 @@ fn compare_with_negamax_ttt() {
     // https://math.stackexchange.com/a/486548
     assert_eq!(boards.len(), 5478);
 
-    let ne = NullEvaluator;
+    let mut ne = NullEvaluator;
 
     type R = (SearchResult<i32>, Option<usize>);
 
     for board in boards {
-        let (nega_res, _): R = negamax(&board, 10, &ne);
-        let (alphabeta_res, _): R = alphabeta(&board, 10, &ne);
+        let (nega_res, _): R = negamax(&board, 10, &mut ne);
+        let (alphabeta_res, _): R = alphabeta(&board, 10, &mut ne);
 
         assert_eq!(nega_res, alphabeta_res);
     }

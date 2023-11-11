@@ -3,14 +3,14 @@ use thesis::algos::mcts::mcts::{MCTSSpec, MCTS};
 use thesis::algos::mcts::strategy::DefaultStrategy;
 use thesis::core::position::Position;
 
-struct YourType;
+struct SampleSpec;
 
-impl MCTSSpec for YourType {
+impl MCTSSpec for SampleSpec {
     type Position = Chess;
     type Strategy = DefaultStrategy;
 }
 
-type R = MCTS<YourType>;
+type R = MCTS<SampleSpec>;
 
 fn main() {
     use std::time::Instant;
