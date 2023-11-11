@@ -1,7 +1,10 @@
-use super::{evaluator::DeepCmpEvaluator, service::DeepCmpService, value::DeepCmpValue};
+use super::{
+    evaluator::DeepCmpEvaluator, round_robin_sort::rr_sort, service::DeepCmpService,
+    value::DeepCmpValue,
+};
 use crate::{
     algos::alphabeta::alphabeta,
-    core::{agent::Agent, position},
+    core::{agent::Agent, position, value::Value},
     nn::nn_encoding::TensorEncodeable,
 };
 use rand::seq::SliceRandom;
@@ -58,9 +61,10 @@ where
         }
 
         // use an special "sorting" algorithm for non-transitive / non-symmetric relations like this one
-        //rr_sort(&results).first().map(|(_, action)| action)
-
-        results[..k]
+        rr_sort(&results, &|l, r| l.0.compare(&r.0))
+            // keep the top-k
+            [..k]
+            // choose one at random
             .choose(&mut rand::thread_rng())
             .map(|(_, action)| action)
             .cloned()

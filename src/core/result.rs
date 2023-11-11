@@ -1,5 +1,3 @@
-use crate::cmp::loose_ord::LooseOrd;
-
 use super::{
     outcome::Outcome,
     value::{self, Value},
@@ -49,15 +47,6 @@ where
             Terminal(Draw) => Terminal(Draw),
             NonTerminal(value) => NonTerminal(value.reverse()),
         }
-    }
-}
-
-impl<V> LooseOrd for SearchResult<V>
-where
-    V: value::Value,
-{
-    fn loose_cmp(&self, other: &Self) -> Ordering {
-        self.compare(other)
     }
 }
 
