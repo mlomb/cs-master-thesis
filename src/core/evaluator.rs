@@ -1,4 +1,4 @@
 pub trait PositionEvaluator<Position, Value> {
     /// Evaluates a position into a Value
-    fn eval(&self, state: &Position) -> Value;
+    fn eval(&self, position: &Position) -> Value;
 }

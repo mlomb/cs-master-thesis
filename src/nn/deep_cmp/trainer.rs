@@ -1,4 +1,4 @@
-use super::nn::*;
+use super::evaluator::DeepCmpEvaluator;
 use super::ringbuffer_set::RingBufferSet;
 use crate::{
     algos::alphabeta::alphabeta,
@@ -9,34 +9,33 @@ use crate::{
         position::{self, Position},
         result::SearchResult,
     },
-    deep::nn_agent::NNAgent,
+    nn::{deep_cmp::agent::DeepCmpAgent, nn_encoding::TensorEncodeable},
 };
 use ort::Session;
-use std::{hash::Hash, rc::Rc};
+use std::{collections::HashSet, hash::Hash, rc::Rc};
 
-pub struct Trainer<P> {
+pub struct DeepCmpTrainer<P> {
     win_positions: RingBufferSet<P>,
     loss_positions: RingBufferSet<P>,
-    evaluator: Rc<NNEvaluator>,
+    all_positions: HashSet<P>,
+    evaluator: Rc<DeepCmpEvaluator<P>>,
 }
 
-impl<P> Trainer<P>
+impl<P> DeepCmpTrainer<P>
 where
-    P: Position + Eq + Hash,
+    P: Position + TensorEncodeable + Eq + Hash,
 {
     pub fn new(capacity: usize, session: Session) -> Self {
-        Trainer {
+        DeepCmpTrainer {
             win_positions: RingBufferSet::new(capacity),
             loss_positions: RingBufferSet::new(capacity),
-            evaluator: Rc::new(NNEvaluator::new(session)),
+            all_positions: HashSet::new(),
+            evaluator: Rc::new(DeepCmpEvaluator::new(session)),
         }
     }
 
-    pub fn generate_samples(&mut self)
-    where
-        NNEvaluator: PositionEvaluator<P, NNValue>,
-    {
-        let mut agent = NNAgent::new(self.evaluator.clone());
+    pub fn generate_samples(&mut self) {
+        let mut agent = DeepCmpAgent::new(self.evaluator.clone());
         let mut position = P::initial();
         let mut history = vec![position.clone()];
 
@@ -47,13 +46,22 @@ where
 
             position = position.apply_action(&chosen_action);
             history.push(position.clone());
+            self.all_positions.insert(position.clone());
         }
 
+        let status = position.status();
+
+        // ignore draws
+        if let Some(Outcome::Draw) = status {
+            return;
+        }
+
+        // We expect a loss, since the POV is changed after the last move
         // WLWLWLWL
         //        ↑
         // LWLWLWL
         //       ↑
-        assert_eq!(position.status(), Some(Outcome::Loss));
+        assert_eq!(status, Some(Outcome::Loss));
 
         // iterate over history in reverse
         // knowing that the last state is a loss
@@ -68,9 +76,10 @@ where
         }
 
         println!(
-            "win: {}, loss: {}",
+            "win: {}, loss: {} all: {}",
             self.win_positions.len(),
-            self.loss_positions.len()
+            self.loss_positions.len(),
+            self.all_positions.len()
         );
     }
 }
