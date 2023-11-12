@@ -470,6 +470,7 @@ dependencies = [
 name = "thesis"
 version = "0.1.0"
 dependencies = [
+ "lazy_static",
  "ndarray",
  "ort",
  "rand",

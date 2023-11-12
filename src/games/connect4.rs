@@ -17,7 +17,7 @@ impl Position for Connect4 {
     }
 
     fn valid_actions(&self) -> Vec<usize> {
-        let mut actions = Vec::new();
+        let mut actions = Vec::with_capacity(COLS);
 
         let occupied = self.0.occupied_board();
         for col in 0..COLS {

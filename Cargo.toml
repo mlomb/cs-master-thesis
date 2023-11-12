@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+lazy_static = "1.4.0"
 ndarray = "0.15.6"
 ort = { git = "https://github.com/pykeio/ort", branch = "v2", features = ["download-binaries", "cuda"] }
 rand = "0.8.5"

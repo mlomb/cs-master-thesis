@@ -1,8 +1,7 @@
-use std::fmt;
-
 use super::mnk_sets::mnk_winning_sets;
 use crate::core::outcome::*;
 use crate::core::position::*;
+use std::fmt;
 
 /// Position for m-n-k games, such as TicTacToe and Connect4.
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
@@ -41,8 +40,9 @@ impl<const M: usize, const N: usize, const K: usize> MNK<M, N, K> {
     /// i.e 0b111_111_111 for 3x3
     const FULL_BOARD: u64 = (1 << (M * N)) - 1;
 
-    // All bitboards that are winning sets for the game.
+    /// All bitboards that are winning sets for the game.
     // const WINNING_SETS: Vec<u64> = mnk_winning_sets(M, N, K);
+    // cant use this :(
 
     /// Returns a bitboard with all the used bits set to 1.
     pub fn occupied_board(&self) -> u64 {
@@ -99,12 +99,22 @@ impl<const M: usize, const N: usize, const K: usize> Position for MNK<M, N, K> {
     }
 
     fn status(&self) -> Option<Outcome> {
-        // TODO: make const or smth
-        let winning_sets: Vec<u64> = mnk_winning_sets(M, N, K);
+        // TODO: make this right
+        // not sure how to use const or static right with generics
+        lazy_static::lazy_static! {
+            static ref WS_TTT: Vec<u64> = mnk_winning_sets(3, 3, 3);
+            static ref WS_C4: Vec<u64> = mnk_winning_sets(6, 7, 4);
+        }
 
-        for player in 0..2 {
-            for &set in &winning_sets {
-                if (self.board[player] as u64 & set) == set {
+        let winning_sets = match (M, N, K) {
+            (3, 3, 3) => &*WS_TTT,
+            (6, 7, 4) => &*WS_C4,
+            _ => unimplemented!(),
+        };
+
+        for set in winning_sets {
+            for player in 0..2 {
+                if (self.board[player] as u64 & *set) == *set {
                     return if player as u8 == self.who_plays {
                         Some(Outcome::Win)
                     } else {

@@ -15,7 +15,9 @@ fn main() -> ort::Result<()> {
 
     let mut trainer = DeepCmpTrainer::<Connect4>::new(10000, session);
 
-    loop {
+    for _i in 0..100 {
         trainer.generate_samples();
     }
+
+    Ok(())
 }

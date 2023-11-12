@@ -77,6 +77,6 @@ mod tests {
     #[test]
     fn winning_set_connect4() {
         let c4 = mnk_winning_sets(6, 7, 4);
-        assert_eq!(c4.len(), 69);
+        assert_eq!(c4.len(), 69); // yeah, no kidding
     }
 }
