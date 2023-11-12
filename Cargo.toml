@@ -10,5 +10,6 @@ ort = { git = "https://github.com/pykeio/ort", branch = "v2", features = ["downl
 rand = "0.8.5"
 ringbuffer = "0.15.0"
 shakmaty = "0.26.0"
+shared_memory = "0.12.4"
 smallvec = "1.11.1"
 tracing-subscriber = "0.3.17"
