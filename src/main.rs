@@ -23,7 +23,7 @@ fn main() -> ort::Result<()> {
     }
 
     // Get pointer to the shared memory
-    let shmem = open_shmem("deep_cmp_shmem-signal", 8096).unwrap();
+    let shmem = open_shmem("deep_cmp_shmem-signal", 4096 * 2).unwrap();
 
     let r = open_shmem("deep_cmp_shmem-inputs", 4096).unwrap();
     let j = open_shmem("deep_cmp_shmem-outputs", 4096).unwrap();
