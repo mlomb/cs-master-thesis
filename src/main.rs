@@ -1,7 +1,7 @@
 use ort::{Environment, ExecutionProvider, SessionBuilder};
 use thesis::{
     games::connect4::Connect4,
-    nn::{deep_cmp::DeepCmpTrainer, model_management, shmem::open_shmem},
+    nn::{deep_cmp::DeepCmpTrainer, model_management},
 };
 
 fn main() -> ort::Result<()> {
@@ -17,7 +17,7 @@ fn main() -> ort::Result<()> {
         .with_intra_threads(1)?
         .with_model_from_file("models/best/onnx_model.onnx")?;
 
-    let mut trainer = DeepCmpTrainer::<Connect4>::new(10000, session);
+    let mut trainer = DeepCmpTrainer::<Connect4>::new(10000, 600, session);
 
     for _i in 0..5 {
         trainer.generate_samples();

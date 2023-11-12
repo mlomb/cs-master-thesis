@@ -1,6 +1,7 @@
 use crate::core::position::Position;
-use ndarray::Axis;
+use ndarray::{s, ArrayD, Axis};
 use ort::Session;
+use rand::distributions::Slice;
 use std::hash::Hash;
 use std::{cmp::Ordering, collections::HashMap};
 
@@ -39,28 +40,22 @@ where
             self.hits += 1;
             return *ordering;
         }
-
         self.misses += 1;
-
-        let input = P::concat(&left.encode(), &right.encode())
-            // insert one axis: batch size
-            .insert_axis(Axis(0));
-
-        let outputs = self.session.run(ort::inputs![input].unwrap()).unwrap();
-        let data = outputs[0]
-            .extract_tensor::<f32>()
-            .unwrap()
-            .view()
-            .t()
-            .into_owned();
-
         self.inferences += 1;
 
-        let res = if data[[0, 0]] < data[[1, 0]] {
-            std::cmp::Ordering::Greater
-        } else {
-            std::cmp::Ordering::Less
-        };
+        let mut input_tensor = ArrayD::zeros(P::input_shape());
+        P::encode_input(left, right, &mut input_tensor.view_mut());
+
+        // add batch size axis
+        input_tensor = input_tensor.insert_axis(Axis(0));
+
+        let outputs = self
+            .session
+            .run(ort::inputs![input_tensor].unwrap())
+            .unwrap();
+
+        let output_tensor = outputs[0].extract_tensor::<f32>().unwrap();
+        let res = P::decode_output(&output_tensor.view().index_axis(Axis(0), 0));
 
         self.hs.insert(pair, res);
         res
