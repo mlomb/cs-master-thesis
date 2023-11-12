@@ -1,10 +1,11 @@
-use super::ringbuffer_set::RingBufferSet;
 use super::service::DeepCmpService;
+use super::{encoding::TensorEncodeable, ringbuffer_set::RingBufferSet};
 use crate::{
     core::{agent::Agent, outcome::Outcome, position::Position},
-    nn::{deep_cmp::agent::DeepCmpAgent, nn_encoding::TensorEncodeable},
+    nn::{deep_cmp::agent::DeepCmpAgent, shmem::open_shmem},
 };
 use ort::Session;
+use shared_memory::Shmem;
 use std::{cell::RefCell, collections::HashSet, hash::Hash, rc::Rc};
 
 pub struct DeepCmpTrainer<P> {
@@ -12,6 +13,11 @@ pub struct DeepCmpTrainer<P> {
     loss_positions: RingBufferSet<P>,
     all_positions: HashSet<P>,
     service: Rc<RefCell<DeepCmpService<P>>>,
+
+    // shared memory with Python for training
+    signal_shmem: Shmem,
+    inputs_shmem: Shmem,
+    outputs_shmem: Shmem,
 }
 
 impl<P> DeepCmpTrainer<P>
@@ -24,6 +30,11 @@ where
             loss_positions: RingBufferSet::new(capacity),
             all_positions: HashSet::new(),
             service: Rc::new(RefCell::new(DeepCmpService::new(session))),
+
+            // initialize required shared memory buffers for training
+            signal_shmem: open_shmem("deep_cmp_shmem-signal", 4096).unwrap(),
+            inputs_shmem: open_shmem("deep_cmp_shmem-inputs", 4096).unwrap(),
+            outputs_shmem: open_shmem("deep_cmp_shmem-outputs", 4096).unwrap(),
         }
     }
 
@@ -74,5 +85,15 @@ where
             self.loss_positions.len(),
             self.all_positions.len()
         );
+    }
+
+    /// Prepares and fills the training data
+    pub fn train(&mut self) {
+
+        // samples will be tagged like this
+        // [W, L]: [1, 0]
+        // [L, W]: [0, 1]
+
+        // prepare inputs
     }
 }

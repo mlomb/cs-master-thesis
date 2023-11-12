@@ -1,8 +1,5 @@
-use super::{service::DeepCmpService, value::DeepCmpValue};
-use crate::{
-    core::{evaluator::PositionEvaluator, position::Position},
-    nn::nn_encoding::TensorEncodeable,
-};
+use super::{encoding::TensorEncodeable, service::DeepCmpService, value::DeepCmpValue};
+use crate::core::{evaluator::PositionEvaluator, position::Position};
 use std::{cell::RefCell, rc::Rc};
 
 pub struct DeepCmpEvaluator<Position> {

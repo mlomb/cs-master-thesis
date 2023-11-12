@@ -1,8 +1,10 @@
 use crate::games::connect4::*;
-use ndarray::{ArrayD, IxDyn};
+use ndarray::{ArrayD, Axis, IxDyn};
 
 pub trait TensorEncodeable {
     fn encode(&self) -> ArrayD<f32>;
+
+    fn concat(left: &ArrayD<f32>, right: &ArrayD<f32>) -> ArrayD<f32>;
 }
 
 // TODO: move this to another file
@@ -18,6 +20,20 @@ impl TensorEncodeable for Connect4 {
                 }
             }
         }
+
+        tensor
+    }
+
+    fn concat(left: &ArrayD<f32>, right: &ArrayD<f32>) -> ArrayD<f32> {
+        assert_eq!(left.shape(), &[7, 6, 2]);
+        assert_eq!(right.shape(), &[7, 6, 2]);
+
+        let mut tensor = left.clone();
+        tensor
+            .append(Axis(2), right.view().into_shape(right.shape()).unwrap())
+            .unwrap();
+
+        assert_eq!(tensor.shape(), &[7, 6, 4]);
 
         tensor
     }

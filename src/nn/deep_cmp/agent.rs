@@ -1,11 +1,10 @@
 use super::{
-    evaluator::DeepCmpEvaluator, round_robin_sort::rr_sort, service::DeepCmpService,
-    value::DeepCmpValue,
+    encoding::TensorEncodeable, evaluator::DeepCmpEvaluator, round_robin_sort::rr_sort,
+    service::DeepCmpService, value::DeepCmpValue,
 };
 use crate::{
     algos::alphabeta::alphabeta,
     core::{agent::Agent, position, value::Value},
-    nn::nn_encoding::TensorEncodeable,
 };
 use rand::seq::SliceRandom;
 use std::{cell::RefCell, collections::VecDeque, rc::Rc};

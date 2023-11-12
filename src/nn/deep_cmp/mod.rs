@@ -1,4 +1,5 @@
 mod agent;
+mod encoding;
 mod evaluator;
 mod ringbuffer_set;
 mod round_robin_sort;

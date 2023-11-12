@@ -1,8 +1,10 @@
-use crate::{core::position::Position, nn::nn_encoding::TensorEncodeable};
+use crate::core::position::Position;
 use ndarray::Axis;
 use ort::Session;
 use std::hash::Hash;
 use std::{cmp::Ordering, collections::HashMap};
+
+use super::encoding::TensorEncodeable;
 
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct Pair<P>(P, P);
@@ -40,14 +42,9 @@ where
 
         self.misses += 1;
 
-        // insert one axis: batch size
-        let b1 = left.encode().insert_axis(Axis(0));
-        let b2 = right.encode().insert_axis(Axis(0));
-
-        let mut input = b1;
-        input
-            .append(Axis(3), b2.view().into_shape(b2.shape()).unwrap())
-            .unwrap();
+        let input = P::concat(&left.encode(), &right.encode())
+            // insert one axis: batch size
+            .insert_axis(Axis(0));
 
         let outputs = self.session.run(ort::inputs![input].unwrap()).unwrap();
         let data = outputs[0]

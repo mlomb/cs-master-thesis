@@ -1,8 +1,5 @@
-use super::service::DeepCmpService;
-use crate::{
-    core::{position::Position, value::Value},
-    nn::nn_encoding::TensorEncodeable,
-};
+use super::{encoding::TensorEncodeable, service::DeepCmpService};
+use crate::core::{position::Position, value::Value};
 use core::hash::Hash;
 use std::{cell::RefCell, cmp::Ordering, rc::Rc};
 
