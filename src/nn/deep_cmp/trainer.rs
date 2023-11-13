@@ -53,12 +53,12 @@ where
         let outputs_shape = IxDyn(&outputs_shape_vec);
 
         // create shared memory buffers for training
-        let status_shmem = open_shmem("deepcmp-status", 1 * 4).unwrap();
+        let status_shmem = open_shmem("deepcmp-status", 2 * 4).unwrap();
         let inputs_shmem = open_shmem("deepcmp-inputs", inputs_shape.size() * 4).unwrap();
         let outputs_shmem = open_shmem("deepcmp-outputs", outputs_shape.size() * 4).unwrap();
 
         let status_tensor =
-            unsafe { ArrayViewMut::from_shape_ptr(IxDyn(&[1]), status_shmem.as_ptr() as *mut u32) };
+            unsafe { ArrayViewMut::from_shape_ptr(IxDyn(&[2]), status_shmem.as_ptr() as *mut u32) };
         let inputs_tensor = unsafe {
             ArrayViewMut::from_shape_ptr(inputs_shape, inputs_shmem.as_ptr() as *mut f32)
         };
@@ -166,8 +166,12 @@ where
 
         let status_ptr = self.status_shmem.as_ptr();
 
-        // mark as ready so Python can start training
-        unsafe { status_ptr.offset(0).write(1) };
+        unsafe {
+            // mark as ready so Python can start training
+            status_ptr.offset(0).write(1);
+            // set version to 1
+            status_ptr.offset(1).write(1);
+        };
 
         // wait for Python to finish training
         while unsafe { status_ptr.offset(0).read() } == 1 {
