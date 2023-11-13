@@ -4,46 +4,79 @@ use crate::{
     core::{agent::Agent, outcome::Outcome, position::Position},
     nn::{deep_cmp::agent::DeepCmpAgent, shmem::open_shmem},
 };
-use ndarray::{s, ArrayD, ArrayView, ArrayViewMut, IxDyn};
+use ndarray::{ArrayViewMut, ArrayViewMutD, Axis, Dimension, IxDyn};
 use ort::Session;
+use rand::Rng;
 use shared_memory::Shmem;
+use std::cmp::Ordering;
 use std::{cell::RefCell, collections::HashSet, hash::Hash, rc::Rc};
 
-pub struct DeepCmpTrainer<P> {
+pub struct DeepCmpTrainer<'a, P> {
     win_positions: RingBufferSet<P>,
     loss_positions: RingBufferSet<P>,
     all_positions: HashSet<P>,
     service: Rc<RefCell<DeepCmpService<P>>>,
 
-    samples_per_iter: usize,
+    batch_size: usize,
 
     // shared memory with Python for training
+    // we need to keep these alive, since we
+    // use them in the tensors below
+    #[allow(dead_code)]
     signal_shmem: Shmem,
+    #[allow(dead_code)]
     inputs_shmem: Shmem,
+    #[allow(dead_code)]
     outputs_shmem: Shmem,
+
+    // tensors (that use the shared memory)
+    inputs_tensor: ArrayViewMutD<'a, f32>,
+    outputs_tensor: ArrayViewMutD<'a, f32>,
 }
 
-impl<P> DeepCmpTrainer<P>
+impl<P> DeepCmpTrainer<'_, P>
 where
     P: Position + TensorEncodeable + Eq + Hash,
 {
-    pub fn new(capacity: usize, samples_per_iter: usize, session: Session) -> Self {
+    pub fn new(capacity: usize, batch_size: usize, session: Session) -> Self {
+        // extract shapes from Position
+        let mut inputs_shape_vec = P::input_shape();
+        let mut outputs_shape_vec = P::output_shape();
+
+        // add train batch axis
+        inputs_shape_vec.insert(0, batch_size);
+        outputs_shape_vec.insert(0, batch_size);
+
+        // build ndarray dyn shapes
+        let inputs_shape = IxDyn(&inputs_shape_vec);
+        let outputs_shape = IxDyn(&outputs_shape_vec);
+
+        // create shared memory buffers for training
+        let inputs_shmem = open_shmem("deepcmp-inputs", inputs_shape.size() * 4).unwrap();
+        let outputs_shmem = open_shmem("deepcmp-outputs", outputs_shape.size() * 4).unwrap();
+
+        let inputs_tensor = unsafe {
+            ArrayViewMut::from_shape_ptr(inputs_shape, inputs_shmem.as_ptr() as *mut f32)
+        };
+        let outputs_tensor = unsafe {
+            ArrayViewMut::from_shape_ptr(outputs_shape, outputs_shmem.as_ptr() as *mut f32)
+        };
+
         DeepCmpTrainer {
             win_positions: RingBufferSet::new(capacity),
             loss_positions: RingBufferSet::new(capacity),
             all_positions: HashSet::new(),
             service: Rc::new(RefCell::new(DeepCmpService::new(session))),
 
-            samples_per_iter,
+            batch_size,
 
             // initialize required shared memory buffers for training
             signal_shmem: open_shmem("deepcmp-signal", 4096).unwrap(),
-            inputs_shmem: open_shmem(
-                "deepcmp-inputs",
-                samples_per_iter * P::input_shape_size() * 4,
-            )
-            .unwrap(),
-            outputs_shmem: open_shmem("deepcmp-outputs", samples_per_iter * 2 * 4).unwrap(),
+            inputs_shmem,
+            outputs_shmem,
+
+            inputs_tensor,
+            outputs_tensor,
         }
     }
 
@@ -98,35 +131,27 @@ where
 
     /// Prepares and fills the training data
     pub fn train(&mut self) {
-        // samples will be tagged like this
-        // [W, L]: [1, 0]
-        // [L, W]: [0, 1]
+        let mut rng = rand::thread_rng();
 
-        let signal_ptr = unsafe { self.signal_shmem.as_ptr() as *mut f32 };
-        let inputs_ptr = unsafe { self.inputs_shmem.as_ptr() as *mut f32 };
-        let outputs_ptr = unsafe { self.outputs_shmem.as_ptr() as *mut f32 };
+        for i in 0..self.batch_size {
+            let win_pos = self.win_positions.sample_one(&mut rng).unwrap();
+            let loss_pos = self.win_positions.sample_one(&mut rng).unwrap();
 
-        // prepare inputs
-        let mut bro =
-            unsafe { ArrayViewMut::from_shape_ptr([self.samples_per_iter, 7, 6, 4], inputs_ptr) };
+            let (left_board, ordering, right_board) = if rng.gen_bool(0.5) {
+                (win_pos, Ordering::Greater, loss_pos)
+            } else {
+                (loss_pos, Ordering::Less, win_pos)
+            };
 
-        for i in 0..self.samples_per_iter {
             P::encode_input(
-                self.win_positions.to_vec()[i],
-                self.loss_positions.to_vec()[i],
-                &mut bro.slice_mut(s![i, .., .., ..]).view_mut().into_dyn(),
+                left_board,
+                right_board,
+                &mut self.inputs_tensor.index_axis_mut(Axis(0), i),
+            );
+            P::encode_output(
+                ordering,
+                &mut self.outputs_tensor.index_axis_mut(Axis(0), i),
             );
         }
-
-        for i in 0..7 {
-            for j in 0..6 {
-                for k in 0..4 {
-                    //bro[[0, i, j, k]] = (i * 100 + j * 10 + k) as f32;
-                    println!("i: {}, j: {}, k: {}, val: {}", i, j, k, bro[[0, i, j, k]]);
-                }
-            }
-        }
-
-        std::thread::sleep(std::time::Duration::from_secs(10000));
     }
 }

@@ -47,6 +47,10 @@ where
         vec.shuffle(rng);
         vec
     }
+
+    pub fn sample_one<R: Rng>(&self, rng: &mut R) -> Option<&T> {
+        self.ring.iter().choose(rng)
+    }
 }
 
 #[cfg(test)]

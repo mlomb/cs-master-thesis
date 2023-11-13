@@ -21,7 +21,9 @@ fn main() -> ort::Result<()> {
 
     for _i in 0..5 {
         trainer.generate_samples();
+        trainer.generate_samples();
         trainer.train();
+        std::thread::sleep(std::time::Duration::from_secs(10000));
     }
 
     model_management::Pepe::new("models").latest();

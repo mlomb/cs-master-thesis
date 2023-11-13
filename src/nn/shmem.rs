@@ -11,7 +11,7 @@ pub fn open_shmem(id: &str, size: usize) -> Result<Shmem, ShmemError> {
             shmem.set_owner(true);
 
             // insufficient size, drop and try again
-            if shmem.len() < size {
+            if shmem.len() != size {
                 // force drop
                 drop(shmem);
 
