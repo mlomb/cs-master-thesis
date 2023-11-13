@@ -1,7 +1,7 @@
 use shakmaty::Chess;
-use thesis::algos::mcts::mcts::{MCTSSpec, MCTS};
-use thesis::algos::mcts::strategy::DefaultStrategy;
 use thesis::core::position::Position;
+use thesis::search::mcts::mcts::{MCTSSpec, MCTS};
+use thesis::search::mcts::strategy::DefaultStrategy;
 
 struct SampleSpec;
 

@@ -3,8 +3,8 @@ use super::{
     service::DeepCmpService, value::DeepCmpValue,
 };
 use crate::{
-    algos::alphabeta::alphabeta,
     core::{agent::Agent, position, value::Value},
+    search::alphabeta::alphabeta,
 };
 use rand::seq::SliceRandom;
 use std::{cell::RefCell, collections::VecDeque, rc::Rc};

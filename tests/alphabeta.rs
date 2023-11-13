@@ -1,13 +1,13 @@
 use std::collections::HashSet;
 use std::hash::Hash;
-use thesis::algos::alphabeta::alphabeta;
-use thesis::algos::negamax::negamax;
 use thesis::core::position::Position;
 use thesis::core::result::SearchResult;
 use thesis::evaluators::null::NullEvaluator;
 use thesis::games::connect4::Connect4;
 use thesis::games::connect4_strat::Connect4BasicEvaluator;
 use thesis::games::mnk::TicTacToe;
+use thesis::search::alphabeta::alphabeta;
+use thesis::search::negamax::negamax;
 
 fn generate_boards<P: Position + Sized + Eq + Hash>(
     from: &P,

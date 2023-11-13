@@ -1,9 +1,9 @@
-use thesis::algos::negamax::negamax;
 use thesis::core::outcome::Outcome::*;
 use thesis::core::position::Position;
 use thesis::core::result::SearchResult;
 use thesis::evaluators::null::NullEvaluator;
 use thesis::games::mnk::TicTacToe;
+use thesis::search::negamax::negamax;
 
 // We need a concrete type for A
 type R = SearchResult<i32>;
