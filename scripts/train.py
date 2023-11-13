@@ -16,7 +16,7 @@ def open_shm(name):
         print(f"The shared memory block '{name}' does not exist. Please run the Rust side first.")
         exit(1)
 
-shm_signal = open_shm("deepcmp-signal")
+shm_status = open_shm("deepcmp-status")
 shm_inputs = open_shm("deepcmp-inputs")
 shm_outputs = open_shm("deepcmp-outputs")
 
@@ -26,22 +26,46 @@ import os
 import onnx
 import tf2onnx
 import tensorflow.keras as keras
+import math
 
 tensorboard = keras.callbacks.TensorBoard(
     log_dir='./logs',
     write_graph=False,
 )
 
+model_path = "../models/best"
+status = np.asarray(shm_status.buf).view(np.int32)
 inputs = np.asarray(shm_inputs.buf).view(np.float32)
-inputs = inputs.reshape((600, 7, 6, 4))
+outputs = np.asarray(shm_outputs.buf).view(np.float32)
 
-for i in range(0, 7):
-    for j in range(0, 6):
-        for k in range(0, 4):
-            print("inputs[0][{}][{}][{}] = {}".format(i, j, k, inputs[0][i][j][k]))
+model = keras.models.load_model(model_path)
 
+def train_iteration():
+
+    batch_size = inputs.size // math.prod(model.inputs[0].shape.as_list()[1:])
+    inputs_shape = (batch_size,) + model.inputs[0].shape[1:]
+    outputs_shape = (batch_size,) + model.outputs[0].shape[1:]
+    
+    x = inputs.reshape(inputs_shape)
+    y = outputs.reshape(outputs_shape)
+    
+    # fit model
+    model.fit(
+        x=x,
+        y=y,
+        shuffle=False, # already shuffled
+        batch_size=batch_size,
+        #initial_epoch=version,
+        #epochs=version+1,
+        callbacks=[tensorboard]
+    )
 
 while True:
-    time.sleep(0.1)
+    # wait until ready
+    while status[0] == 0:
+        time.sleep(0.1)
 
-    # print(shm_signal.buf[:10].tolist())
+    train_iteration()
+
+    # mark as done
+    status[0] = 0

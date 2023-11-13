@@ -23,13 +23,14 @@ pub struct DeepCmpTrainer<'a, P> {
     // we need to keep these alive, since we
     // use them in the tensors below
     #[allow(dead_code)]
-    signal_shmem: Shmem,
+    status_shmem: Shmem,
     #[allow(dead_code)]
     inputs_shmem: Shmem,
     #[allow(dead_code)]
     outputs_shmem: Shmem,
 
     // tensors (that use the shared memory)
+    status_tensor: ArrayViewMutD<'a, u32>,
     inputs_tensor: ArrayViewMutD<'a, f32>,
     outputs_tensor: ArrayViewMutD<'a, f32>,
 }
@@ -52,9 +53,12 @@ where
         let outputs_shape = IxDyn(&outputs_shape_vec);
 
         // create shared memory buffers for training
+        let status_shmem = open_shmem("deepcmp-status", 1 * 4).unwrap();
         let inputs_shmem = open_shmem("deepcmp-inputs", inputs_shape.size() * 4).unwrap();
         let outputs_shmem = open_shmem("deepcmp-outputs", outputs_shape.size() * 4).unwrap();
 
+        let status_tensor =
+            unsafe { ArrayViewMut::from_shape_ptr(IxDyn(&[1]), status_shmem.as_ptr() as *mut u32) };
         let inputs_tensor = unsafe {
             ArrayViewMut::from_shape_ptr(inputs_shape, inputs_shmem.as_ptr() as *mut f32)
         };
@@ -71,10 +75,11 @@ where
             batch_size,
 
             // initialize required shared memory buffers for training
-            signal_shmem: open_shmem("deepcmp-signal", 4096).unwrap(),
+            status_shmem,
             inputs_shmem,
             outputs_shmem,
 
+            status_tensor,
             inputs_tensor,
             outputs_tensor,
         }
@@ -131,11 +136,16 @@ where
 
     /// Prepares and fills the training data
     pub fn train(&mut self) {
+        // clear tensors
+        self.status_tensor.fill(0);
+        self.inputs_tensor.fill(0.0);
+        self.outputs_tensor.fill(0.0);
+
         let mut rng = rand::thread_rng();
 
         for i in 0..self.batch_size {
             let win_pos = self.win_positions.sample_one(&mut rng).unwrap();
-            let loss_pos = self.win_positions.sample_one(&mut rng).unwrap();
+            let loss_pos = self.loss_positions.sample_one(&mut rng).unwrap();
 
             let (left_board, ordering, right_board) = if rng.gen_bool(0.5) {
                 (win_pos, Ordering::Greater, loss_pos)
@@ -152,6 +162,16 @@ where
                 ordering,
                 &mut self.outputs_tensor.index_axis_mut(Axis(0), i),
             );
+        }
+
+        let status_ptr = self.status_shmem.as_ptr();
+
+        // mark as ready so Python can start training
+        unsafe { status_ptr.offset(0).write(1) };
+
+        // wait for Python to finish training
+        while unsafe { status_ptr.offset(0).read() } == 1 {
+            std::thread::sleep(std::time::Duration::from_millis(100));
         }
     }
 }

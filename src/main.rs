@@ -17,13 +17,13 @@ fn main() -> ort::Result<()> {
         .with_intra_threads(1)?
         .with_model_from_file("models/best/onnx_model.onnx")?;
 
-    let mut trainer = DeepCmpTrainer::<Connect4>::new(10000, 600, session);
+    let mut trainer = DeepCmpTrainer::<Connect4>::new(10000, 2048, session);
 
-    for _i in 0..5 {
+    for _i in 0..1000 {
         trainer.generate_samples();
         trainer.generate_samples();
         trainer.train();
-        std::thread::sleep(std::time::Duration::from_secs(10000));
+        //std::thread::sleep(std::time::Duration::from_secs(10000));
     }
 
     model_management::Pepe::new("models").latest();
