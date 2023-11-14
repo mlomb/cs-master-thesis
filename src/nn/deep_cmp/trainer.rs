@@ -2,7 +2,7 @@ use super::service::DeepCmpService;
 use super::{encoding::TensorEncodeable, ringbuffer_set::RingBufferSet};
 use crate::core::r#match::{play_match, MatchOutcome};
 use crate::{
-    core::{agent::Agent, outcome::Outcome, position::Position},
+    core::position::Position,
     nn::{deep_cmp::agent::DeepCmpAgent, shmem::open_shmem},
 };
 use ndarray::{ArrayViewMut, ArrayViewMutD, Axis, Dimension, IxDyn};

@@ -1,7 +1,7 @@
 use std::cmp::Ordering;
 
 use crate::games::connect4::*;
-use ndarray::{s, ArrayViewD, ArrayViewMut3, ArrayViewMutD, Dimension, IxDyn};
+use ndarray::{s, ArrayViewD, ArrayViewMut3, ArrayViewMutD};
 
 pub trait TensorEncodeable {
     /// Returns the shape of the input tensor.
@@ -24,10 +24,6 @@ pub trait TensorEncodeable {
 fn encode_connect4(board: &Connect4, tensor: &mut ArrayViewMut3<f32>) {
     assert_eq!(tensor.shape(), &[7, 6, 2]);
     let who_plays = board.0.who_plays();
-
-    // clear tensor
-    // TODO: clear in another place
-    tensor.fill(0.0);
 
     for row in 0..ROWS {
         for col in 0..COLS {

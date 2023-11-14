@@ -1,8 +1,6 @@
 use crate::core::position::Position;
-use ndarray::{s, ArrayD, Axis};
+use ndarray::{ArrayD, Axis};
 use ort::Session;
-use rand::distributions::Slice;
-use std::hash::Hash;
 use std::{cmp::Ordering, collections::HashMap};
 
 use super::encoding::TensorEncodeable;
