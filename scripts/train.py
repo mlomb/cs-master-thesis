@@ -37,7 +37,7 @@ if len(sys.argv) < 2:
 else:
     models_path = Path(sys.argv[1])
 
-status = np.asarray(shm_status.buf).view(np.int32)
+status = np.asarray(shm_status.buf).view(np.uint32)
 inputs = np.asarray(shm_inputs.buf).view(np.float32)
 outputs = np.asarray(shm_outputs.buf).view(np.float32)
 

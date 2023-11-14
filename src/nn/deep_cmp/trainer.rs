@@ -1,5 +1,6 @@
 use super::service::DeepCmpService;
 use super::{encoding::TensorEncodeable, ringbuffer_set::RingBufferSet};
+use crate::core::r#match::{play_match, MatchOutcome};
 use crate::{
     core::{agent::Agent, outcome::Outcome, position::Position},
     nn::{deep_cmp::agent::DeepCmpAgent, shmem::open_shmem},
@@ -17,6 +18,7 @@ pub struct DeepCmpTrainer<'a, P> {
     all_positions: HashSet<P>,
     service: Rc<RefCell<DeepCmpService<P>>>,
 
+    version: usize,
     batch_size: usize,
 
     // shared memory with Python for training
@@ -37,7 +39,7 @@ pub struct DeepCmpTrainer<'a, P> {
 
 impl<P> DeepCmpTrainer<'_, P>
 where
-    P: Position + TensorEncodeable + Eq + Hash,
+    P: Position + TensorEncodeable + Eq + Hash + 'static,
 {
     pub fn new(capacity: usize, batch_size: usize, session: Session) -> Self {
         // extract shapes from Position
@@ -72,6 +74,7 @@ where
             all_positions: HashSet::new(),
             service: Rc::new(RefCell::new(DeepCmpService::new(session))),
 
+            version: 1,
             batch_size,
 
             // initialize required shared memory buffers for training
@@ -86,45 +89,36 @@ where
     }
 
     pub fn generate_samples(&mut self) {
-        let mut agent = DeepCmpAgent::new(self.service.clone());
-        let mut position = P::initial();
-        let mut history = vec![position.clone()];
+        let agent = Rc::new(RefCell::new(DeepCmpAgent::new(self.service.clone())));
+        let mut history = Vec::<P>::new();
 
-        while let None = position.status() {
-            let chosen_action = agent
-                .next_action(&position)
-                .expect("agent to return action");
+        let outcome = play_match(agent.clone(), agent, Some(&mut history));
 
-            position = position.apply_action(&chosen_action);
-            history.push(position.clone());
-            self.all_positions.insert(position.clone());
-        }
+        // even positions
+        history
+            .iter()
+            .step_by(2)
+            .cloned()
+            .for_each(|pos| match outcome {
+                MatchOutcome::WinAgent1 => self.win_positions.insert(pos),
+                MatchOutcome::WinAgent2 => self.loss_positions.insert(pos),
+                _ => (),
+            });
 
-        let status = position.status();
+        // odd positions
+        history
+            .iter()
+            .skip(1)
+            .step_by(2)
+            .cloned()
+            .for_each(|pos| match outcome {
+                MatchOutcome::WinAgent1 => self.loss_positions.insert(pos),
+                MatchOutcome::WinAgent2 => self.win_positions.insert(pos),
+                _ => (),
+            });
 
-        // ignore draws
-        if let Some(Outcome::Draw) = status {
-            return;
-        }
-
-        // We expect a loss, since the POV is changed after the last move
-        // WLWLWLWL
-        //        ↑
-        // LWLWLWL
-        //       ↑
-        assert_eq!(status, Some(Outcome::Loss));
-
-        // iterate over history in reverse
-        // knowing that the last state is a loss
-        let mut it = history.iter().rev().peekable();
-        while it.peek().is_some() {
-            if let Some(pos) = it.next() {
-                self.loss_positions.insert(pos.clone());
-            }
-            if let Some(pos) = it.next() {
-                self.win_positions.insert(pos.clone());
-            }
-        }
+        // add all positions to the set
+        self.all_positions.extend(history.iter().cloned());
 
         println!(
             "win: {}, loss: {} all: {}",
@@ -164,18 +158,20 @@ where
             );
         }
 
-        let status_ptr = self.status_shmem.as_ptr();
+        let status_ptr = self.status_shmem.as_ptr() as *mut u32;
 
         unsafe {
+            // write version
+            status_ptr.offset(1).write(self.version as u32);
             // mark as ready so Python can start training
             status_ptr.offset(0).write(1);
-            // set version to 1
-            status_ptr.offset(1).write(1);
         };
 
         // wait for Python to finish training
         while unsafe { status_ptr.offset(0).read() } == 1 {
             std::thread::sleep(std::time::Duration::from_millis(100));
         }
+
+        self.version += 1;
     }
 }
