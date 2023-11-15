@@ -1,7 +1,7 @@
 // https://github.com/epwalsh/batched-fn/blob/main/src/lib.rs
 
 use flume::{unbounded, Sender};
-use ort::Session;
+use ort::{Session, SessionInputs, SessionOutputs};
 use std::{thread::JoinHandle, time::Duration};
 
 enum Message {
@@ -27,6 +27,8 @@ impl Batcher {
         let handle = std::thread::spawn(move || {
             let mut batch_inputs = Vec::with_capacity(max_batch_size);
             let mut batch_txs = Vec::with_capacity(max_batch_size);
+
+            let mut i = 0;
 
             // Wait for the first input in the batch
             while let Ok(Message::Sample(input, result_tx)) = rx.recv() {
@@ -57,7 +59,11 @@ impl Batcher {
                 }
 
                 // Run the batch
-                batch_txs.iter().for_each(|tx| tx.send(0).unwrap());
+                println!("Running batch {}: {:?}", i, batch_inputs.len());
+                batch_txs.iter().for_each(|tx| tx.send(i).unwrap());
+                i += 1;
+
+                session.run(input_values);
 
                 // Cleanup
                 batch_inputs.clear();
@@ -76,7 +82,10 @@ impl Batcher {
         self.handle.join().unwrap();
     }
 
-    pub fn run(&self, input: usize) -> usize {
+    pub fn run<'s>(
+        &self,
+        input_values: impl Into<SessionInputs<'s>>,
+    ) -> Result<SessionOutputs, usize> {
         // Create a channel to get the data back
         let (result_tx, result_rx) = unbounded();
 
@@ -91,29 +100,35 @@ impl Batcher {
 #[cfg(test)]
 mod tests {
     use super::Batcher;
-    use ort::{Environment, Session, SessionBuilder};
+    use ort::{download::vision::ImageClassification, Environment, Session, SessionBuilder};
     use std::time::Duration;
 
     fn load_test_model() -> ort::Result<Session> {
         let environment = Environment::builder().build()?.into_arc();
         let session = SessionBuilder::new(&environment)?
             .with_intra_threads(1)?
-            .with_model_from_memory(include_bytes!("../../tests/test_model.onnx"))?;
+            .with_model_downloaded(ImageClassification::MobileNet)?;
 
         Ok(session)
     }
 
     #[test]
     fn single_thread() {
-        let batcher = Batcher::spawn_with(load_test_model().unwrap(), 7, Duration::from_millis(50));
+        let batcher =
+            Batcher::spawn_with(load_test_model().unwrap(), 16, Duration::from_millis(50));
 
         std::thread::scope(|s| {
             for _ in 0..20 {
                 s.spawn({
                     let batcher = &batcher;
                     move || {
+                        let mut rng = rand::thread_rng();
                         for key in [1, 2, 3, 4, 5, 6, 7, 8, 9] {
                             std::thread::yield_now();
+                            std::thread::sleep(Duration::from_millis(
+                                // random
+                                rand::Rng::gen_range(&mut rng, 0..200),
+                            ));
                             let v = batcher.run(key);
                             println!("{}: {}", key, v);
                         }

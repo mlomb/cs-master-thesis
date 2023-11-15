@@ -8,7 +8,7 @@ flume = "0.11.0"
 indicatif = "0.17.7"
 lazy_static = "1.4.0"
 ndarray = "0.15.6"
-ort = { git = "https://github.com/pykeio/ort", branch = "v2", features = ["download-binaries", "cuda"] }
+ort = { git = "https://github.com/pykeio/ort", branch = "v2", features = ["fetch-models", "download-binaries", "cuda"] }
 rand = "0.8.5"
 rayon = "1.8.0"
 ringbuffer = "0.15.0"
