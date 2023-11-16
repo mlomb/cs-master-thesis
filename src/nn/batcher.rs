@@ -1,8 +1,8 @@
 // https://github.com/epwalsh/batched-fn/blob/main/src/lib.rs
 
 use flume::{unbounded, Sender};
-use ndarray::{Array, ArrayD, ArrayViewD, Axis, IxDyn};
-use ort::Session;
+use ndarray::{ArrayD, Axis, Slice};
+use ort::{Session, Value};
 use std::{thread::JoinHandle, time::Duration};
 
 enum Message {
@@ -10,7 +10,7 @@ enum Message {
     Stop,
 
     /// A new batch has been requested
-    Sample(Vec<ArrayD<f32>>, Sender<usize>),
+    Sample(Vec<ArrayD<f32>>, Sender<Vec<ArrayD<f32>>>),
 }
 
 pub struct Batcher {
@@ -29,7 +29,7 @@ impl Batcher {
             let mut batch_txs = Vec::with_capacity(max_batch_size);
             let mut batch_inputs: Vec<ArrayD<f32>> = session
                 .inputs
-                .into_iter()
+                .iter()
                 .map(|input| {
                     input
                         .input_type
@@ -41,18 +41,15 @@ impl Batcher {
                     assert!(shape[0] == -1, "model must support dynamic batch size");
                     assert!(shape[1..].iter().all(|&d| d != -1), "only one dynamic");
 
-                    let mut shape = shape
-                        .into_iter()
-                        .map(|d| d as usize)
-                        .collect::<Vec<usize>>();
+                    // i64 -> usize
+                    let mut shape: Vec<usize> = shape.into_iter().map(|d| d as usize).collect();
+
                     // reserve size for the biggest batch
                     shape[0] = max_batch_size;
                     shape
                 })
                 .map(|shape| ArrayD::zeros(shape))
                 .collect();
-
-            let mut i = 0;
 
             // Wait for the first input in the batch
             while let Ok(Message::Sample(inputs, result_tx)) = rx.recv() {
@@ -69,7 +66,7 @@ impl Batcher {
                 let deadline = std::time::Instant::now() + max_wait_time;
 
                 // Wait for more inputs to come in
-                while batch_inputs.len() < max_batch_size {
+                while batch_txs.len() < max_batch_size {
                     if let Ok(message) = rx.recv_deadline(deadline) {
                         match message {
                             Message::Stop => {
@@ -77,13 +74,17 @@ impl Batcher {
                                 return;
                             }
                             Message::Sample(inputs, result_tx) => {
+                                let sample_index = batch_txs.len();
+
                                 // Add the input to the batch
                                 batch_txs.push(result_tx);
                                 batch_inputs.iter_mut().zip(inputs).for_each(
-                                    |(batch_input, input)| 
+                                    |(batch_input, input)| {
                                         // Note that this will panic if the input is not the right shape
-                                        batch_input.index_axis_mut(Axis(0), batch_txs.len() - 1).assign(&input)
-                                    ,
+                                        batch_input
+                                            .index_axis_mut(Axis(0), sample_index)
+                                            .assign(&input)
+                                    },
                                 );
                             }
                         }
@@ -93,14 +94,47 @@ impl Batcher {
                     }
                 }
 
+                // Convert the inputs into ort::Value-s
+                let values: Vec<Value> = batch_inputs
+                    .iter()
+                    .map(|input| {
+                        Value::from_array(
+                            // Only keep the samples that were added to the batch
+                            input.slice_axis(Axis(0), Slice::from(0..batch_txs.len())),
+                        )
+                        .unwrap()
+                    })
+                    .collect();
+
                 // Run the batch
-                //println!("Running batch {}: {:?}", i, batch_inputs.len());
-                batch_txs.iter().for_each(|tx| tx.send(i).unwrap());
-                i += 1;
-                //session.run(ort::inputs![batch_inputs]);
+                println!("Running batch for {} samples", batch_txs.len());
+                let result = session.run(values);
+
+                match result {
+                    Ok(outputs) => {
+                        println!("Inference OK {:?}", outputs[0].extract_tensor::<f32>());
+
+                        for (index, tx) in batch_txs.iter().enumerate() {
+                            let arrays: Vec<ArrayD<f32>> = outputs
+                                .iter()
+                                .map(|(_, value)| {
+                                    value
+                                        .extract_tensor()
+                                        .unwrap()
+                                        .view()
+                                        // extract the result from that sample
+                                        .index_axis(Axis(0), index)
+                                        .to_owned()
+                                })
+                                .collect();
+                            tx.send(arrays).unwrap();
+                        }
+                    }
+                    // TODO: handle properly
+                    Err(err) => panic!("Error running inference"),
+                }
 
                 // Cleanup
-                batch_inputs.clear();
                 batch_txs.clear();
             }
         });
@@ -116,7 +150,7 @@ impl Batcher {
         self.handle.join().unwrap();
     }
 
-    pub fn run(&self, inputs: Vec<ArrayD<f32>>) -> usize {
+    pub fn run(&self, inputs: Vec<ArrayD<f32>>) -> Vec<ArrayD<f32>> {
         // Create a channel to get the data back
         let (result_tx, result_rx) = unbounded();
 
@@ -132,7 +166,7 @@ impl Batcher {
 mod tests {
     use super::Batcher;
     use ndarray::ArrayD;
-    use ort::{download::vision::ImageClassification, Environment, Session, SessionBuilder};
+    use ort::{Environment, Session, SessionBuilder};
     use std::time::Duration;
 
     fn load_test_model() -> ort::Result<Session> {
@@ -163,7 +197,8 @@ mod tests {
                                 rand::Rng::gen_range(&mut rng, 0..200),
                             ));
                             let inputs = vec![ArrayD::zeros(vec![7, 6, 4])];
-                            let v = batcher.run(inputs);
+                            let out = batcher.run(inputs);
+                            assert_eq!(out, vec![ArrayD::from_elem(vec![2], 0.5)]);
                             //println!("{}: {}", key, v);
                         }
                     }
