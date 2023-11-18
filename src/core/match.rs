@@ -1,5 +1,5 @@
 use super::{agent::Agent, outcome::Outcome, position::Position};
-use std::{cell::RefCell, rc::Rc};
+use std::{cell::RefCell, rc::Rc, sync::Arc};
 
 /// The outcome of a two-agent match
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
@@ -12,9 +12,9 @@ pub enum MatchOutcome {
 
 /// Play a match between two agents.
 /// Agent 1 plays first.
-pub fn play_match<P>(
-    agent1: Rc<RefCell<dyn Agent<P>>>,
-    agent2: Rc<RefCell<dyn Agent<P>>>,
+pub fn play_match<'a, P>(
+    agent1: &'a mut dyn Agent<P>,
+    agent2: &'a mut dyn Agent<P>,
     mut history: Option<&mut Vec<P>>,
 ) -> MatchOutcome
 where
@@ -30,9 +30,9 @@ where
 
     while let None = position.status() {
         let chosen_action = if who_plays {
-            agent1.borrow_mut()
+            &mut *agent1
         } else {
-            agent2.borrow_mut()
+            &mut *agent2
         }
         .next_action(&position)
         .expect("agent to return action");
