@@ -39,6 +39,7 @@ pub struct DeepCmpTrainer<'a, P> {
 
 impl<P> DeepCmpTrainer<'_, P>
 where
+    // TODO: preguntar a sponja por que hace falta el 'static
     P: Position + TensorEncodeable + Eq + Hash + 'static,
 {
     pub fn new(capacity: usize, batch_size: usize, session: Session) -> Self {
@@ -92,30 +93,25 @@ where
         let agent = Rc::new(RefCell::new(DeepCmpAgent::new(self.service.clone())));
         let mut history = Vec::<P>::new();
 
-        let outcome = play_match(agent.clone(), agent, Some(&mut history));
+        let outcome = MatchOutcome::WinAgent1; //play_match(agent.clone(), agent, Some(&mut history));
 
         // even positions
-        history
-            .iter()
-            .step_by(2)
-            .cloned()
-            .for_each(|pos| match outcome {
-                MatchOutcome::WinAgent1 => self.win_positions.insert(pos),
-                MatchOutcome::WinAgent2 => self.loss_positions.insert(pos),
+        for pos in history.iter().step_by(2) {
+            match outcome {
+                MatchOutcome::WinAgent1 => self.win_positions.insert(pos.clone()),
+                MatchOutcome::WinAgent2 => self.loss_positions.insert(pos.clone()),
                 _ => (),
-            });
+            }
+        }
 
         // odd positions
-        history
-            .iter()
-            .skip(1)
-            .step_by(2)
-            .cloned()
-            .for_each(|pos| match outcome {
-                MatchOutcome::WinAgent1 => self.loss_positions.insert(pos),
-                MatchOutcome::WinAgent2 => self.win_positions.insert(pos),
+        for pos in history.iter().skip(1).step_by(2) {
+            match outcome {
+                MatchOutcome::WinAgent1 => self.loss_positions.insert(pos.clone()),
+                MatchOutcome::WinAgent2 => self.win_positions.insert(pos.clone()),
                 _ => (),
-            });
+            }
+        }
 
         // add all positions to the set
         self.all_positions.extend(history.iter().cloned());

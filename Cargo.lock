@@ -418,13 +418,25 @@ checksum = "dd8b5dd2ae5ed71462c540258bedcb51965123ad7e7ccf4b9a8cafaa4a63576d"
 
 [[package]]
 name = "ort"
+version = "2.0.0-alpha.0"
+source = "git+https://github.com/pykeio/ort?rev=584a6e34#584a6e3479dcdc4ea97e5886f569101c758a6384"
+dependencies = [
+ "ndarray",
+ "once_cell",
+ "ort-sys 2.0.0-alpha.0",
+ "thiserror",
+ "tracing",
+]
+
+[[package]]
+name = "ort"
 version = "2.0.0"
 source = "git+https://github.com/pykeio/ort?branch=v2#84add5f0d22c36ed251e063e40a1457ea01ece69"
 dependencies = [
  "half",
  "ndarray",
  "once_cell",
- "ort-sys",
+ "ort-sys 0.0.1",
  "smallvec",
  "thiserror",
  "tracing",
@@ -440,6 +452,25 @@ dependencies = [
  "tar",
  "ureq",
  "zip",
+]
+
+[[package]]
+name = "ort-sys"
+version = "2.0.0-alpha.0"
+source = "git+https://github.com/pykeio/ort?rev=584a6e34#584a6e3479dcdc4ea97e5886f569101c758a6384"
+dependencies = [
+ "flate2",
+ "tar",
+]
+
+[[package]]
+name = "ort_batcher"
+version = "0.1.0"
+source = "git+https://github.com/mlomb/ort-batcher#20adf155e57cd439666d6a6ebff5867e1178223c"
+dependencies = [
+ "flume",
+ "ndarray",
+ "ort 2.0.0-alpha.0",
 ]
 
 [[package]]
@@ -691,7 +722,8 @@ dependencies = [
  "indicatif",
  "lazy_static",
  "ndarray",
- "ort",
+ "ort 2.0.0",
+ "ort_batcher",
  "rand",
  "rayon",
  "ringbuffer",

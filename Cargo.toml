@@ -16,3 +16,4 @@ shakmaty = "0.26.0"
 shared_memory = "0.12.4"
 smallvec = "1.11.1"
 tracing-subscriber = "0.3.17"
+ort_batcher = { git = "https://github.com/mlomb/ort-batcher" }
