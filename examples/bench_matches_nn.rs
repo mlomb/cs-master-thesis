@@ -79,7 +79,7 @@ fn main() -> ort::Result<()> {
                 "{spinner:.green} [Elapsed {elapsed_precise}] (ETA {eta}) [{bar:.cyan/blue}] {human_pos}/{human_len}  {per_sec} ",
             )
             .unwrap()
-            .progress_chars("#>-"),
+            .progress_chars("#987654321-")
         );
 
         (0..n).into_par_iter().for_each(|_| {

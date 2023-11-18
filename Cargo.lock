@@ -444,6 +444,7 @@ dependencies = [
 [[package]]
 name = "ort_batcher"
 version = "0.1.0"
+source = "git+https://github.com/mlomb/ort-batcher#20adf155e57cd439666d6a6ebff5867e1178223c"
 dependencies = [
  "flume",
  "ndarray",
