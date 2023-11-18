@@ -1,16 +1,11 @@
 use ndarray::*;
-use ort::{Environment, ExecutionProvider, SessionBuilder};
+use ort::{CPUExecutionProvider, CUDAExecutionProvider, Environment, SessionBuilder};
 
 fn main() -> ort::Result<()> {
     tracing_subscriber::fmt::init();
 
-    println!(
-        "CUDA available: {}",
-        ExecutionProvider::CUDA(Default::default()).is_available()?
-    );
-
     let environment = Environment::builder()
-        .with_execution_providers([ExecutionProvider::CPU(Default::default())])
+        .with_execution_providers([CPUExecutionProvider::default().build()])
         .build()?
         .into_arc();
 

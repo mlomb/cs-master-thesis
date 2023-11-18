@@ -1,6 +1,9 @@
-use std::sync::mpsc::{self, Receiver, Sender};
+use std::{
+    sync::mpsc::{self, Receiver, Sender},
+    time::Duration,
+};
 
-use indicatif::ProgressBar;
+use indicatif::{ProgressBar, ProgressIterator};
 use rand::seq::SliceRandom;
 use rayon::prelude::*;
 use thesis::{
@@ -21,7 +24,7 @@ fn main() {
         }
     }
 
-    let n = 2 * 1000000;
+    let n = 1 * 1000000;
 
     {
         let start = std::time::Instant::now();
@@ -48,6 +51,7 @@ fn main() {
             play_match(&mut agent1, &mut agent2, None);
             pb.inc(1);
         });
+
         pb.finish();
         println!("elapsed: {:?}", start.elapsed());
     }
