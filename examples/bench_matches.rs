@@ -1,24 +1,11 @@
 use indicatif::ProgressBar;
-use rand::seq::SliceRandom;
 use rayon::prelude::*;
 use thesis::{
-    core::{agent::Agent, position::Position, r#match::play_match},
+    core::{agent::RandomAgent, r#match::play_match},
     games::connect4::Connect4,
 };
 
 fn main() {
-    struct RandomAgent {}
-    unsafe impl Send for RandomAgent {}
-    unsafe impl Sync for RandomAgent {}
-    impl Agent<Connect4> for RandomAgent {
-        fn next_action(&mut self, position: &Connect4) -> Option<usize> {
-            position
-                .valid_actions()
-                .choose(&mut rand::thread_rng())
-                .cloned()
-        }
-    }
-
     let n = 1 * 1000000;
 
     {
@@ -28,7 +15,7 @@ fn main() {
         for _ in 0..n {
             let mut agent1 = RandomAgent {};
             let mut agent2 = RandomAgent {};
-            play_match(&mut agent1, &mut agent2, None);
+            play_match::<Connect4>(&mut agent1, &mut agent2, None);
             pb.inc(1);
         }
 
@@ -43,7 +30,7 @@ fn main() {
         (0..n).into_par_iter().for_each(|_| {
             let mut agent1 = RandomAgent {};
             let mut agent2 = RandomAgent {};
-            play_match(&mut agent1, &mut agent2, None);
+            play_match::<Connect4>(&mut agent1, &mut agent2, None);
             pb.inc(1);
         });
 
@@ -62,7 +49,7 @@ fn main() {
                     for _ in 0..n / 8 {
                         let mut agent1 = RandomAgent {};
                         let mut agent2 = RandomAgent {};
-                        play_match(&mut agent1, &mut agent2, None);
+                        play_match::<Connect4>(&mut agent1, &mut agent2, None);
                         pb.inc(1);
                     }
                 });
