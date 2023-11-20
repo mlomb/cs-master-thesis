@@ -1,8 +1,10 @@
 use std::{io::Write, sync::Arc, time::Duration};
 
 use indicatif::{ProgressBar, ProgressState, ProgressStyle};
-use ndarray::ArrayD;
-use ort::{CPUExecutionProvider, CUDAExecutionProvider, Environment, SessionBuilder};
+use ndarray::{ArrayD, Axis};
+use ort::{
+    CPUExecutionProvider, CUDAExecutionProvider, Environment, Session, SessionBuilder, Value,
+};
 use ort_batcher::batcher::Batcher;
 use rand::seq::SliceRandom;
 use rayon::prelude::*;
@@ -18,8 +20,8 @@ fn main() -> ort::Result<()> {
         .unwrap();
 
     let environment = Environment::builder()
-        //.with_execution_providers([CPUExecutionProvider::default().build()])
-        .with_execution_providers([CUDAExecutionProvider::default().build()])
+        .with_execution_providers([CPUExecutionProvider::default().build()])
+        //.with_execution_providers([CUDAExecutionProvider::default().build()])
         .build()?
         .into_arc();
 
@@ -34,12 +36,24 @@ fn main() -> ort::Result<()> {
     #[derive(Clone)]
     struct RandomAgent {
         sum: f32,
+        //session: Arc<Session>,
         batcher: Arc<Batcher>,
     }
     // unsafe impl Send for RandomAgent {}
     // unsafe impl Sync for RandomAgent {}
     impl Agent<Connect4> for RandomAgent {
         fn next_action(&mut self, position: &Connect4) -> Option<usize> {
+            /*
+            let input = ArrayD::<f32>::zeros(vec![7, 6, 4]).insert_axis(Axis(0));
+            let value = Value::from_array(input.clone()).unwrap();
+            self.session.run([value]).unwrap()[0]
+                .extract_tensor::<f32>()
+                .unwrap()
+                .view()
+                .index_axis(Axis(0), 0)
+                .to_owned();
+            */
+
             let res = self.batcher.run(vec![ArrayD::<f32>::zeros(vec![7, 6, 4])]);
             self.sum += res.unwrap()[0][0];
             position
@@ -52,24 +66,9 @@ fn main() -> ort::Result<()> {
     let n = 1 * 1000000;
     let agent = RandomAgent {
         sum: 0.0,
+        //session: Arc::new(session),
         batcher: batcher.clone(),
     };
-
-    /*
-    // too slow
-    {
-        let start = std::time::Instant::now();
-        let pb = ProgressBar::new(n);
-
-        for _ in 0..n {
-            play_match(&mut agent.clone(), &mut agent.clone(), None);
-            pb.inc(1);
-        }
-
-        pb.finish();
-        println!("elapsed: {:?}", start.elapsed());
-    }
-    */
 
     {
         let start = std::time::Instant::now();
@@ -90,29 +89,6 @@ fn main() -> ort::Result<()> {
         pb.finish();
         println!("elapsed: {:?}", start.elapsed());
     }
-
-    /*
-    {
-        let start = std::time::Instant::now();
-        let pb = ProgressBar::new(n);
-
-        std::thread::scope(|s| {
-            for _ in 0..8 {
-                let pb = &pb;
-                let agent = &agent;
-                s.spawn(move || {
-                    for _ in 0..n / 8 {
-                        play_match(&mut agent.clone(), &mut agent.clone(), None);
-                        pb.inc(1);
-                    }
-                });
-            }
-        });
-
-        pb.finish();
-        println!("elapsed: {:?}", start.elapsed());
-    }
-    */
 
     Ok(())
 }
