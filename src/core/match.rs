@@ -1,5 +1,4 @@
 use super::{agent::Agent, outcome::Outcome, position::Position};
-use std::{cell::RefCell, rc::Rc, sync::Arc};
 
 /// The outcome of a two-agent match
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]

@@ -1,13 +1,10 @@
-use std::{io::Write, sync::Arc, time::Duration};
-
-use indicatif::{ProgressBar, ProgressState, ProgressStyle};
-use ndarray::{ArrayD, Axis};
-use ort::{
-    CPUExecutionProvider, CUDAExecutionProvider, Environment, Session, SessionBuilder, Value,
-};
+use indicatif::{ProgressBar, ProgressStyle};
+use ndarray::ArrayD;
+use ort::{CPUExecutionProvider, Environment, SessionBuilder};
 use ort_batcher::batcher::Batcher;
 use rand::seq::SliceRandom;
 use rayon::prelude::*;
+use std::{sync::Arc, time::Duration};
 use thesis::{
     core::{agent::Agent, position::Position, r#match::play_match},
     games::connect4::Connect4,

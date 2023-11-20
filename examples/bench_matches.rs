@@ -1,9 +1,4 @@
-use std::{
-    sync::mpsc::{self, Receiver, Sender},
-    time::Duration,
-};
-
-use indicatif::{ProgressBar, ProgressIterator};
+use indicatif::ProgressBar;
 use rand::seq::SliceRandom;
 use rayon::prelude::*;
 use thesis::{

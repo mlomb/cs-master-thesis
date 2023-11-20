@@ -1,5 +1,5 @@
 use ndarray::*;
-use ort::{CPUExecutionProvider, CUDAExecutionProvider, Environment, SessionBuilder};
+use ort::{CPUExecutionProvider, Environment, SessionBuilder};
 
 fn main() -> ort::Result<()> {
     tracing_subscriber::fmt::init();

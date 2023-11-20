@@ -1,4 +1,4 @@
-use ort::{Environment, ExecutionProvider, SessionBuilder};
+use ort::{CPUExecutionProvider, Environment, SessionBuilder};
 use thesis::{
     games::connect4::Connect4,
     nn::{deep_cmp::DeepCmpTrainer, model_management},
@@ -8,7 +8,7 @@ fn main() -> ort::Result<()> {
     println!("Hello, world!");
 
     let environment = Environment::builder()
-        .with_execution_providers([ExecutionProvider::CPU(Default::default())])
+        .with_execution_providers([CPUExecutionProvider::default().build()])
         .with_name("deep_cmp")
         .build()?
         .into_arc();

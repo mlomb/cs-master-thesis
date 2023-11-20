@@ -90,10 +90,11 @@ where
     }
 
     pub fn generate_samples(&mut self) {
-        let agent = Rc::new(RefCell::new(DeepCmpAgent::new(self.service.clone())));
+        let mut agent1 = DeepCmpAgent::new(self.service.clone());
+        let mut agent2 = DeepCmpAgent::new(self.service.clone());
         let mut history = Vec::<P>::new();
 
-        let outcome = MatchOutcome::WinAgent1; //play_match(agent.clone(), agent, Some(&mut history));
+        let outcome = play_match(&mut agent1, &mut agent2, Some(&mut history));
 
         // even positions
         for pos in history.iter().step_by(2) {
