@@ -5,6 +5,7 @@ use crate::core::{
 };
 use indicatif::{ProgressBar, ProgressStyle};
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
+use std::fmt;
 use std::{
     fmt::Debug,
     sync::{Arc, Mutex},
@@ -77,10 +78,6 @@ where
             None
         };
 
-        if let Some(pb) = &progress_bar {
-            pb.set_length((self.agents.len().pow(2) * self.num_matches) as u64);
-        }
-
         let run_match = |(i, j): (usize, usize)| {
             let mut agent1: Box<dyn Agent<P>> = self.agents[i]();
             let mut agent2: Box<dyn Agent<P>> = self.agents[j]();
@@ -95,8 +92,13 @@ where
         };
 
         let pairs = itertools::iproduct!(0..self.agents.len(), 0..self.agents.len())
+            .filter(|(i, j)| i != j)
             .collect::<Vec<(usize, usize)>>()
             .repeat(self.num_matches);
+
+        if let Some(pb) = &progress_bar {
+            pb.set_length(pairs.len() as u64);
+        }
 
         if self.parallel {
             pairs.into_par_iter().for_each(run_match);
@@ -110,7 +112,11 @@ where
             pb.finish();
         }
 
-        TournamentResult { results }
+        TournamentResult {
+            results,
+            names: self.names.clone(),
+            num_matches: self.num_matches,
+        }
     }
 }
 
@@ -146,9 +152,131 @@ impl Entry {
 #[derive(Debug)]
 pub struct TournamentResult {
     results: Vec<Vec<Entry>>,
+    names: Vec<String>,
+    num_matches: usize,
 }
 
-impl TournamentResult {}
+impl TournamentResult {
+    pub fn total_counts(&self, agent_name: &str) -> (usize, usize, usize) {
+        let mut wins = 0;
+        let mut losses = 0;
+        let mut draws = 0;
+
+        let agent_index = self
+            .names
+            .iter()
+            .position(|name| name == agent_name)
+            .unwrap();
+
+        // all values in the row are where agent plays first
+        for entry in &self.results[agent_index] {
+            wins += entry.wins_1;
+            losses += entry.wins_2;
+            draws += entry.draws;
+        }
+        // and the columns where agent plays second
+        for row in &self.results {
+            let entry = &row[agent_index];
+            wins += entry.wins_2;
+            losses += entry.wins_1;
+            draws += entry.draws;
+        }
+
+        (wins, losses, draws)
+    }
+
+    pub fn win_rate(&self, agent_name: &str) -> f64 {
+        let (wins, losses, _) = self.total_counts(agent_name);
+        wins as f64 / (wins + losses) as f64
+    }
+}
+
+impl fmt::Display for TournamentResult {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        use tabled::{builder::*, settings::object::Segment, settings::*};
+
+        let mut names_padded = self.names.clone();
+        names_padded.insert(0, "".to_string());
+        names_padded.insert(0, format!("N={}", self.num_matches));
+
+        let mut builder = Builder::new();
+        builder.push_record(["Win/Loss/Draw (WR%)", "", "Plays 2nd"]);
+        builder.push_record(names_padded);
+
+        for (i, row) in self.results.iter().enumerate() {
+            let mut record = vec!["Plays 1st".to_string(), self.names[i].clone()];
+
+            for (j, entry) in row.iter().enumerate() {
+                if i == j {
+                    let perf = self.total_counts(&self.names[i]);
+                    record.push(format!(
+                        "{}/{}/{} ({:.1}%)",
+                        perf.0,
+                        perf.1,
+                        perf.2,
+                        (perf.0 as f64 / (perf.0 + perf.1) as f64) * 100.0
+                    ));
+                } else {
+                    record.push(format!(
+                        "{}/{}/{} ({:.1}%)",
+                        entry.wins_1,
+                        entry.wins_2,
+                        entry.draws,
+                        (entry.wins_1 as f64 / entry.total as f64) * 100.0
+                    ));
+                }
+            }
+
+            builder.push_record(record);
+        }
+
+        let mut table = builder.build();
+        table
+            .with(Style::ascii())
+            .with(Color::FG_BRIGHT_WHITE)
+            .with(
+                Modify::new((0, 0)) // W/L/D
+                    .with(Span::column(2))
+                    .with(Alignment::center())
+                    .with(Alignment::center_vertical()),
+            )
+            .with(
+                Modify::new((1, 0)) // N=
+                    .with(Span::column(2))
+                    .with(Alignment::center())
+                    .with(Alignment::center_vertical()),
+            )
+            // Plays second
+            .with(
+                Modify::new((0, 2))
+                    .with(Span::column(999))
+                    .with(Alignment::center())
+                    .with(Alignment::center_vertical())
+                    .with(Color::FG_BRIGHT_WHITE),
+            )
+            // Plays first
+            .with(
+                Modify::new((2, 0))
+                    .with(Span::row(999))
+                    .with(Alignment::center())
+                    .with(Alignment::center_vertical()),
+            )
+            // agent names
+            .with(Modify::new(Segment::new(2.., 2..)).with(Color::FG_BRIGHT_BLUE))
+            .with(Modify::new(Segment::new(1..=1, 1..)).with(Color::BOLD | Color::FG_BRIGHT_YELLOW))
+            .with(
+                Modify::new(Segment::new(2.., 1..=1)).with(Color::BOLD | Color::FG_BRIGHT_YELLOW),
+            );
+        for i in 0..self.names.len() {
+            table.with(
+                Modify::new(Segment::new(i + 2..=i + 2, i + 2..=i + 2))
+                    .with(Color::BOLD | Color::FG_CYAN),
+            );
+        }
+
+        write!(f, "{}", table.to_string())
+    }
+}
 
 #[cfg(test)]
 mod tests {
@@ -160,22 +288,11 @@ mod tests {
         let res1 = Tournament::<TicTacToe>::new()
             .add_agent("agent1", &|| Box::new(RandomAgent {}))
             .add_agent("agent2", &|| Box::new(RandomAgent {}))
-            .num_matches(1000)
+            .num_matches(10000)
             .show_progress(true)
             .use_parallel(true)
             .run();
 
-        println!("{:?}", res1);
-
-        /*
-        let agents = vec![
-            || Box::new(RandomAgent {}) as Box<dyn Agent<TicTacToe>>,
-            || Box::new(RandomAgent {}) as Box<dyn Agent<TicTacToe>>,
-        ];
-        let pb = ProgressBar::new(0);
-        let res = tournament(agents, 100000, Some(&pb));
-
-        println!("{:?}", res);
-        */
+        println!("{:}", res1);
     }
 }
