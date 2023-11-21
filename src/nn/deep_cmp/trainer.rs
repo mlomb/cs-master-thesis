@@ -1,22 +1,21 @@
+use super::encoding::TensorEncodeable;
+use super::samples::Samples;
 use super::service::DeepCmpService;
-use super::{encoding::TensorEncodeable, ringbuffer_set::RingBufferSet};
-use crate::core::r#match::{play_match, MatchOutcome};
-use crate::{
-    core::position::Position,
-    nn::{deep_cmp::agent::DeepCmpAgent, shmem::open_shmem},
-};
-use ndarray::{ArrayViewMut, ArrayViewMutD, Axis, Dimension, IxDyn};
+use crate::core::r#match::play_match;
+use crate::core::tournament::Tournament;
+use crate::nn::shmem::open_shmem;
+use crate::{core::position::Position, nn::deep_cmp::agent::DeepCmpAgent};
+use indicatif::ProgressBar;
+use ndarray::{ArrayViewMut, IxDyn};
 use ort::Session;
-use rand::Rng;
+use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use shared_memory::Shmem;
-use std::cmp::Ordering;
-use std::{cell::RefCell, collections::HashSet, hash::Hash, rc::Rc};
+use std::hash::Hash;
+use std::sync::{Arc, Mutex};
 
-pub struct DeepCmpTrainer<'a, P> {
-    win_positions: RingBufferSet<P>,
-    loss_positions: RingBufferSet<P>,
-    all_positions: HashSet<P>,
-    service: Rc<RefCell<DeepCmpService<P>>>,
+pub struct DeepCmpTrainer<P> {
+    service: Arc<DeepCmpService<P>>,
+    samples: Mutex<Samples<P>>,
 
     version: usize,
     batch_size: usize,
@@ -30,50 +29,24 @@ pub struct DeepCmpTrainer<'a, P> {
     inputs_shmem: Shmem,
     #[allow(dead_code)]
     outputs_shmem: Shmem,
-
-    // tensors (that use the shared memory)
-    status_tensor: ArrayViewMutD<'a, u32>,
-    inputs_tensor: ArrayViewMutD<'a, f32>,
-    outputs_tensor: ArrayViewMutD<'a, f32>,
 }
 
-impl<P> DeepCmpTrainer<'_, P>
+impl<P> DeepCmpTrainer<P>
 where
-    // TODO: preguntar a sponja por que hace falta el 'static
-    P: Position + TensorEncodeable + Eq + Hash + 'static,
+    P: Position + TensorEncodeable + Eq + Hash + Sync + Send,
 {
     pub fn new(capacity: usize, batch_size: usize, session: Session) -> Self {
-        // extract shapes from Position
-        let mut inputs_shape_vec = P::input_shape();
-        let mut outputs_shape_vec = P::output_shape();
-
-        // add train batch axis
-        inputs_shape_vec.insert(0, batch_size);
-        outputs_shape_vec.insert(0, batch_size);
-
-        // build ndarray dyn shapes
-        let inputs_shape = IxDyn(&inputs_shape_vec);
-        let outputs_shape = IxDyn(&outputs_shape_vec);
+        let inputs_size = batch_size * P::input_shape().iter().product::<usize>();
+        let outputs_size = batch_size * P::output_shape().iter().product::<usize>();
 
         // create shared memory buffers for training
         let status_shmem = open_shmem("deepcmp-status", 2 * 4).unwrap();
-        let inputs_shmem = open_shmem("deepcmp-inputs", inputs_shape.size() * 4).unwrap();
-        let outputs_shmem = open_shmem("deepcmp-outputs", outputs_shape.size() * 4).unwrap();
-
-        let status_tensor =
-            unsafe { ArrayViewMut::from_shape_ptr(IxDyn(&[2]), status_shmem.as_ptr() as *mut u32) };
-        let inputs_tensor = unsafe {
-            ArrayViewMut::from_shape_ptr(inputs_shape, inputs_shmem.as_ptr() as *mut f32)
-        };
-        let outputs_tensor = unsafe {
-            ArrayViewMut::from_shape_ptr(outputs_shape, outputs_shmem.as_ptr() as *mut f32)
-        };
+        let inputs_shmem = open_shmem("deepcmp-inputs", inputs_size * 4).unwrap();
+        let outputs_shmem = open_shmem("deepcmp-outputs", outputs_size * 4).unwrap();
 
         DeepCmpTrainer {
-            win_positions: RingBufferSet::new(capacity),
-            loss_positions: RingBufferSet::new(capacity),
-            all_positions: HashSet::new(),
-            service: Rc::new(RefCell::new(DeepCmpService::new(session))),
+            service: Arc::new(DeepCmpService::new(session)),
+            samples: Mutex::new(Samples::new(capacity)),
 
             version: 1,
             batch_size,
@@ -82,78 +55,53 @@ where
             status_shmem,
             inputs_shmem,
             outputs_shmem,
-
-            status_tensor,
-            inputs_tensor,
-            outputs_tensor,
         }
     }
 
     pub fn generate_samples(&mut self) {
-        let mut agent1 = DeepCmpAgent::new(self.service.clone());
-        let mut agent2 = DeepCmpAgent::new(self.service.clone());
-        let mut history = Vec::<P>::new();
+        let pb = ProgressBar::new(10);
 
-        let outcome = play_match(&mut agent1, &mut agent2, Some(&mut history));
+        (0..10).into_par_iter().for_each(|_| {
+            let mut agent1 = DeepCmpAgent::new(self.service.clone());
+            let mut agent2 = DeepCmpAgent::new(self.service.clone());
+            let mut history = Vec::<P>::new();
 
-        // even positions
-        for pos in history.iter().step_by(2) {
-            match outcome {
-                MatchOutcome::WinAgent1 => self.win_positions.insert(pos.clone()),
-                MatchOutcome::WinAgent2 => self.loss_positions.insert(pos.clone()),
-                _ => (),
-            }
-        }
+            let outcome = play_match(&mut agent1, &mut agent2, Some(&mut history));
 
-        // odd positions
-        for pos in history.iter().skip(1).step_by(2) {
-            match outcome {
-                MatchOutcome::WinAgent1 => self.loss_positions.insert(pos.clone()),
-                MatchOutcome::WinAgent2 => self.win_positions.insert(pos.clone()),
-                _ => (),
-            }
-        }
+            self.samples.lock().unwrap().add_match(&history, outcome);
 
-        // add all positions to the set
-        self.all_positions.extend(history.iter().cloned());
+            pb.inc(1);
+        });
 
-        println!(
-            "win: {}, loss: {} all: {}",
-            self.win_positions.len(),
-            self.loss_positions.len(),
-            self.all_positions.len()
-        );
+        pb.finish();
     }
 
     /// Prepares and fills the training data
     pub fn train(&mut self) {
-        // clear tensors
-        self.status_tensor.fill(0);
-        self.inputs_tensor.fill(0.0);
-        self.outputs_tensor.fill(0.0);
+        // extract shapes from Position
+        let mut inputs_shape_vec = P::input_shape();
+        let mut outputs_shape_vec = P::output_shape();
 
-        let mut rng = rand::thread_rng();
+        // add train batch axis
+        inputs_shape_vec.insert(0, self.batch_size);
+        outputs_shape_vec.insert(0, self.batch_size);
 
-        for i in 0..self.batch_size {
-            let win_pos = self.win_positions.sample_one(&mut rng).unwrap();
-            let loss_pos = self.loss_positions.sample_one(&mut rng).unwrap();
+        // build ndarray dyn shapes
+        let inputs_shape = IxDyn(&inputs_shape_vec);
+        let outputs_shape = IxDyn(&outputs_shape_vec);
 
-            let (left_board, ordering, right_board) = if rng.gen_bool(0.5) {
-                (win_pos, Ordering::Greater, loss_pos)
-            } else {
-                (loss_pos, Ordering::Less, win_pos)
-            };
+        let mut inputs_tensor = unsafe {
+            ArrayViewMut::from_shape_ptr(inputs_shape, self.inputs_shmem.as_ptr() as *mut f32)
+        };
+        let mut outputs_tensor = unsafe {
+            ArrayViewMut::from_shape_ptr(outputs_shape, self.outputs_shmem.as_ptr() as *mut f32)
+        };
 
-            P::encode_input(
-                left_board,
-                right_board,
-                &mut self.inputs_tensor.index_axis_mut(Axis(0), i),
-            );
-            P::encode_output(
-                ordering,
-                &mut self.outputs_tensor.index_axis_mut(Axis(0), i),
-            );
-        }
+        self.samples.lock().unwrap().write_samples(
+            self.batch_size,
+            &mut inputs_tensor,
+            &mut outputs_tensor,
+        );
 
         let status_ptr = self.status_shmem.as_ptr() as *mut u32;
 
@@ -170,5 +118,18 @@ where
         }
 
         self.version += 1;
+    }
+
+    pub fn evaluate(&mut self) {
+        let svc = &self.service;
+
+        let res = Tournament::<P>::new()
+            // .add_agent("current", &|| Box::new(DeepCmpAgent::new(svc.clone())))
+            .num_matches(100)
+            .show_progress(true)
+            .use_parallel(true)
+            .run();
+
+        println!("{}", res);
     }
 }

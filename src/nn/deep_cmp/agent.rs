@@ -7,7 +7,7 @@ use crate::{
     search::alphabeta::alphabeta,
 };
 use rand::seq::SliceRandom;
-use std::{cell::RefCell, collections::VecDeque, rc::Rc};
+use std::{cell::RefCell, collections::VecDeque, rc::Rc, sync::Arc};
 
 /// The agent for the DeepCompare algorithm
 ///
@@ -17,7 +17,7 @@ use std::{cell::RefCell, collections::VecDeque, rc::Rc};
 /// If the wiggle is empty it will default to 1, i.e. it will choose the best action.
 pub struct DeepCmpAgent<Position> {
     /// Reference back to the service
-    service: Rc<RefCell<DeepCmpService<Position>>>,
+    service: Arc<DeepCmpService<Position>>,
     /// The depth to use for the search
     target_depth: usize,
     /// Queue of integers to use as the k in the top-k actions, consumed each turn
@@ -25,7 +25,7 @@ pub struct DeepCmpAgent<Position> {
 }
 
 impl<Position> DeepCmpAgent<Position> {
-    pub fn new(service: Rc<RefCell<DeepCmpService<Position>>>) -> Self {
+    pub fn new(service: Arc<DeepCmpService<Position>>) -> Self {
         DeepCmpAgent {
             service,
             target_depth: 3,

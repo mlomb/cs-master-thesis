@@ -9,7 +9,6 @@ where
     fn next_action(&mut self, position: &Position) -> Option<Position::Action>;
 }
 
-#[derive(Clone)]
 pub struct RandomAgent {}
 
 impl<Position> Agent<Position> for RandomAgent

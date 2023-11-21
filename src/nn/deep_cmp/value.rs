@@ -1,29 +1,27 @@
 use super::{encoding::TensorEncodeable, service::DeepCmpService};
 use crate::core::{position::Position, value::Value};
 use core::hash::Hash;
-use std::{cell::RefCell, cmp::Ordering, rc::Rc};
+use std::{borrow::BorrowMut, cell::RefCell, cmp::Ordering, rc::Rc, sync::Arc};
 
 #[derive(Clone)]
 pub struct DeepCmpValue<Position> {
-    pub service: Rc<RefCell<DeepCmpService<Position>>>,
+    pub service: Arc<DeepCmpService<Position>>,
     pub position: Position,
     pub point_of_view: bool,
 }
 
 impl<P> Value for DeepCmpValue<P>
 where
-    P: Position + TensorEncodeable + Hash + Clone + PartialEq + Eq + Hash,
+    P: Position + TensorEncodeable + Hash + Clone + PartialEq + Eq + Hash + Sync + Send,
 {
     fn compare(&self, other: &DeepCmpValue<P>) -> Ordering {
         // We should only be comparing values from the same model
-        assert_eq!(self.service.as_ptr(), other.service.as_ptr());
+        assert!(Arc::ptr_eq(&self.service, &other.service));
 
         // This is a theory, not sure if it's true
         assert_eq!(self.point_of_view, other.point_of_view);
 
-        self.service
-            .borrow_mut()
-            .compare(&self.position, &other.position)
+        self.service.compare(&self.position, &other.position)
     }
 
     fn reverse(&self) -> DeepCmpValue<P> {

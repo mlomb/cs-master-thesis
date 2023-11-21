@@ -2,6 +2,8 @@ use crate::core::position::Position;
 use ndarray::{ArrayD, Axis};
 use ort::Session;
 use std::hash::Hash;
+use std::sync::atomic::AtomicUsize;
+use std::sync::{Arc, Mutex, RwLock};
 use std::{cmp::Ordering, collections::HashMap};
 
 use super::encoding::TensorEncodeable;
@@ -11,36 +13,38 @@ pub struct Pair<P>(P, P);
 
 pub struct DeepCmpService<Position> {
     session: Session,
-    inferences: usize,
-    hs: HashMap<Pair<Position>, Ordering>,
+    inferences: AtomicUsize,
+    hs: Arc<Mutex<HashMap<Pair<Position>, Ordering>>>,
 
-    hits: usize,
-    misses: usize,
+    hits: AtomicUsize,
+    misses: AtomicUsize,
 }
 
 impl<P> DeepCmpService<P>
 where
-    P: Position + TensorEncodeable + Eq + Hash,
+    P: Position + TensorEncodeable + Eq + Hash + Send + Sync,
 {
     pub fn new(session: Session) -> Self {
         Self {
             session: session,
-            inferences: 0,
-            hs: HashMap::new(),
-            hits: 0,
-            misses: 0,
+            inferences: AtomicUsize::new(0),
+            hs: Arc::new(Mutex::new(HashMap::new())),
+            hits: AtomicUsize::new(0),
+            misses: AtomicUsize::new(0),
         }
     }
 
-    pub fn compare(&mut self, left: &P, right: &P) -> Ordering {
+    pub fn compare(&self, left: &P, right: &P) -> Ordering {
         let pair = Pair(left.clone(), right.clone());
 
-        if let Some(ordering) = self.hs.get(&pair) {
-            self.hits += 1;
+        if let Some(ordering) = self.hs.lock().unwrap().get(&pair) {
+            self.hits.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
             return *ordering;
         }
-        self.misses += 1;
-        self.inferences += 1;
+        self.misses
+            .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        self.inferences
+            .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
 
         let mut input_tensor = ArrayD::zeros(P::input_shape());
         P::encode_input(left, right, &mut input_tensor.view_mut());
@@ -56,7 +60,7 @@ where
         let output_tensor = outputs[0].extract_tensor::<f32>().unwrap();
         let res = P::decode_output(&output_tensor.view().index_axis(Axis(0), 0));
 
-        self.hs.insert(pair, res);
+        self.hs.lock().unwrap().insert(pair, res);
         res
     }
 }

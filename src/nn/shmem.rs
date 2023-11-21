@@ -1,7 +1,12 @@
+use std::borrow::BorrowMut;
+
 use shared_memory::{Shmem, ShmemConf, ShmemError};
 
 /// Create or open a shared memory mapping
 pub fn open_shmem(id: &str, size: usize) -> Result<Shmem, ShmemError> {
+    // required for Windows
+    let size = size.next_multiple_of(4096);
+
     match ShmemConf::new().os_id(id).size(size).create() {
         Err(ShmemError::MappingIdExists) => {
             // if the rare case the mapping already exists, open it

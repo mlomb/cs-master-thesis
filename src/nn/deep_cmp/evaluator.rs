@@ -1,13 +1,13 @@
 use super::{encoding::TensorEncodeable, service::DeepCmpService, value::DeepCmpValue};
 use crate::core::{evaluator::PositionEvaluator, position::Position};
-use std::{cell::RefCell, rc::Rc};
+use std::{cell::RefCell, rc::Rc, sync::Arc};
 
 pub struct DeepCmpEvaluator<Position> {
-    service: Rc<RefCell<DeepCmpService<Position>>>,
+    service: Arc<DeepCmpService<Position>>,
 }
 
 impl<Position> DeepCmpEvaluator<Position> {
-    pub fn new(service: Rc<RefCell<DeepCmpService<Position>>>) -> Self {
+    pub fn new(service: Arc<DeepCmpService<Position>>) -> Self {
         DeepCmpEvaluator { service }
     }
 }
