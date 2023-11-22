@@ -19,6 +19,9 @@ where
     }
 
     pub fn insert(&mut self, value: T) {
+        self.ring.push(value);
+
+        /*
         if self.set.insert(value.clone()) {
             if self.ring.is_full() {
                 // remove the oldest element from set
@@ -28,6 +31,7 @@ where
             }
             self.ring.push(value);
         }
+         */
     }
 
     pub fn len(&self) -> usize {

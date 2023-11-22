@@ -142,19 +142,17 @@ where
         ));
         let cloned_candidate_model = candidate_model.clone();
 
-        let best_closure = move || {
-            Box::new(DeepCmpAgent::new(best_model.clone(), [8, 4, 4, 4, 2])) as Box<dyn Agent<_>>
-        };
+        let best_closure =
+            move || Box::new(DeepCmpAgent::new(best_model.clone(), [8, 8, 8])) as Box<dyn Agent<_>>;
         let candidate_closure = move || {
-            Box::new(DeepCmpAgent::new(candidate_model.clone(), [8, 4, 4, 4, 2]))
-                as Box<dyn Agent<_>>
+            Box::new(DeepCmpAgent::new(candidate_model.clone(), [8, 8, 8])) as Box<dyn Agent<_>>
         };
 
         let res = Tournament::new()
             //.add_agent("random", &|| Box::new(RandomAgent {}))
             .add_agent("best", &best_closure)
             .add_agent("candidate", &candidate_closure)
-            .num_matches(50)
+            .num_matches(10)
             .show_progress(true)
             .use_parallel(true)
             .run();
