@@ -25,11 +25,11 @@ pub struct DeepCmpAgent<Position> {
 }
 
 impl<Position> DeepCmpAgent<Position> {
-    pub fn new(service: Arc<DeepCmpService<Position>>) -> Self {
+    pub fn new<const N: usize>(service: Arc<DeepCmpService<Position>>, wiggle: [usize; N]) -> Self {
         DeepCmpAgent {
             service,
             target_depth: 3,
-            random_wiggle: VecDeque::from([8, 8, 8, 4, 3, 2]),
+            random_wiggle: VecDeque::from(wiggle),
         }
     }
 }

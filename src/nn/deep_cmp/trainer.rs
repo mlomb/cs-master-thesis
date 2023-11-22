@@ -1,7 +1,7 @@
 use super::encoding::TensorEncodeable;
 use super::samples::Samples;
 use super::service::DeepCmpService;
-use crate::core::agent::Agent;
+use crate::core::agent::{Agent, RandomAgent};
 use crate::core::r#match::play_match;
 use crate::core::tournament::Tournament;
 use crate::nn::shmem::open_shmem;
@@ -51,7 +51,7 @@ where
             // load best model
             best_model: Arc::new(DeepCmpService::new(
                 ort_environment.clone(),
-                "models/best/onnx_model.onnx",
+                "models/initial/onnx_model.onnx",
             )),
             ort_environment,
 
@@ -63,12 +63,12 @@ where
     }
 
     pub fn generate_samples(&mut self) {
-        let n = 20;
+        let n = 300;
         let pb = ProgressBar::new(n);
 
         (0..n).into_par_iter().for_each(|_| {
-            let mut agent1 = DeepCmpAgent::new(self.best_model.clone());
-            let mut agent2 = DeepCmpAgent::new(self.best_model.clone());
+            let mut agent1 = DeepCmpAgent::new(self.best_model.clone(), [8, 8, 8, 4, 3, 2]);
+            let mut agent2 = DeepCmpAgent::new(self.best_model.clone(), [8, 8, 8, 4, 3, 2]);
             let mut history = Vec::<P>::new();
 
             let outcome = play_match(&mut agent1, &mut agent2, Some(&mut history));
@@ -113,6 +113,9 @@ where
         unsafe {
             // write version
             status_ptr.offset(1).write(self.version as u32);
+            // write batch size
+            status_ptr.offset(2).write(self.batch_size as u32);
+
             // mark as ready so Python can start training
             status_ptr.offset(0).write(1);
         };
@@ -131,20 +134,28 @@ where
             self.ort_environment.clone(),
             "models/candidate/onnx_model.onnx",
         ));
+        let cloned_candidate_model = candidate_model.clone();
 
-        let best_closure =
-            move || Box::new(DeepCmpAgent::new(best_model.clone())) as Box<dyn Agent<_>>;
-        let candidate_closure =
-            move || Box::new(DeepCmpAgent::new(candidate_model.clone())) as Box<dyn Agent<_>>;
+        let best_closure = move || {
+            Box::new(DeepCmpAgent::new(best_model.clone(), [8, 4, 4, 4, 2])) as Box<dyn Agent<_>>
+        };
+        let candidate_closure = move || {
+            Box::new(DeepCmpAgent::new(candidate_model.clone(), [8, 4, 4, 4, 2]))
+                as Box<dyn Agent<_>>
+        };
 
         let res = Tournament::new()
+            .add_agent("random", &|| Box::new(RandomAgent {}))
             .add_agent("best", &best_closure)
             .add_agent("candidate", &candidate_closure)
-            .num_matches(100)
+            .num_matches(50)
             .show_progress(true)
             .use_parallel(true)
             .run();
 
         println!("{}", res);
+
+        // assume better
+        self.best_model = cloned_candidate_model;
     }
 }

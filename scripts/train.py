@@ -38,25 +38,23 @@ if len(sys.argv) < 2:
 else:
     models_path = Path(sys.argv[1])
 
-status = np.asarray(shm_status.buf).view(np.uint32)
-inputs = np.asarray(shm_inputs.buf).view(np.float32)
-outputs = np.asarray(shm_outputs.buf).view(np.float32)
-
 tensorboard = keras.callbacks.TensorBoard(
     log_dir='./logs',
     write_graph=False,
 )
 
-def train_iteration(version: int):
-    model = keras.models.load_model(models_path / "best")
+model = keras.models.load_model(models_path / "initial")
 
-    # infer shapes using the model and shmem size
-    batch_size = inputs.size // math.prod(model.inputs[0].shape.as_list()[1:])
-    inputs_shape = (batch_size,) + model.inputs[0].shape[1:]
-    outputs_shape = (batch_size,) + model.outputs[0].shape[1:]
+def train_iteration(version: int, batch_size: int):
+    # extract shapes from model
+    inputs_shape = model.inputs[0].shape[1:]
+    outputs_shape = model.outputs[0].shape[1:]
+
+    inputs = np.asarray(shm_inputs.buf[:batch_size * math.prod(inputs_shape) * 4]).view(np.float32)
+    outputs = np.asarray(shm_outputs.buf[:batch_size * math.prod(outputs_shape) * 4]).view(np.float32)
     
-    x = inputs.reshape(inputs_shape)
-    y = outputs.reshape(outputs_shape)
+    x = inputs.reshape((batch_size,) + inputs_shape)
+    y = outputs.reshape((batch_size,) + outputs_shape)
     
     model.fit(
         x=x,
@@ -80,12 +78,15 @@ def train_iteration(version: int):
 print("Ready")
 
 while True:
+    status = np.asarray(shm_status.buf).view(np.uint32)
+
     # wait until ready
     while status[0] == 0:
         time.sleep(0.1)
 
     train_iteration(
-        version=status[1]
+        version=status[1],
+        batch_size=status[2]
     )
 
     # mark as done

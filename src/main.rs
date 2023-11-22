@@ -13,13 +13,13 @@ fn main() -> ort::Result<()> {
         .build()?
         .into_arc();
 
-    let mut trainer = DeepCmpTrainer::<Connect4>::new(10000, 2048, environment);
+    let mut trainer = DeepCmpTrainer::<Connect4>::new(5000, 1024, environment);
 
-    for _i in 0..1000 {
+    for _i in 0..100000 {
         trainer.generate_samples();
         trainer.train();
         trainer.evaluate();
-        //std::thread::sleep(std::time::Duration::from_secs(10000));
+        std::thread::sleep(std::time::Duration::from_secs(1));
     }
 
     model_management::Pepe::new("models").latest();
