@@ -6,7 +6,7 @@ use crate::core::r#match::play_match;
 use crate::core::tournament::Tournament;
 use crate::nn::shmem::open_shmem;
 use crate::{core::position::Position, nn::deep_cmp::agent::DeepCmpAgent};
-use indicatif::ProgressBar;
+use indicatif::{ProgressBar, ProgressStyle};
 use ndarray::{ArrayViewMut, IxDyn};
 use ort::Environment;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
@@ -63,8 +63,14 @@ where
     }
 
     pub fn generate_samples(&mut self) {
-        let n = 300;
-        let pb = ProgressBar::new(n);
+        let n = 50;
+        let pb = ProgressBar::new(n).with_style(
+            ProgressStyle::with_template(
+                "{spinner:.green} {prefix} [Elapsed {elapsed_precise}] (ETA {eta}) [{bar:.cyan/blue}] {human_pos}/{human_len}  {per_sec} ",
+            )
+            .unwrap()
+            .progress_chars("#987654321-")
+        ).with_prefix("Generating samples");
 
         (0..n).into_par_iter().for_each(|_| {
             let mut agent1 = DeepCmpAgent::new(self.best_model.clone(), [8, 8, 8, 4, 3, 2]);
@@ -145,7 +151,7 @@ where
         };
 
         let res = Tournament::new()
-            .add_agent("random", &|| Box::new(RandomAgent {}))
+            //.add_agent("random", &|| Box::new(RandomAgent {}))
             .add_agent("best", &best_closure)
             .add_agent("candidate", &candidate_closure)
             .num_matches(50)

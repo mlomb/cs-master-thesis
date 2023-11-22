@@ -1,8 +1,5 @@
 use ort::{CPUExecutionProvider, Environment};
-use thesis::{
-    games::connect4::Connect4,
-    nn::{deep_cmp::DeepCmpTrainer, model_management},
-};
+use thesis::{games::connect4::Connect4, nn::deep_cmp::DeepCmpTrainer};
 
 fn main() -> ort::Result<()> {
     println!("Hello, world!");
@@ -18,11 +15,11 @@ fn main() -> ort::Result<()> {
     for _i in 0..100000 {
         trainer.generate_samples();
         trainer.train();
-        trainer.evaluate();
+        //trainer.evaluate();
         std::thread::sleep(std::time::Duration::from_secs(1));
     }
 
-    model_management::Pepe::new("models").latest();
+    // model_management::Pepe::new("models").latest();
 
     Ok(())
 }
