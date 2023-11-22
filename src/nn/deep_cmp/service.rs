@@ -1,12 +1,11 @@
+use super::encoding::TensorEncodeable;
 use crate::core::position::Position;
 use ndarray::{ArrayD, Axis};
-use ort::Session;
+use ort::{Environment, Session, SessionBuilder};
 use std::hash::Hash;
 use std::sync::atomic::AtomicUsize;
-use std::sync::{Arc, Mutex, RwLock};
+use std::sync::{Arc, Mutex};
 use std::{cmp::Ordering, collections::HashMap};
-
-use super::encoding::TensorEncodeable;
 
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct Pair<P>(P, P);
@@ -24,9 +23,14 @@ impl<P> DeepCmpService<P>
 where
     P: Position + TensorEncodeable + Eq + Hash + Send + Sync,
 {
-    pub fn new(session: Session) -> Self {
+    pub fn new(environment: Arc<Environment>, path: &str) -> Self {
+        let session = SessionBuilder::new(&environment)
+            .unwrap()
+            .with_model_from_file(path)
+            .unwrap();
+
         Self {
-            session: session,
+            session,
             inferences: AtomicUsize::new(0),
             hs: Arc::new(Mutex::new(HashMap::new())),
             hits: AtomicUsize::new(0),

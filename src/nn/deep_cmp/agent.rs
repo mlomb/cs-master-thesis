@@ -7,7 +7,7 @@ use crate::{
     search::alphabeta::alphabeta,
 };
 use rand::seq::SliceRandom;
-use std::{cell::RefCell, collections::VecDeque, rc::Rc, sync::Arc};
+use std::{collections::VecDeque, sync::Arc};
 
 /// The agent for the DeepCompare algorithm
 ///

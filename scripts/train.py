@@ -6,10 +6,11 @@ import numpy as np
 from pathlib import Path
 from multiprocessing import shared_memory, resource_tracker
 
-def open_shm(name: str):
+
+def open_shm(name: str) -> memoryview:
     try:
         # map shared memory with the Rust side
-        shm = shared_memory.SharedMemory(name, create=False)
+        shm = shared_memory.SharedMemory(name)
         # avoid disposing the memory block on exit
         # see https://github.com/python/cpython/pull/15989
         if sys.platform != 'win32':
@@ -75,6 +76,8 @@ def train_iteration(version: int):
     os.makedirs(candidate_path, exist_ok=True)
     model.save(candidate_path)
     onnx.save_model(onnx_model, candidate_path / "onnx_model.onnx")
+
+print("Ready")
 
 while True:
     # wait until ready

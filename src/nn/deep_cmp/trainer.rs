@@ -1,41 +1,40 @@
 use super::encoding::TensorEncodeable;
 use super::samples::Samples;
 use super::service::DeepCmpService;
+use crate::core::agent::Agent;
 use crate::core::r#match::play_match;
 use crate::core::tournament::Tournament;
 use crate::nn::shmem::open_shmem;
 use crate::{core::position::Position, nn::deep_cmp::agent::DeepCmpAgent};
 use indicatif::ProgressBar;
 use ndarray::{ArrayViewMut, IxDyn};
-use ort::Session;
+use ort::Environment;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use shared_memory::Shmem;
 use std::hash::Hash;
 use std::sync::{Arc, Mutex};
 
 pub struct DeepCmpTrainer<P> {
-    service: Arc<DeepCmpService<P>>,
-    samples: Mutex<Samples<P>>,
-
     version: usize,
     batch_size: usize,
+    samples: Mutex<Samples<P>>,
+
+    best_model: Arc<DeepCmpService<P>>,
+    ort_environment: Arc<Environment>,
 
     // shared memory with Python for training
     // we need to keep these alive, since we
     // use them in the tensors below
-    #[allow(dead_code)]
     status_shmem: Shmem,
-    #[allow(dead_code)]
     inputs_shmem: Shmem,
-    #[allow(dead_code)]
     outputs_shmem: Shmem,
 }
 
 impl<P> DeepCmpTrainer<P>
 where
-    P: Position + TensorEncodeable + Eq + Hash + Sync + Send,
+    P: Position + TensorEncodeable + Eq + Hash + Sync + Send + 'static,
 {
-    pub fn new(capacity: usize, batch_size: usize, session: Session) -> Self {
+    pub fn new(capacity: usize, batch_size: usize, ort_environment: Arc<Environment>) -> Self {
         let inputs_size = batch_size * P::input_shape().iter().product::<usize>();
         let outputs_size = batch_size * P::output_shape().iter().product::<usize>();
 
@@ -45,11 +44,16 @@ where
         let outputs_shmem = open_shmem("deepcmp-outputs", outputs_size * 4).unwrap();
 
         DeepCmpTrainer {
-            service: Arc::new(DeepCmpService::new(session)),
-            samples: Mutex::new(Samples::new(capacity)),
-
             version: 1,
             batch_size,
+            samples: Mutex::new(Samples::new(capacity)),
+
+            // load best model
+            best_model: Arc::new(DeepCmpService::new(
+                ort_environment.clone(),
+                "models/best/onnx_model.onnx",
+            )),
+            ort_environment,
 
             // initialize required shared memory buffers for training
             status_shmem,
@@ -59,11 +63,12 @@ where
     }
 
     pub fn generate_samples(&mut self) {
-        let pb = ProgressBar::new(10);
+        let n = 20;
+        let pb = ProgressBar::new(n);
 
-        (0..10).into_par_iter().for_each(|_| {
-            let mut agent1 = DeepCmpAgent::new(self.service.clone());
-            let mut agent2 = DeepCmpAgent::new(self.service.clone());
+        (0..n).into_par_iter().for_each(|_| {
+            let mut agent1 = DeepCmpAgent::new(self.best_model.clone());
+            let mut agent2 = DeepCmpAgent::new(self.best_model.clone());
             let mut history = Vec::<P>::new();
 
             let outcome = play_match(&mut agent1, &mut agent2, Some(&mut history));
@@ -121,10 +126,20 @@ where
     }
 
     pub fn evaluate(&mut self) {
-        let svc = &self.service;
+        let best_model = self.best_model.clone();
+        let candidate_model = Arc::new(DeepCmpService::new(
+            self.ort_environment.clone(),
+            "models/candidate/onnx_model.onnx",
+        ));
 
-        let res = Tournament::<P>::new()
-            // .add_agent("current", &|| Box::new(DeepCmpAgent::new(svc.clone())))
+        let best_closure =
+            move || Box::new(DeepCmpAgent::new(best_model.clone())) as Box<dyn Agent<_>>;
+        let candidate_closure =
+            move || Box::new(DeepCmpAgent::new(candidate_model.clone())) as Box<dyn Agent<_>>;
+
+        let res = Tournament::new()
+            .add_agent("best", &best_closure)
+            .add_agent("candidate", &candidate_closure)
             .num_matches(100)
             .show_progress(true)
             .use_parallel(true)

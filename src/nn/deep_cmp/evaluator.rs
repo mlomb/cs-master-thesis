@@ -1,6 +1,6 @@
 use super::{encoding::TensorEncodeable, service::DeepCmpService, value::DeepCmpValue};
 use crate::core::{evaluator::PositionEvaluator, position::Position};
-use std::{cell::RefCell, rc::Rc, sync::Arc};
+use std::sync::Arc;
 
 pub struct DeepCmpEvaluator<Position> {
     service: Arc<DeepCmpService<Position>>,
@@ -20,7 +20,7 @@ where
         DeepCmpValue {
             service: self.service.clone(),
             position: position.clone(),
-            point_of_view: false,
+            flip_point_of_view: false,
         }
     }
 }
