@@ -8,10 +8,9 @@ import tf2onnx
 input = Input(shape=(7,6,4), name='input')
 
 x = Flatten()(input)
-x = Dense(128, activation='relu')(x)
-x = Dense(64, activation='relu')(x)
-x = Dense(32, activation='relu')(x)
-x = Dense(16, activation='relu')(x)
+x = Dense(1024, activation='relu')(x)
+x = Dense(512, activation='relu')(x)
+x = Dense(256, activation='relu')(x)
 x = Dense(2, activation='softmax', name='output')(x)
 
 model = Model(inputs=[input], outputs=[x])
