@@ -1,15 +1,14 @@
 use ndarray::*;
-use ort::{CPUExecutionProvider, Environment, SessionBuilder};
+use ort::{CPUExecutionProvider, Session};
 
 fn main() -> ort::Result<()> {
     tracing_subscriber::fmt::init();
 
-    let environment = Environment::builder()
+    ort::init()
         .with_execution_providers([CPUExecutionProvider::default().build()])
-        .build()?
-        .into_arc();
+        .commit()?;
 
-    let session = SessionBuilder::new(&environment)?
+    let session = Session::builder()?
         .with_intra_threads(1)?
         .with_model_from_file("models/best/onnx_model.onnx")?;
 

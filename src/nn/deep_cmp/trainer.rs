@@ -1,14 +1,13 @@
 use super::encoding::TensorEncodeable;
 use super::samples::Samples;
 use super::service::DeepCmpService;
-use crate::core::agent::{Agent, RandomAgent};
+use crate::core::agent::Agent;
 use crate::core::r#match::play_match;
 use crate::core::tournament::Tournament;
 use crate::nn::shmem::open_shmem;
 use crate::{core::position::Position, nn::deep_cmp::agent::DeepCmpAgent};
 use indicatif::{ProgressBar, ProgressStyle};
 use ndarray::{ArrayViewMut, IxDyn};
-use ort::Environment;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use shared_memory::Shmem;
 use std::hash::Hash;
@@ -20,7 +19,6 @@ pub struct DeepCmpTrainer<P> {
     samples: Mutex<Samples<P>>,
 
     best_model: Arc<DeepCmpService<P>>,
-    ort_environment: Arc<Environment>,
 
     // shared memory with Python for training
     // we need to keep these alive, since we
@@ -34,7 +32,7 @@ impl<P> DeepCmpTrainer<P>
 where
     P: Position + TensorEncodeable + Eq + Hash + Sync + Send + 'static,
 {
-    pub fn new(capacity: usize, batch_size: usize, ort_environment: Arc<Environment>) -> Self {
+    pub fn new(capacity: usize, batch_size: usize) -> Self {
         let inputs_size = batch_size * P::input_shape().iter().product::<usize>();
         let outputs_size = batch_size * P::output_shape().iter().product::<usize>();
 
@@ -49,11 +47,7 @@ where
             samples: Mutex::new(Samples::new(capacity)),
 
             // load best model
-            best_model: Arc::new(DeepCmpService::new(
-                ort_environment.clone(),
-                "models/initial/onnx_model.onnx",
-            )),
-            ort_environment,
+            best_model: Arc::new(DeepCmpService::new("models/initial/onnx_model.onnx")),
 
             // initialize required shared memory buffers for training
             status_shmem,
@@ -136,10 +130,7 @@ where
 
     pub fn evaluate(&mut self) {
         let best_model = self.best_model.clone();
-        let candidate_model = Arc::new(DeepCmpService::new(
-            self.ort_environment.clone(),
-            "models/candidate/onnx_model.onnx",
-        ));
+        let candidate_model = Arc::new(DeepCmpService::new("models/candidate/onnx_model.onnx"));
         let cloned_candidate_model = candidate_model.clone();
 
         let best_closure =

@@ -1,7 +1,7 @@
 use super::encoding::TensorEncodeable;
 use crate::core::position::Position;
 use ndarray::{ArrayD, Axis};
-use ort::{Environment, Session, SessionBuilder};
+use ort::Session;
 use std::hash::Hash;
 use std::sync::atomic::AtomicUsize;
 use std::sync::{Arc, Mutex};
@@ -23,8 +23,8 @@ impl<P> DeepCmpService<P>
 where
     P: Position + TensorEncodeable + Eq + Hash + Send + Sync,
 {
-    pub fn new(environment: Arc<Environment>, path: &str) -> Self {
-        let session = SessionBuilder::new(&environment)
+    pub fn new(path: &str) -> Self {
+        let session = Session::builder()
             .unwrap()
             .with_model_from_file(path)
             .unwrap();

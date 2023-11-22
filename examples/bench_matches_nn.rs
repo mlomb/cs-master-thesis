@@ -1,6 +1,6 @@
 use indicatif::{ProgressBar, ProgressStyle};
 use ndarray::ArrayD;
-use ort::{CPUExecutionProvider, Environment, SessionBuilder};
+use ort::{CPUExecutionProvider, Session};
 use ort_batcher::batcher::Batcher;
 use rand::seq::SliceRandom;
 use rayon::prelude::*;
@@ -16,13 +16,12 @@ fn main() -> ort::Result<()> {
         .build_global()
         .unwrap();
 
-    let environment = Environment::builder()
+    ort::init()
         .with_execution_providers([CPUExecutionProvider::default().build()])
         //.with_execution_providers([CUDAExecutionProvider::default().build()])
-        .build()?
-        .into_arc();
+        .commit()?;
 
-    let session = SessionBuilder::new(&environment)?
+    let session = Session::builder()?
         .with_intra_threads(4)?
         .with_model_from_file("models/best/onnx_model.onnx")?;
 
