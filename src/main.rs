@@ -14,7 +14,7 @@ fn main() -> ort::Result<()> {
     for _i in 0..100000 {
         trainer.generate_samples();
         trainer.train();
-        //trainer.evaluate();
+        trainer.evaluate();
         std::thread::sleep(std::time::Duration::from_secs(1));
     }
 
