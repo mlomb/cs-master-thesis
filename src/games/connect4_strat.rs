@@ -1,5 +1,5 @@
 use super::connect4::{Connect4, COLS, ROWS};
-use crate::core::evaluator::PositionEvaluator;
+use crate::core::{agent::Agent, evaluator::PositionEvaluator};
 
 pub struct Connect4BasicEvaluator;
 
@@ -68,5 +68,15 @@ impl PositionEvaluator<Connect4, i32> for Connect4BasicEvaluator {
     fn eval(&self, state: &Connect4) -> i32 {
         count(state.0.board, state.0.who_plays as usize) as i32
             - count(state.0.board, (1 - state.0.who_plays) as usize) as i32
+    }
+}
+
+pub struct Connect4BasicAgent {}
+
+impl Agent<Connect4> for Connect4BasicAgent {
+    fn next_action(&mut self, position: &Connect4) -> Option<usize> {
+        let (_, action) = crate::search::alphabeta::alphabeta(position, 8, &Connect4BasicEvaluator);
+
+        action
     }
 }
