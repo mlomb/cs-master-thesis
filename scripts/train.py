@@ -75,6 +75,13 @@ def train_iteration(version: int, batch_size: int):
     model.save(candidate_path)
     onnx.save_model(onnx_model, candidate_path / "onnx_model.onnx")
 
+    if version % 50 == 0:
+        # save the new best model
+        checkpoint_path = models_path / ("chk_" + str(version))
+        os.makedirs(checkpoint_path, exist_ok=True)
+        model.save(checkpoint_path)
+        onnx.save_model(onnx_model, checkpoint_path / "onnx_model.onnx")
+
 print("Ready")
 
 while True:
