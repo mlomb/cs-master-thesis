@@ -1,7 +1,7 @@
+use thesis::core::evaluator::NullEvaluator;
 use thesis::core::outcome::Outcome::*;
 use thesis::core::position::Position;
 use thesis::core::result::SearchResult;
-use thesis::evaluators::null::NullEvaluator;
 use thesis::games::mnk::TicTacToe;
 use thesis::search::negamax::negamax;
 

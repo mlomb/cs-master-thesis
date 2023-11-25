@@ -1,8 +1,8 @@
 use std::collections::HashSet;
 use std::hash::Hash;
+use thesis::core::evaluator::NullEvaluator;
 use thesis::core::position::Position;
 use thesis::core::result::SearchResult;
-use thesis::evaluators::null::NullEvaluator;
 use thesis::games::connect4::Connect4;
 use thesis::games::connect4_strat::Connect4BasicEvaluator;
 use thesis::games::mnk::TicTacToe;
