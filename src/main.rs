@@ -29,7 +29,7 @@ fn main() -> ort::Result<()> {
             trainer.evaluate();
             std::thread::sleep(std::time::Duration::from_secs(1));
         }
-    } else if true {
+    } else if false {
         let initial_model = Arc::new(DeepCmpService::new("models/initial/onnx_model.onnx"));
         let depth_model = Arc::new(DeepCmpService::new("models/depth/onnx_model.onnx"));
         //let best_fc_model = Arc::new(DeepCmpService::new("models/best_fc/onnx_model.onnx"));
@@ -62,7 +62,7 @@ fn main() -> ort::Result<()> {
             .run();
 
         println!("{}", res);
-    } else {
+    } else if false {
         let initial_model = Arc::new(DeepCmpService::<Connect4>::new(
             "models/depth/onnx_model.onnx",
         ));
@@ -84,6 +84,38 @@ fn main() -> ort::Result<()> {
             println!("{}", pos);
             who_plays = if who_plays == "X" { "O" } else { "X" };
         }
+    } else {
+        let model = Arc::new(DeepCmpService::<Connect4>::new(
+            "models/best_fc/onnx_model.onnx",
+        ));
+
+        use tabled::{builder::*, settings::object::Segment, settings::*};
+
+        let mut builder = Builder::new();
+        builder.push_record(["", "0", "1", "2", "3", "4", "5", "6"]);
+
+        for i in 0..7 {
+            let mut row = Vec::new();
+            row.push(i.to_string());
+
+            for j in 0..7 {
+                if i != j {
+                    let cmp = model
+                        .compare(
+                            &Connect4::initial().apply_action(&i),
+                            &Connect4::initial().apply_action(&j),
+                        )
+                        .reverse();
+
+                    row.push(format!("{:?}", cmp));
+                } else {
+                    row.push("-".to_string());
+                }
+            }
+            builder.push_record(row);
+        }
+
+        println!("{}", builder.build());
     }
 
     // model_management::Pepe::new("models").latest();
