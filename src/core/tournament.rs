@@ -157,7 +157,7 @@ pub struct TournamentResult {
 }
 
 impl TournamentResult {
-    pub fn total_counts(&self, agent_name: &str) -> (usize, usize, usize) {
+    pub fn total_counts(&self, agent_name: &str) -> (usize, usize, usize, usize) {
         let mut wins = 0;
         let mut losses = 0;
         let mut draws = 0;
@@ -182,12 +182,14 @@ impl TournamentResult {
             draws += entry.draws;
         }
 
-        (wins, losses, draws)
+        let total = wins + losses + draws;
+
+        (wins, losses, draws, total)
     }
 
     pub fn win_rate(&self, agent_name: &str) -> f64 {
-        let (wins, losses, _) = self.total_counts(agent_name);
-        wins as f64 / (wins + losses) as f64
+        let (wins, _, draws, total) = self.total_counts(agent_name);
+        (wins as f64 + draws as f64 / 2.0) / total as f64
     }
 }
 
@@ -208,13 +210,13 @@ impl fmt::Display for TournamentResult {
 
             for (j, entry) in row.iter().enumerate() {
                 if i == j {
-                    let perf = self.total_counts(&self.names[i]);
+                    let (wins, losses, draws, total) = self.total_counts(&self.names[i]);
                     record.push(format!(
                         "{}/{}/{} ({:.1}%)",
-                        perf.0,
-                        perf.1,
-                        perf.2,
-                        (perf.0 as f64 / (perf.0 + perf.1) as f64) * 100.0
+                        wins,
+                        losses,
+                        draws,
+                        (wins as f64 + draws as f64 / 2.0) / total as f64 * 100.0
                     ));
                 } else {
                     record.push(format!(
@@ -222,7 +224,9 @@ impl fmt::Display for TournamentResult {
                         entry.wins_1,
                         entry.wins_2,
                         entry.draws,
-                        (entry.wins_1 as f64 / entry.total as f64) * 100.0
+                        ((entry.wins_1 as f64 + entry.draws as f64 / 2.0)
+                            / (entry.wins_1 + entry.wins_2 + entry.draws) as f64)
+                            * 100.0
                     ));
                 }
             }
