@@ -134,23 +134,27 @@ where
         let cloned_candidate_model = candidate_model.clone();
 
         let best_closure =
-            move || Box::new(DeepCmpAgent::new(best_model.clone(), [8, 8, 8])) as Box<dyn Agent<_>>;
+            move || Box::new(DeepCmpAgent::new(best_model.clone(), [7, 7, 7])) as Box<dyn Agent<_>>;
         let candidate_closure = move || {
-            Box::new(DeepCmpAgent::new(candidate_model.clone(), [8, 8, 8])) as Box<dyn Agent<_>>
+            Box::new(DeepCmpAgent::new(candidate_model.clone(), [7, 7, 7])) as Box<dyn Agent<_>>
         };
 
         let res = Tournament::new()
             //.add_agent("random", &|| Box::new(RandomAgent {}))
             .add_agent("best", &best_closure)
             .add_agent("candidate", &candidate_closure)
-            .num_matches(10)
+            .num_matches(100)
             .show_progress(true)
             .use_parallel(true)
             .run();
 
         println!("{}", res);
 
-        // assume better
-        self.best_model = cloned_candidate_model;
+        if res.win_rate("candidate") > 0.55 {
+            println!("Candidate is better, replacing best model");
+            self.best_model = cloned_candidate_model;
+        } else {
+            println!("Candidate is not better, keeping best model");
+        }
     }
 }

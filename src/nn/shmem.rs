@@ -1,5 +1,3 @@
-use std::borrow::BorrowMut;
-
 use shared_memory::{Shmem, ShmemConf, ShmemError};
 
 /// Create or open a shared memory mapping
@@ -17,7 +15,7 @@ pub fn open_shmem(id: &str, size: usize) -> Result<Shmem, ShmemError> {
 
             // insufficient size, drop and try again
             if shmem.len() != size {
-                // force drop
+                // force drop (does this really work on Windows?)
                 drop(shmem);
 
                 return open_shmem(id, size);
