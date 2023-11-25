@@ -30,6 +30,7 @@ where
         }
     }
 
+    #[allow(dead_code)]
     pub fn len(&self) -> usize {
         self.set.len()
     }
@@ -48,6 +49,7 @@ where
         vec
     }
 
+    #[allow(dead_code)]
     pub fn sample_one<R: Rng>(&self, rng: &mut R) -> Option<&T> {
         self.ring.iter().choose(rng)
     }

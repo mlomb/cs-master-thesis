@@ -7,7 +7,7 @@ use rand::{
 
 use super::{encoding::TensorEncodeable, ringbuffer_set::RingBufferSet};
 use crate::core::r#match::MatchOutcome;
-use std::{cmp::Ordering, collections::HashSet, hash::Hash, os::windows};
+use std::{cmp::Ordering, collections::HashSet, hash::Hash};
 
 pub struct SamplesDepth<P> {
     win_positions: RingBufferSet<P>,
