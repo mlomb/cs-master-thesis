@@ -29,7 +29,7 @@ fn main() -> ort::Result<()> {
             trainer.evaluate();
             std::thread::sleep(std::time::Duration::from_secs(1));
         }
-    } else if false {
+    } else if true {
         let initial_model = Arc::new(DeepCmpService::new("models/initial/onnx_model.onnx"));
         let depth_model = Arc::new(DeepCmpService::new("models/depth/onnx_model.onnx"));
         //let best_fc_model = Arc::new(DeepCmpService::new("models/best_fc/onnx_model.onnx"));
@@ -86,7 +86,7 @@ fn main() -> ort::Result<()> {
         }
     } else {
         let model = Arc::new(DeepCmpService::<Connect4>::new(
-            "models/best_fc/onnx_model.onnx",
+            "models/chk_100/onnx_model.onnx",
         ));
 
         use tabled::{builder::*, settings::object::Segment, settings::*};

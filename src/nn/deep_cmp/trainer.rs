@@ -5,15 +5,16 @@ use crate::core::agent::Agent;
 use crate::core::r#match::play_match;
 use crate::core::tournament::Tournament;
 use crate::nn::shmem::open_shmem;
+use crate::nn::train::Train;
 use crate::{core::position::Position, nn::deep_cmp::agent::DeepCmpAgent};
 use indicatif::{ProgressBar, ProgressStyle};
-use ndarray::{ArrayViewMut, IxDyn};
+use ndarray::{ArrayViewMut, Dimension, IxDyn};
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use shared_memory::Shmem;
 use std::hash::Hash;
 use std::sync::{Arc, Mutex};
 
-pub struct DeepCmpTrainer<P> {
+pub struct DeepCmpTrainer<'a, P> {
     version: usize,
     batch_size: usize,
     samples: Mutex<Samples<P>>,
@@ -26,9 +27,11 @@ pub struct DeepCmpTrainer<P> {
     status_shmem: Shmem,
     inputs_shmem: Shmem,
     outputs_shmem: Shmem,
+
+    train: Train<'a>,
 }
 
-impl<P> DeepCmpTrainer<P>
+impl<P> DeepCmpTrainer<'_, P>
 where
     P: Position + TensorEncodeable + Eq + Hash + Sync + Send + 'static,
 {
@@ -53,6 +56,8 @@ where
             status_shmem,
             inputs_shmem,
             outputs_shmem,
+
+            train: Train::new(batch_size, P::input_shape(), P::output_shape()),
         }
     }
 
@@ -83,6 +88,8 @@ where
 
     /// Prepares and fills the training data
     pub fn train(&mut self) {
+        self.train.fit("asd");
+
         // extract shapes from Position
         let mut inputs_shape_vec = P::input_shape();
         let mut outputs_shape_vec = P::output_shape();
