@@ -1,0 +1,15 @@
+[package]
+name = "thesis"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+indicatif = "0.17.7"
+pgn-reader = "0.25.0"
+rand = "0.8.5"
+shakmaty = "0.26.0"
+zstd = "0.13.0"
+
+[patch.crates-io]
+shakmaty = { git = "https://github.com/niklasf/shakmaty" }
+

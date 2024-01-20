@@ -1,3 +1,2 @@
-/target
-/models
-logs
+data/
+target/
