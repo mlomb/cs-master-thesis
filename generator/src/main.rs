@@ -24,6 +24,7 @@ fn main() -> io::Result<()> {
         )
         .unwrap();
 
+    let mut count = 0;
     let mut out_part = 0;
     let mut out_file: Option<File> = None;
 
@@ -41,7 +42,6 @@ fn main() -> io::Result<()> {
 
         let mut reader = BufferedReader::new(uncompressed);
         let mut visitor = GameVisitor::new();
-        let mut count = 0;
 
         while let Ok(Some(sample)) = reader.read_game(&mut visitor) {
             bar.inc(1);
