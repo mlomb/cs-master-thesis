@@ -1,24 +1,10 @@
-use indicatif::{ProgressBar, ProgressStyle};
-use pgn_reader::{BufferedReader, RawHeader, SanPlus, Skip, Visitor};
+use crate::sample::Sample;
+use pgn_reader::{RawHeader, SanPlus, Skip, Visitor};
 use rand::prelude::SliceRandom;
 use rand::Rng;
-use shakmaty::{Board, Chess, Color, Outcome, Position};
-use std::{
-    cell::RefCell,
-    fs::File,
-    io::{self},
-    rc::Rc,
-};
+use shakmaty::{Chess, Position};
 
-#[derive(Debug)]
-struct Sample {
-    parent: Board,
-    observed: Board,
-    random: Board,
-}
-
-#[derive(Debug)]
-struct GameVisitor {
+pub struct GameVisitor {
     event: String,
     termination: String,
     white_elo: i32,
@@ -28,7 +14,7 @@ struct GameVisitor {
 }
 
 impl GameVisitor {
-    fn new() -> Self {
+    pub fn new() -> Self {
         GameVisitor {
             event: "".to_string(),
             termination: "".to_string(),
@@ -66,7 +52,7 @@ impl Visitor for GameVisitor {
     }
 
     fn end_headers(&mut self) -> Skip {
-        const ELO_THRESHOLD: i32 = 2000;
+        const ELO_THRESHOLD: i32 = 1600;
 
         let keep =
             // keep rated classical games
@@ -118,10 +104,27 @@ impl Visitor for GameVisitor {
                 }
             };
 
+            let mut parent = parent.board().clone();
+            let mut observed = observed.board().clone();
+            let mut random = random.board().clone();
+
+            //  flip boards to be from white's POV
+            if (index % 2) == 0 {
+                // W B B
+                observed.flip_vertical();
+                observed.swap_colors();
+                random.flip_vertical();
+                random.swap_colors();
+            } else {
+                // B W W
+                parent.flip_vertical();
+                parent.swap_colors();
+            }
+
             let sample: Sample = Sample {
-                parent: parent.board().clone(),
-                observed: observed.board().clone(),
-                random: random.board().clone(),
+                parent,
+                observed,
+                random,
             };
 
             return Some(sample);
@@ -129,46 +132,3 @@ impl Visitor for GameVisitor {
     }
 }
 
-fn main() -> io::Result<()> {
-    let files = vec![
-        "../data/source/lichess_db_standard_rated_2023-09.pgn.zst",
-        "../data/source/lichess_db_standard_rated_2023-10.pgn.zst",
-        "../data/source/lichess_db_standard_rated_2023-11.pgn.zst",
-    ];
-
-    let bar_style = ProgressStyle::default_spinner()
-        .template(
-            "{spinner:.green} [Elapsed {elapsed_precise}] [Parsed {human_pos} @ {per_sec}] {msg} {prefix}",
-        )
-        .unwrap();
-
-    for path in files {
-        let file = File::open(&path)?;
-        let uncompressed: Box<dyn io::Read> = if path.ends_with(".zst") {
-            Box::new(zstd::Decoder::new(file)?)
-        } else {
-            Box::new(file)
-        };
-
-        let bar = ProgressBar::new_spinner()
-            .with_style(bar_style.clone())
-            .with_prefix(path);
-
-        let mut reader = BufferedReader::new(uncompressed);
-        let mut visitor = GameVisitor::new();
-        let mut count = 0;
-
-        while let Ok(Some(sample)) = reader.read_game(&mut visitor) {
-            bar.inc(1);
-
-            if let Some(sample) = sample {
-                println!("{:?}", sample);
-                count += 1;
-                bar.set_message(format!("[Accepted {}]", count));
-            }
-        }
-        bar.finish();
-    }
-
-    Ok(())
-}
