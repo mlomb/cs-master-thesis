@@ -11,10 +11,13 @@ use visitor::GameVisitor;
 
 fn main() -> io::Result<()> {
     let files = vec![
-        //"D:/lichess/lichess_db_standard_rated_2023-12.pgn.zst",
+        "D:/lichess/lichess_db_standard_rated_2023-12.pgn.zst",
         "D:/lichess/lichess_db_standard_rated_2023-11.pgn.zst",
         "D:/lichess/lichess_db_standard_rated_2023-10.pgn.zst",
         "D:/lichess/lichess_db_standard_rated_2023-09.pgn.zst",
+        "D:/lichess/lichess_db_standard_rated_2023-08.pgn.zst",
+        "D:/lichess/lichess_db_standard_rated_2023-07.pgn.zst",
+        "D:/lichess/lichess_db_standard_rated_2023-06.pgn.zst",
     ];
     const MAX_OUT_SIZE: u64 = 1024 * 1024 * 512; // 512 MB
 
