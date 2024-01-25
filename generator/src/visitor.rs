@@ -5,6 +5,8 @@ use rand::Rng;
 use shakmaty::{Chess, Position};
 
 pub struct GameVisitor {
+    min_elo: i32,
+    
     event: String,
     termination: String,
     white_elo: i32,
@@ -14,8 +16,9 @@ pub struct GameVisitor {
 }
 
 impl GameVisitor {
-    pub fn new() -> Self {
+    pub fn new(min_elo: i32) -> Self {
         GameVisitor {
+            min_elo,
             event: "".to_string(),
             termination: "".to_string(),
             white_elo: 0,
@@ -52,16 +55,14 @@ impl Visitor for GameVisitor {
     }
 
     fn end_headers(&mut self) -> Skip {
-        const ELO_THRESHOLD: i32 = 1600;
-
         let keep =
             // keep rated classical games
             self.event.starts_with("Rated Classical") &&
             // keep normal terminations (excl. Abandoned, Time forfeit, Rules infraction)
             self.termination == "Normal" &&
             // keep games with good elo
-            self.white_elo >= ELO_THRESHOLD &&
-            self.black_elo >= ELO_THRESHOLD;
+            self.white_elo >= self.min_elo &&
+            self.black_elo >= self.min_elo;
 
         Skip(!keep)
     }

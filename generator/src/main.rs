@@ -1,25 +1,37 @@
 pub mod sample;
 pub mod visitor;
 
+use clap::Parser;
 use indicatif::{ProgressBar, ProgressStyle};
 use pgn_reader::BufferedReader;
 use std::{
     fs::File,
-    io::{self, Seek},
+    io::{self},
 };
 use visitor::GameVisitor;
 
+#[derive(Parser)]
+struct Cli {
+    /// List of .pgn or .pgn.zst to read games
+    inputs: Vec<String>,
+
+    /// Output binary file to write the samples
+    #[arg(short, long, value_name = "output")]
+    output: String,
+
+    /// Only accept games where both player have at least this elo
+    #[arg(short, long, value_name = "min-elo")]
+    min_elo: i32,
+}
+
 fn main() -> io::Result<()> {
-    let files = vec![
-        "D:/lichess/lichess_db_standard_rated_2023-12.pgn.zst",
-        "D:/lichess/lichess_db_standard_rated_2023-11.pgn.zst",
-        "D:/lichess/lichess_db_standard_rated_2023-10.pgn.zst",
-        "D:/lichess/lichess_db_standard_rated_2023-09.pgn.zst",
-        "D:/lichess/lichess_db_standard_rated_2023-08.pgn.zst",
-        "D:/lichess/lichess_db_standard_rated_2023-07.pgn.zst",
-        "D:/lichess/lichess_db_standard_rated_2023-06.pgn.zst",
-    ];
-    const MAX_OUT_SIZE: u64 = 1024 * 1024 * 512; // 512 MB
+    let args = Cli::parse_from(wild::args());
+
+    println!(
+        "Parsing {} files and writing to {}",
+        args.inputs.len(),
+        args.output
+    );
 
     let bar_style = ProgressStyle::default_spinner()
         .template(
@@ -28,10 +40,10 @@ fn main() -> io::Result<()> {
         .unwrap();
 
     let mut count = 0;
-    let mut out_part = 0;
-    let mut out_file: Option<File> = None;
+    let mut out_file = File::create(args.output)?;
+    let mut visitor = GameVisitor::new(args.min_elo);
 
-    for path in files {
+    for path in args.inputs {
         let file = File::open(&path)?;
         let uncompressed: Box<dyn io::Read> = if path.ends_with(".zst") {
             Box::new(zstd::Decoder::new(file)?)
@@ -44,20 +56,15 @@ fn main() -> io::Result<()> {
             .with_prefix(path);
 
         let mut reader = BufferedReader::new(uncompressed);
-        let mut visitor = GameVisitor::new();
 
         while let Ok(Some(sample)) = reader.read_game(&mut visitor) {
             bar.inc(1);
 
             if let Some(sample) = sample {
-                if out_file.is_none() || out_file.as_ref().unwrap().stream_position()? > MAX_OUT_SIZE {
-                    out_part += 1;
-                    out_file = Some(File::create(format!("../data/dataset/{}.bin", out_part))?);
-                }
-                sample.write_to(&mut out_file.as_mut().unwrap())?;
+                sample.write_to(&mut out_file)?;
 
                 count += 1;
-                bar.set_message(format!("[Accepted {}] [Writing {}.bin]", count, out_part));
+                bar.set_message(format!("[Accepted {}]", count));
             }
         }
         bar.finish();
