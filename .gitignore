@@ -1,2 +1,5 @@
 data/
 target/
+checkpoints/
+logs/
+__pycache__/
