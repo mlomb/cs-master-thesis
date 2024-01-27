@@ -1,7 +1,6 @@
 import chess
 import tensorflow as tf
 import numpy as np
-from numpy import ndarray as NDArray
 
 def decode_board(tensor: tf.Tensor) -> tf.Tensor:
     """
