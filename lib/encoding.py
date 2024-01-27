@@ -23,19 +23,46 @@ def encode_board(board: chess.Board):
     for i in range(64):
         piece = board.piece_at(i)
         if piece is not None:
-            match piece.symbol():
-                case "P": channel = 0
-                case "N": channel = 1
-                case "B": channel = 2
-                case "R": channel = 3
-                case "Q": channel = 4
-                case "K": channel = 5
-                case "p": channel = 6
-                case "n": channel = 7
-                case "b": channel = 8
-                case "r": channel = 9
-                case "q": channel = 10
-                case "k": channel = 11
+            #match piece.symbol():
+            #    case "P": channel = 0
+            #    case "N": channel = 1
+            #    case "B": channel = 2
+            #    case "R": channel = 3
+            #    case "Q": channel = 4
+            #    case "K": channel = 5
+            #    case "p": channel = 6
+            #    case "n": channel = 7
+            #    case "b": channel = 8
+            #    case "r": channel = 9
+            #    case "q": channel = 10
+            #    case "k": channel = 11
+
+            if piece.symbol() == "P":
+                channel = 0
+            elif piece.symbol() == "N":
+                channel = 1
+            elif piece.symbol() == "B":
+                channel = 2
+            elif piece.symbol() == "R":
+                channel = 3
+            elif piece.symbol() == "Q":
+                channel = 4
+            elif piece.symbol() == "K":
+                channel = 5
+            elif piece.symbol() == "p":
+                channel = 6
+            elif piece.symbol() == "n":
+                channel = 7
+            elif piece.symbol() == "b":
+                channel = 8
+            elif piece.symbol() == "r":
+                channel = 9
+            elif piece.symbol() == "q":
+                channel = 10
+            elif piece.symbol() == "k":
+                channel = 11
+            else:
+                raise Exception("Unknown piece: " + piece.symbol())
 
             rank = i // 8
             file = i % 8
