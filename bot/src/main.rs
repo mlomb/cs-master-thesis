@@ -24,7 +24,7 @@ fn main() -> ort::Result<()> {
     let mut position: Chess = Chess::default();
 
     for line in io::stdin().lock().lines() {
-        let msg: UciMessage = parse_one(&line.unwrap());
+        let msg: UciMessage = parse_one(&line.unwrap().trim());
 
         file.write_all(format!("{}\n", msg).as_bytes()).unwrap();
 
@@ -80,8 +80,13 @@ fn main() -> ort::Result<()> {
                 file.write_all(format!("{:?}\n", search_control).as_bytes())
                     .unwrap();
 
-                let (score, mv) =
-                    search::negamax(position.clone(), 3, -f32::INFINITY, f32::INFINITY, &session);
+                let (score, mv) = search::negamax(
+                    position.clone(),
+                    5,
+                    f32::NEG_INFINITY,
+                    f32::INFINITY,
+                    &session,
+                );
 
                 eprintln!("Search result: {} {}", mv, score);
                 println!("{}", UciMessage::best_move(move_to_uci(mv)));

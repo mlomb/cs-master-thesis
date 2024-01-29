@@ -6,7 +6,13 @@ use shakmaty::{Chess, Color, Move, Position};
 
 use crate::encoding::encode_board;
 
-pub fn negamax(chess: Chess, depth: i32, alpha: f32, beta: f32, model: &Session) -> (f32, Move) {
+pub fn negamax(
+    chess: Chess,
+    depth: i32,
+    mut alpha: f32,
+    beta: f32,
+    model: &Session,
+) -> (f32, Move) {
     let moves = chess.legal_moves();
     let mut x = Array2::<i64>::zeros((moves.len(), 12));
 
@@ -39,60 +45,31 @@ pub fn negamax(chess: Chess, depth: i32, alpha: f32, beta: f32, model: &Session)
     // sort from LOWEST to HIGHEST
     indexes.sort_by(|a, b| scores[*a].partial_cmp(&scores[*b]).unwrap());
 
-    for index in indexes {
-        eprintln!(" - {}: {}", moves[index], scores[index]);
-
-        return (scores[index], moves[index].clone());
-    }
-
-    return (0.5, moves[0].clone());
-
-    /*
-    for i in 1..legal_moves.len() {
-        let mut board_copy = chess.clone();
-        board_copy.play_unchecked(&legal_moves[i]);
-        boards.push(board_copy);
-        moves.push(mv);
-        Xs.push(encode_board(&board_copy));
-    }
-
-    //let scores = model.run(inputs![x].unwrap()).unwrap()[0]
-    //    .extract::<Array2<f32>>()
-    //    .unwrap();
-
-    let checkmate_score = 1e6;
-
-    let mut child_nodes: Vec<(f32, Move, Board)> = scores
-        .iter()
-        .zip(moves.iter())
-        .zip(boards.iter())
-        .map(|((score, mv), board)| {
-            let mut score = -score;
-
-            if board.is_checkmate() {
-                score = checkmate_score;
-            }
-
-            (score, *mv, board.clone())
-        })
-        .collect();
-
-    child_nodes.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap());
-
     let mut best_value = f32::NEG_INFINITY;
     let mut best_move = None;
 
-    for (score, mv, next_board) in child_nodes {
-        let value = if depth == 1 || score == checkmate_score {
-            score
+    for index in indexes {
+        let value: f32;
+
+        if depth == 1 {
+            // since the move has been made, and the position
+            // has been evaluated for the other player,
+            // we have to negate the score
+            // this is why we sort from LOWEST to HIGHEST
+            value = -scores[index];
         } else {
-            let (neg_value, _) = negamax(next_board, depth - 1, -beta, -alpha, model);
-            -neg_value
-        };
+            let mut chess_moved = chess.clone();
+            chess_moved.play_unchecked(&moves[index]);
+
+            let (neg_value, _) = negamax(chess_moved, depth - 1, -beta, -alpha, model);
+            value = -neg_value;
+        }
+
+        // eprintln!(" - {}: {}", moves[index], scores[index]);
 
         if value > best_value {
             best_value = value;
-            best_move = Some(mv);
+            best_move = Some(moves[index].clone());
         }
 
         if value > alpha {
@@ -104,6 +81,5 @@ pub fn negamax(chess: Chess, depth: i32, alpha: f32, beta: f32, model: &Session)
         }
     }
 
-    (best_value, best_move.unwrap())
-     */
+    return (best_value, best_move.unwrap());
 }
