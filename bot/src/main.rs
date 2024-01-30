@@ -1,17 +1,22 @@
 mod encoding;
 mod search;
 
-use ort::Session;
+use ort::{CUDAExecutionProvider, Session};
 use shakmaty::fen::Fen;
 use shakmaty::uci::Uci;
 use shakmaty::{Chess, File, Move, Position, Square};
 use std::io::Write;
 use std::io::{self, BufRead};
+use std::time::Instant;
 use vampirc_uci::{parse_one, UciMessage, UciMove, UciOptionConfig, UciPiece, UciSquare};
 
 fn main() -> ort::Result<()> {
+    // ort::init()
+    //     .with_execution_providers([CUDAExecutionProvider::default().build()])
+    //     .commit()?;
+
     let session = Session::builder()?
-        .with_intra_threads(1)?
+        .with_intra_threads(8)?
         .with_model_from_memory(include_bytes!("../../models/model-0682-1.751.onnx"))?;
 
     // append msg to file
@@ -80,15 +85,31 @@ fn main() -> ort::Result<()> {
                 file.write_all(format!("{:?}\n", search_control).as_bytes())
                     .unwrap();
 
+                let mut depth = 3;
+                if let Some(search_control) = search_control {
+                    if let Some(opt_depth) = search_control.depth {
+                        assert!(opt_depth >= 1);
+                        depth = opt_depth as i32;
+                        depth = depth.min(7);
+                    }
+                }
+
+                let start = Instant::now();
                 let (score, mv) = search::negamax(
                     position.clone(),
-                    5,
+                    depth,
                     f32::NEG_INFINITY,
                     f32::INFINITY,
                     &session,
                 );
+                let elapsed = start.elapsed();
 
-                eprintln!("Search result: {} {}", mv.clone().unwrap(), score);
+                eprintln!(
+                    "**** {} {} in {}",
+                    mv.clone().unwrap(),
+                    score,
+                    elapsed.as_millis()
+                );
                 println!("{}", UciMessage::best_move(move_to_uci(mv.unwrap())));
             }
             _ => {}
