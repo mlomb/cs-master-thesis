@@ -88,8 +88,8 @@ fn main() -> ort::Result<()> {
                     &session,
                 );
 
-                eprintln!("Search result: {} {}", mv, score);
-                println!("{}", UciMessage::best_move(move_to_uci(mv)));
+                eprintln!("Search result: {} {}", mv.clone().unwrap(), score);
+                println!("{}", UciMessage::best_move(move_to_uci(mv.unwrap())));
             }
             _ => {}
         }

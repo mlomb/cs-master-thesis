@@ -12,9 +12,15 @@ pub fn negamax(
     mut alpha: f32,
     beta: f32,
     model: &Session,
-) -> (f32, Move) {
+) -> (f32, Option<Move>) {
+    if chess.is_stalemate() {
+        return (0.0, None);
+    }
+
     let moves = chess.legal_moves();
     let mut x = Array2::<i64>::zeros((moves.len(), 12));
+
+    assert!(moves.len() > 0, "no legal moves for position: {:?}", chess);
 
     for i in 0..moves.len() {
         let mut chess_moved = chess.clone();
@@ -22,7 +28,7 @@ pub fn negamax(
 
         if chess_moved.is_checkmate() {
             // detected checkmate
-            return (1e6, moves[i].clone());
+            return (1e6, Some(moves[i].clone()));
         }
 
         let mut board_moved = chess_moved.board().clone();
@@ -81,5 +87,5 @@ pub fn negamax(
         }
     }
 
-    return (best_value, best_move.unwrap());
+    return (best_value, best_move);
 }
