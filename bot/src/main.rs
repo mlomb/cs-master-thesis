@@ -17,7 +17,7 @@ fn main() -> ort::Result<()> {
 
     let session = Session::builder()?
         .with_intra_threads(8)?
-        .with_model_from_memory(include_bytes!("../../models/model-0682-1.751.onnx"))?;
+        .with_model_from_memory(include_bytes!("../../models/model-0075-0.476.onnx"))?;
 
     // append msg to file
     let mut file = std::fs::OpenOptions::new()
@@ -85,7 +85,7 @@ fn main() -> ort::Result<()> {
                 file.write_all(format!("{:?}\n", search_control).as_bytes())
                     .unwrap();
 
-                let mut depth = 3;
+                let mut depth = 4;
                 if let Some(search_control) = search_control {
                     if let Some(opt_depth) = search_control.depth {
                         assert!(opt_depth >= 1);
