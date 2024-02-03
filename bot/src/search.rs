@@ -70,51 +70,24 @@ impl Search {
             // enable following the PV
             // self.follow_pv = true;
 
-            let mut delta = 0.12;
-            let mut alpha = (best_score.unwrap_or(-INFINITE) - delta).max(-INFINITE);
-            let mut beta = (best_score.unwrap_or(INFINITE) + delta).min(INFINITE);
+            // try aspiration window close to the previous iteration's score
+            // we assume that the score of this iteration will not be changing much
+            const DELTA: f32 = 0.12;
+            let mut alpha = (best_score.unwrap_or(-INFINITE) - DELTA).max(-INFINITE);
+            let mut beta = (best_score.unwrap_or(INFINITE) + DELTA).min(INFINITE);
             let mut score;
 
-            // start with a small aspiration window
-            // if the score is outside the window, re-search the position
-            // until we dont fail anymore
             loop {
                 score = self.negamax(position.clone(), alpha, beta, depth);
 
-                // If failing high/low, increase the aspiration window
-                // and re-search the position
-                if score <= alpha {
-                    //  -INF <   [score]  <=  alpha  <=   beta    <= INF
-                    //   |----------|----------|----------|----------|
-                    //           ↑                   ↑ new beta = (alpha + beta) / 2
-                    //           ↑ new alpha = (score - delta)
-                    beta = (alpha + beta) / 2.0;
-                    alpha = (score - delta).max(-INFINITE);
-                } else if score >= beta {
-                    //  -INF <    alpha  <=  beta  <=  [score]   <= INF
-                    //   |----------|----------|----------|----------|
-                    //                                         ↑ new beta = (score + delta)
-                    beta = (score + delta).min(INFINITE);
+                // if failing high/low, re-search the position
+                if score < alpha || score > beta {
+                    // failing high/low, re-search the position with the full window
+                    // score is outside the window
+                    alpha = -INFINITE;
+                    beta = INFINITE;
                 } else {
-                    eprintln!(
-                        "[WITHIN] score: {} alpha: {} beta: {} delta: {}",
-                        score, alpha, beta, delta
-                    );
                     // score is within the window
-                    break;
-                }
-
-                eprintln!(
-                    "[OUTSIDE] score: {} alpha: {} beta: {} delta: {}",
-                    score, alpha, beta, delta
-                );
-
-                // increase delta exponentially
-                delta *= 2.0;
-
-                assert!(alpha >= -INFINITE && beta <= INFINITE);
-
-                if self.aborted {
                     break;
                 }
             }
@@ -214,9 +187,8 @@ impl Search {
         if depth == 0 {
             // escape from recursion
             // run quiescence search
-            //return self.quiescence(position, alpha, beta);
+            return self.quiescence(position, alpha, beta);
             self.nodes += 1;
-
             return self.evaluate(&position);
         }
 
