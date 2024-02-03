@@ -1,7 +1,8 @@
 use crate::{encoding::encode_board, pv::PVTable};
 use ndarray::Array2;
 use ort::{inputs, Session};
-use shakmaty::{CastlingMode, Chess, Color, Move, Position};
+use rand::seq::SliceRandom;
+use shakmaty::{CastlingMode, Chess, Color, Move, MoveList, Position};
 use std::{
     ops::Index,
     time::{Duration, Instant},
@@ -86,6 +87,7 @@ impl Search {
                     // score is outside the window
                     alpha = -INFINITE;
                     beta = INFINITE;
+                    eprintln!("fail high/low, re-searching with full window");
                 } else {
                     // score is within the window
                     break;
@@ -187,7 +189,7 @@ impl Search {
         if depth == 0 {
             // escape from recursion
             // run quiescence search
-            return self.quiescence(position, alpha, beta);
+            //return self.quiescence(position, alpha, beta);
             self.nodes += 1;
             return self.evaluate(&position);
         }
@@ -197,18 +199,10 @@ impl Search {
 
         // generate legal moves
         let mut moves = position.legal_moves();
-
-        // sort using the NN (too slow)
-        // moves.sort_by_cached_key(|mv| {
-        //     let mut chess_moved = position.clone();
-        //     chess_moved.play_unchecked(&mv);
-        //     -(self.evaluate(&chess_moved) * 100000.0) as i32
-        // });
-
-        // sort stable
-        moves.sort_by_key(|mv| mv != self.pv.get_best_move(self.ply));
-
         assert!(moves.len() > 0, "at least one legal move");
+
+        // sort moves
+        self.sort_moves(&mut moves);
 
         for mv in moves {
             let mut chess_moved = position.clone();
@@ -270,6 +264,54 @@ impl Search {
 
         // node fails low
         alpha
+    }
+
+    fn sort_moves(&self, moves: &mut MoveList) {
+        // sort using the NN (too slow)
+        // moves.sort_by_cached_key(|mv| {
+        //     let mut chess_moved = position.clone();
+        //     chess_moved.play_unchecked(&mv);
+        //     -(self.evaluate(&chess_moved) * 100000.0) as i32
+        // });
+
+        let move_pv = self.pv.get_best_move(self.ply);
+
+        // sort using an heuristic
+        moves.sort_by_cached_key(|mv| {
+            let mut score = 0;
+
+            // put the PV move first
+            if mv == move_pv {
+                score = 20_000;
+            }
+
+            if mv.is_capture() {
+                // MVV LVA [attacker][victim]
+                const MVV_LVA: [[i32; 12]; 12] = [
+                    [105, 205, 305, 405, 505, 605, 105, 205, 305, 405, 505, 605],
+                    [104, 204, 304, 404, 504, 604, 104, 204, 304, 404, 504, 604],
+                    [103, 203, 303, 403, 503, 603, 103, 203, 303, 403, 503, 603],
+                    [102, 202, 302, 402, 502, 602, 102, 202, 302, 402, 502, 602],
+                    [101, 201, 301, 401, 501, 601, 101, 201, 301, 401, 501, 601],
+                    [100, 200, 300, 400, 500, 600, 100, 200, 300, 400, 500, 600],
+                    // --
+                    [105, 205, 305, 405, 505, 605, 105, 205, 305, 405, 505, 605],
+                    [104, 204, 304, 404, 504, 604, 104, 204, 304, 404, 504, 604],
+                    [103, 203, 303, 403, 503, 603, 103, 203, 303, 403, 503, 603],
+                    [102, 202, 302, 402, 502, 602, 102, 202, 302, 402, 502, 602],
+                    [101, 201, 301, 401, 501, 601, 101, 201, 301, 401, 501, 601],
+                    [100, 200, 300, 400, 500, 600, 100, 200, 300, 400, 500, 600],
+                ];
+
+                let attacker = mv.role();
+                let victim = mv.capture().unwrap();
+
+                score = MVV_LVA[attacker as usize][victim as usize] + 10_000;
+            }
+
+            // sorts are from low to high, so flip
+            -score
+        });
     }
 
     fn evaluate(&mut self, position: &Chess) -> f32 {
