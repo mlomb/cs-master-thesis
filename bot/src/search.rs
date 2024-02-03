@@ -1,8 +1,11 @@
 use crate::{encoding::encode_board, pv::PVTable};
 use ndarray::Array2;
 use ort::{inputs, Session};
-use shakmaty::{CastlingMode, Chess, Color, Position};
-use std::ops::Index;
+use shakmaty::{CastlingMode, Chess, Color, Move, Position};
+use std::{
+    ops::Index,
+    time::{Duration, Instant},
+};
 
 pub struct Search {
     /// ML model to evaluate positions
@@ -16,9 +19,16 @@ pub struct Search {
     /// Current ply
     ply: usize,
     /// Whether to follow the principal variation
-    follow_pv: bool,
+    // follow_pv: bool,
     /// Principal variation
     pv: PVTable,
+
+    /// Start search time
+    start_time: Instant,
+    /// Time limit, do not exceed this time
+    time_limit: Option<Duration>,
+    /// Whether the search was aborted
+    aborted: bool,
 }
 
 impl Search {
@@ -27,36 +37,63 @@ impl Search {
             model,
             nodes: 0,
             evals: 0,
+            start_time: Instant::now(),
             ply: 0,
-            follow_pv: false,
+            // follow_pv: false,
             pv: PVTable::new(),
+            time_limit: None,
+            aborted: false,
         }
     }
 
-    pub fn go(&mut self, position: &Chess, max_depth: i32) {
+    pub fn go(
+        &mut self,
+        position: &Chess,
+        max_depth: Option<i32>,
+        time_limit: Option<Duration>,
+    ) -> Option<Move> {
         self.nodes = 0;
         self.evals = 0;
         self.ply = 0;
 
-        for depth in 1..=max_depth {
+        // time control
+        self.start_time = Instant::now();
+        self.time_limit = time_limit;
+        self.aborted = false;
+
+        let mut best_move = None;
+
+        for depth in 1..=max_depth.unwrap_or(64) {
             // enable following the PV
-            self.follow_pv = true;
+            // self.follow_pv = true;
 
             // find the best move within a given position
-            let score = self.negamax(position.clone(), f32::NEG_INFINITY, f32::INFINITY, depth);
+            let score = self.negamax(position.clone(), -50000.0, 50000.0, depth);
+
+            if self.aborted {
+                break;
+            }
+
+            best_move = self.pv.get_mainline().first().cloned();
 
             eprint!(
-                "info depth {} nodes {} evals {} score cp {} pv ",
-                depth, self.nodes, self.evals, score
+                "info depth {} nodes {} evals {} time {} score cp {} pv ",
+                depth,
+                self.nodes,
+                self.evals,
+                self.start_time.elapsed().as_millis(),
+                score
             );
             for mv in self.pv.get_mainline() {
                 eprint!("{} ", mv.to_uci(CastlingMode::Standard).to_string());
             }
             eprint!("\n");
         }
+
+        best_move
     }
 
-    pub fn quiescence(&mut self, position: Chess, mut alpha: f32, beta: f32) -> f32 {
+    fn quiescence(&mut self, position: Chess, mut alpha: f32, beta: f32) -> f32 {
         // increment the number of nodes searched
         self.nodes += 1;
 
@@ -101,7 +138,14 @@ impl Search {
         return alpha;
     }
 
-    pub fn negamax(&mut self, position: Chess, mut alpha: f32, beta: f32, depth: i32) -> f32 {
+    fn negamax(&mut self, position: Chess, mut alpha: f32, beta: f32, depth: i32) -> f32 {
+        self.checkup();
+
+        if self.aborted {
+            // abort search (time limit?)
+            return 0.0;
+        }
+
         // init PV
         let mut found_pv = false;
         self.pv.reset(self.ply);
@@ -122,11 +166,7 @@ impl Search {
 
         // generate legal moves
         let mut moves = position.legal_moves();
-        if self.follow_pv {
-            self.follow_pv = false;
-
-            moves.sort_unstable_by_key(|mv| mv != self.pv.get_best_move(self.ply));
-        }
+        moves.sort_unstable_by_key(|mv| mv != self.pv.get_best_move(self.ply));
 
         for mv in moves {
             let mut chess_moved = position.clone();
@@ -190,7 +230,7 @@ impl Search {
         alpha
     }
 
-    pub fn evaluate(&mut self, position: &Chess) -> f32 {
+    fn evaluate(&mut self, position: &Chess) -> f32 {
         // increase number of evals computed
         self.evals += 1;
 
@@ -224,6 +264,14 @@ impl Search {
             let value = scores[0];
 
             return value;
+        }
+    }
+
+    fn checkup(&mut self) {
+        if let Some(time_limit) = self.time_limit {
+            if self.start_time.elapsed() >= time_limit {
+                self.aborted = true;
+            }
         }
     }
 }

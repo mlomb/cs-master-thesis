@@ -3,7 +3,7 @@ use std::mem::MaybeUninit;
 
 const MAX_PLY: usize = 64;
 
-/// Triangular PV table
+/// Triangular Principal Variation table
 /// --------------------------------
 /// PV line: e2e4 e7e5 g1f3 b8c6
 pub struct PVTable {
