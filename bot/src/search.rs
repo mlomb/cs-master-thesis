@@ -197,7 +197,16 @@ impl Search {
 
         // generate legal moves
         let mut moves = position.legal_moves();
-        moves.sort_unstable_by_key(|mv| mv != self.pv.get_best_move(self.ply));
+
+        // sort using the NN (too slow)
+        // moves.sort_by_cached_key(|mv| {
+        //     let mut chess_moved = position.clone();
+        //     chess_moved.play_unchecked(&mv);
+        //     -(self.evaluate(&chess_moved) * 100000.0) as i32
+        // });
+
+        // sort stable
+        moves.sort_by_key(|mv| mv != self.pv.get_best_move(self.ply));
 
         assert!(moves.len() > 0, "at least one legal move");
 
