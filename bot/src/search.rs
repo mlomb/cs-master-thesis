@@ -7,6 +7,8 @@ use std::{
     time::{Duration, Instant},
 };
 
+const INFINITE: f32 = 50000.0;
+
 pub struct Search {
     /// ML model to evaluate positions
     model: Session,
@@ -61,20 +63,68 @@ impl Search {
         self.time_limit = time_limit;
         self.aborted = false;
 
+        let mut best_score = None;
         let mut best_move = None;
 
-        for depth in 1..=max_depth.unwrap_or(64) {
+        for depth in 1..=max_depth.unwrap_or(60) {
             // enable following the PV
             // self.follow_pv = true;
 
-            // find the best move within a given position
-            let score = self.negamax(position.clone(), -50000.0, 50000.0, depth);
+            let mut delta = 0.12;
+            let mut alpha = (best_score.unwrap_or(-INFINITE) - delta).max(-INFINITE);
+            let mut beta = (best_score.unwrap_or(INFINITE) + delta).min(INFINITE);
+            let mut score;
+
+            // start with a small aspiration window
+            // if the score is outside the window, re-search the position
+            // until we dont fail anymore
+            loop {
+                score = self.negamax(position.clone(), alpha, beta, depth);
+
+                // If failing high/low, increase the aspiration window
+                // and re-search the position
+                if score <= alpha {
+                    //  -INF <   [score]  <=  alpha  <=   beta    <= INF
+                    //   |----------|----------|----------|----------|
+                    //           ↑                   ↑ new beta = (alpha + beta) / 2
+                    //           ↑ new alpha = (score - delta)
+                    beta = (alpha + beta) / 2.0;
+                    alpha = (score - delta).max(-INFINITE);
+                } else if score >= beta {
+                    //  -INF <    alpha  <=  beta  <=  [score]   <= INF
+                    //   |----------|----------|----------|----------|
+                    //                                         ↑ new beta = (score + delta)
+                    beta = (score + delta).min(INFINITE);
+                } else {
+                    eprintln!(
+                        "[WITHIN] score: {} alpha: {} beta: {} delta: {}",
+                        score, alpha, beta, delta
+                    );
+                    // score is within the window
+                    break;
+                }
+
+                eprintln!(
+                    "[OUTSIDE] score: {} alpha: {} beta: {} delta: {}",
+                    score, alpha, beta, delta
+                );
+
+                // increase delta exponentially
+                delta *= 2.0;
+
+                assert!(alpha >= -INFINITE && beta <= INFINITE);
+
+                if self.aborted {
+                    break;
+                }
+            }
 
             if self.aborted {
                 break;
             }
 
             best_move = self.pv.get_mainline().first().cloned();
+            best_score = Some(score);
 
             eprint!(
                 "info depth {} nodes {} evals {} time {} score cp {} pv ",
@@ -139,7 +189,9 @@ impl Search {
     }
 
     fn negamax(&mut self, position: Chess, mut alpha: f32, beta: f32, depth: i32) -> f32 {
-        self.checkup();
+        if self.nodes % 1000 == 0 {
+            self.checkup();
+        }
 
         if self.aborted {
             // abort search (time limit?)
@@ -155,10 +207,17 @@ impl Search {
             return 0.0;
         }
 
+        if position.is_checkmate() {
+            return -10000.0;
+        }
+
         if depth == 0 {
             // escape from recursion
             // run quiescence search
-            return self.quiescence(position, alpha, beta);
+            //return self.quiescence(position, alpha, beta);
+            self.nodes += 1;
+
+            return self.evaluate(&position);
         }
 
         // increment the number of nodes searched
@@ -167,6 +226,8 @@ impl Search {
         // generate legal moves
         let mut moves = position.legal_moves();
         moves.sort_unstable_by_key(|mv| mv != self.pv.get_best_move(self.ply));
+
+        assert!(moves.len() > 0, "at least one legal move");
 
         for mv in moves {
             let mut chess_moved = position.clone();
@@ -273,5 +334,16 @@ impl Search {
                 self.aborted = true;
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn test_mates() {
+        const MATE_FENS: [&str; 1] = [
+            //
+            "4k3/4N2R/8/1P1K2P1/8/8/PP5P/8 w - - 5 48",
+        ];
     }
 }
