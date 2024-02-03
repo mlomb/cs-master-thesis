@@ -98,7 +98,11 @@ fn main() -> ort::Result<()> {
                     }
                 }
 
-                let best_move = search.go(&position, max_depth, available_time);
+                let best_move = search.go(
+                    &position,
+                    max_depth,
+                    available_time.map(|t| t - Duration::from_millis(5)),
+                );
 
                 println!("{}", UciMessage::best_move(move_to_uci(best_move.unwrap())));
             }
