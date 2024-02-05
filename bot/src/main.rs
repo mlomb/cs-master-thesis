@@ -1,6 +1,7 @@
 mod encoding;
 mod pv;
 mod search;
+mod tt;
 
 use ort::Session;
 use search::Search;

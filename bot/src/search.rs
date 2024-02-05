@@ -1,4 +1,8 @@
-use crate::{encoding::encode_board, pv::PVTable};
+use crate::{
+    encoding::encode_board,
+    pv::PVTable,
+    tt::{TFlag, TTable},
+};
 use ndarray::Array2;
 use ort::{inputs, Session};
 use shakmaty::{CastlingMode, Chess, Color, Move, MoveList, Position};
@@ -22,8 +26,10 @@ pub struct Search {
 
     /// Current ply
     ply: usize,
-    /// Principal variation
+    /// Principal variation table
     pv: PVTable,
+    /// Transposition table
+    tt: TTable,
 
     /// Start search time
     start_time: Instant,
@@ -42,6 +48,7 @@ impl Search {
             start_time: Instant::now(),
             ply: 0,
             pv: PVTable::new(),
+            tt: TTable::new(1_000_000 * 20), // ~480MB
             time_limit: None,
             aborted: false,
         }
@@ -62,42 +69,17 @@ impl Search {
         self.time_limit = time_limit;
         self.aborted = false;
 
-        let mut best_score = None;
         let mut best_line = None;
 
         for depth in 1..=max_depth.unwrap_or(60) {
-            // try aspiration window close to the previous iteration's score
-            // we assume that the score of this iteration will not be changing much
-            const DELTA: Value = 10;
-            let mut alpha = (best_score.unwrap_or(-INFINITE) - DELTA).max(-INFINITE);
-            let mut beta = (best_score.unwrap_or(INFINITE) + DELTA).min(INFINITE);
-            let mut score;
-            // disable aspiration window
-            alpha = -INFINITE;
-            beta = INFINITE;
-
-            loop {
-                score = self.negamax(position.clone(), alpha, beta, depth, false);
-
-                // if failing high/low, re-search the position
-                if score < alpha || score > beta {
-                    // failing high/low, re-search the position with the full window
-                    // score is outside the window
-                    alpha = -INFINITE;
-                    beta = INFINITE;
-                    eprintln!("fail high/low, re-searching with full window");
-                } else {
-                    // score is within the window
-                    break;
-                }
-            }
+            let score = self.negamax(position.clone(), -INFINITE, INFINITE, depth, false);
 
             if self.aborted {
+                // do not replace best line since the search is incomplete
                 break;
             }
 
             best_line = Some(self.pv.get_mainline());
-            best_score = Some(score);
 
             eprint!(
                 "info depth {} nodes {} evals {} time {} score cp {} pv ",
@@ -107,7 +89,7 @@ impl Search {
                 self.start_time.elapsed().as_millis(),
                 score
             );
-            for mv in self.pv.get_mainline() {
+            for mv in best_line.as_ref().unwrap() {
                 eprint!("{} ", mv.to_uci(CastlingMode::Standard).to_string());
             }
             eprint!("\n");
@@ -167,23 +149,28 @@ impl Search {
         mut alpha: Value,
         beta: Value,
         depth: i32,
-        do_null: bool,
+        allow_null: bool,
     ) -> Value {
-        assert!(beta > alpha);
+        assert!(-INFINITE <= alpha && alpha < beta && beta <= INFINITE);
         assert!(depth >= 0);
 
-        if self.nodes % 1000 == 0 {
-            self.checkup();
-        }
+        self.pv.reset(self.ply);
+
+        // time control
+        self.checkup();
 
         if self.aborted {
-            // abort search (time limit?)
+            // abort search (most likely time limit)
             return 0;
         }
 
-        // init PV
-        let mut found_pv = false;
-        self.pv.reset(self.ply);
+        let hash_key = self.tt.hash(&position);
+        let mut pv_move = None;
+
+        if let Some(score) = self.tt.probe(hash_key, alpha, beta, depth, &mut pv_move) {
+            // hit!
+            return score;
+        }
 
         // TODO: optimize
         if position.is_stalemate() {
@@ -203,8 +190,8 @@ impl Search {
         }
 
         let in_check = position.is_check();
+        let mut tt_alpha_flag = TFlag::Alpha;
 
-        //
         // Null Move Pruning
         // https://www.chessprogramming.org/Null_Move_Pruning
         // TODO: watch out for more Zugzwang positions
@@ -215,11 +202,11 @@ impl Search {
         // - we have remaining depth
         // - not in check
         // - TODO: at least one major piece still on the board
-        if do_null && self.ply > 0 && depth >= 4 && !in_check {
-            // R: depth reduction value
-            // https://www.chessprogramming.org/Depth_Reduction_R
-            const R: i32 = 2;
-
+        //
+        // R: depth reduction value
+        // https://www.chessprogramming.org/Depth_Reduction_R
+        const R: i32 = 2;
+        if allow_null && self.ply > 0 && depth >= R + 1 && !in_check {
             // make a null move
             // (forfeit the move and let the opponent play)
             let null_position = unsafe { position.clone().swap_turn().unwrap_unchecked() };
@@ -239,46 +226,30 @@ impl Search {
         assert!(moves.len() > 0, "at least one legal move");
 
         // sort moves
-        self.sort_moves(&mut moves);
+        self.sort_moves(&mut moves, pv_move);
 
-        for mv in moves {
+        let mut best_move = None;
+        let mut best_score = -INFINITE;
+
+        for move_ in moves {
             let mut chess_moved = position.clone();
-            chess_moved.play_unchecked(&mv);
+            chess_moved.play_unchecked(&move_);
 
             self.ply += 1;
-
-            let mut score;
-
-            // variable to store current move's score
-            //if found_pv {
-            //    /* Once you've found a move with a score that is between alpha and beta,
-            //    the rest of the moves are searched with the goal of proving that they are all bad.
-            //    It's possible to do this a bit faster than a search that worries that one
-            //    of the remaining moves might be good. */
-            //    score = -self.negamax(chess_moved.clone(), -alpha - 0.0001, -alpha, depth - 1);
-            //
-            //    /* If the algorithm finds out that it was wrong, and that one of the
-            //    subsequent moves was better than the first PV move, it has to search again,
-            //    in the normal alpha-beta manner.  This happens sometimes, and it's a waste of time,
-            //    but generally not often enough to counteract the savings gained from doing the
-            //    "bad move proof" search referred to earlier. */
-            //    if (score > alpha) && (score < beta) {
-            //        // Check for failure.
-            //        /* re-search the move that has failed to be proved to be bad
-            //        with normal alpha beta score bounds*/
-            //        score = -self.negamax(chess_moved, -beta, -alpha, depth - 1);
-            //    }
-            //} else {
-            //    // for all other types of nodes
-            //    // do normal alpha beta search
-            //    score = -self.negamax(chess_moved, -beta, -alpha, depth - 1);
-            //};
-            score = -self.negamax(chess_moved, -beta, -alpha, depth - 1, true);
-
+            let score = -self.negamax(chess_moved, -beta, -alpha, depth - 1, true);
             self.ply -= 1;
+
+            // replace best
+            if score > best_score {
+                best_score = score;
+                best_move = Some(move_.clone());
+            }
 
             // fail-hard beta cutoff
             if score >= beta {
+                // store
+                self.tt.record(hash_key, move_, beta, depth, TFlag::Beta);
+
                 // TODO: killer moves
 
                 // fails high
@@ -287,24 +258,26 @@ impl Search {
 
             // found a better move!
             if score > alpha {
+                tt_alpha_flag = TFlag::Exact;
+
                 // PV node
                 alpha = score;
 
-                // enable found PV
-                found_pv = true;
-
-                // write the PV table
-                self.pv.write(self.ply, mv);
+                // write the move into the PV table
+                self.pv.write(self.ply, move_);
             }
         }
 
         // TODO: checkmate?
 
+        self.tt
+            .record(hash_key, best_move.unwrap(), alpha, depth, tt_alpha_flag);
+
         // node fails low
         alpha
     }
 
-    fn sort_moves(&self, moves: &mut MoveList) {
+    fn sort_moves(&self, moves: &mut MoveList, pv_move: Option<Move>) {
         // sort using the NN (too slow)
         // moves.sort_by_cached_key(|mv| {
         //     let mut chess_moved = position.clone();
@@ -312,15 +285,21 @@ impl Search {
         //     -(self.evaluate(&chess_moved) * 100000.0) as i32
         // });
 
-        let move_pv = self.pv.get_best_move(self.ply);
+        let pv_move2 = self.pv.get_best_move(self.ply);
 
         // sort using an heuristic
         moves.sort_by_cached_key(|mv| {
             let mut score = 0;
 
+            if mv == pv_move2 {
+                score += 30_000;
+            }
+
             // put the PV move first
-            if mv == move_pv {
-                score = 20_000;
+            if let Some(pv_move) = &pv_move {
+                if *mv == *pv_move {
+                    score += 20_000;
+                }
             }
 
             if mv.is_capture() {
@@ -344,8 +323,13 @@ impl Search {
                 let attacker = mv.role();
                 let victim = mv.capture().unwrap();
 
-                score = MVV_LVA[attacker as usize][victim as usize] + 10_000;
+                score += MVV_LVA[attacker as usize][victim as usize] + 10_000;
             }
+
+            //eprintln!(
+            //    "ply={} mv={} truepv={} hashpv={:?} score={}",
+            //    self.ply, mv, pv_move2, pv_move, score
+            //);
 
             // sorts are from low to high, so flip
             -score
@@ -459,9 +443,12 @@ impl Search {
     }
 
     fn checkup(&mut self) {
-        if let Some(time_limit) = self.time_limit {
-            if self.start_time.elapsed() >= time_limit {
-                self.aborted = true;
+        if self.nodes & 2047 == 0 {
+            // make sure we are not exceeding the time limit
+            if let Some(time_limit) = self.time_limit {
+                if self.start_time.elapsed() >= time_limit {
+                    self.aborted = true;
+                }
             }
         }
     }
