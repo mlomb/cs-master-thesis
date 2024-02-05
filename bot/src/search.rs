@@ -7,7 +7,9 @@ use std::{
     time::{Duration, Instant},
 };
 
-const INFINITE: f32 = 50000.0;
+type Value = i32;
+
+const INFINITE: Value = 50_000;
 
 pub struct Search {
     /// ML model to evaluate positions
@@ -63,18 +65,19 @@ impl Search {
         let mut best_score = None;
         let mut best_line = None;
 
-        for depth in 1..=max_depth.unwrap_or(2) {
+        for depth in 1..=max_depth.unwrap_or(60) {
             // try aspiration window close to the previous iteration's score
             // we assume that the score of this iteration will not be changing much
-            const DELTA: f32 = 0.12;
+            const DELTA: Value = 10;
             let mut alpha = (best_score.unwrap_or(-INFINITE) - DELTA).max(-INFINITE);
             let mut beta = (best_score.unwrap_or(INFINITE) + DELTA).min(INFINITE);
             let mut score;
+            // disable aspiration window
             alpha = -INFINITE;
             beta = INFINITE;
 
             loop {
-                score = self.negamax(position.clone(), alpha, beta, depth);
+                score = self.negamax(position.clone(), alpha, beta, depth, false);
 
                 // if failing high/low, re-search the position
                 if score < alpha || score > beta {
@@ -110,10 +113,10 @@ impl Search {
             eprint!("\n");
         }
 
-        best_line.iter().next()
+        best_line.unwrap().first().cloned()
     }
 
-    fn quiescence(&mut self, position: Chess, mut alpha: f32, beta: f32) -> f32 {
+    fn quiescence(&mut self, position: Chess, mut alpha: Value, beta: Value) -> Value {
         // increment the number of nodes searched
         self.nodes += 1;
 
@@ -158,14 +161,24 @@ impl Search {
         return alpha;
     }
 
-    fn negamax(&mut self, position: Chess, mut alpha: f32, beta: f32, depth: i32) -> f32 {
+    fn negamax(
+        &mut self,
+        position: Chess,
+        mut alpha: Value,
+        beta: Value,
+        depth: i32,
+        do_null: bool,
+    ) -> Value {
+        assert!(beta > alpha);
+        assert!(depth >= 0);
+
         if self.nodes % 1000 == 0 {
             self.checkup();
         }
 
         if self.aborted {
             // abort search (time limit?)
-            return 0.0;
+            return 0;
         }
 
         // init PV
@@ -174,11 +187,11 @@ impl Search {
 
         // TODO: optimize
         if position.is_stalemate() {
-            return 0.0;
+            return 0;
         }
 
         if position.is_checkmate() {
-            return -10000.0;
+            return -10_000;
         }
 
         if depth == 0 {
@@ -187,6 +200,35 @@ impl Search {
             //return self.quiescence(position, alpha, beta);
             self.nodes += 1;
             return self.evaluate(&position);
+        }
+
+        let in_check = position.is_check();
+
+        //
+        // Null Move Pruning
+        // https://www.chessprogramming.org/Null_Move_Pruning
+        // TODO: watch out for more Zugzwang positions
+        //
+        // Before trying a null move, make sure that:
+        // - we are allowed to make a null move (avoid twice in a row)
+        // - we are not in the first ply
+        // - we have remaining depth
+        // - not in check
+        // - TODO: at least one major piece still on the board
+        if do_null && self.ply > 0 && depth >= 4 && !in_check {
+            // R: depth reduction value
+            // https://www.chessprogramming.org/Depth_Reduction_R
+            const R: i32 = 2;
+
+            // make a null move
+            // (forfeit the move and let the opponent play)
+            let null_position = unsafe { position.clone().swap_turn().unwrap_unchecked() };
+
+            let score = -self.negamax(null_position, -beta, -beta + 1, depth - R - 1, false);
+
+            if score >= beta {
+                return beta;
+            }
         }
 
         // increment the number of nodes searched
@@ -208,33 +250,32 @@ impl Search {
             let mut score;
 
             // variable to store current move's score
-            if found_pv {
-                /* Once you've found a move with a score that is between alpha and beta,
-                the rest of the moves are searched with the goal of proving that they are all bad.
-                It's possible to do this a bit faster than a search that worries that one
-                of the remaining moves might be good. */
-                score = -self.negamax(chess_moved.clone(), -alpha - 0.0001, -alpha, depth - 1);
-
-                /* If the algorithm finds out that it was wrong, and that one of the
-                subsequent moves was better than the first PV move, it has to search again,
-                in the normal alpha-beta manner.  This happens sometimes, and it's a waste of time,
-                but generally not often enough to counteract the savings gained from doing the
-                "bad move proof" search referred to earlier. */
-                if (score > alpha) && (score < beta) {
-                    // Check for failure.
-                    /* re-search the move that has failed to be proved to be bad
-                    with normal alpha beta score bounds*/
-                    score = -self.negamax(chess_moved, -beta, -alpha, depth - 1);
-                }
-            } else {
-                // for all other types of nodes
-                // do normal alpha beta search
-                score = -self.negamax(chess_moved, -beta, -alpha, depth - 1);
-            };
+            //if found_pv {
+            //    /* Once you've found a move with a score that is between alpha and beta,
+            //    the rest of the moves are searched with the goal of proving that they are all bad.
+            //    It's possible to do this a bit faster than a search that worries that one
+            //    of the remaining moves might be good. */
+            //    score = -self.negamax(chess_moved.clone(), -alpha - 0.0001, -alpha, depth - 1);
+            //
+            //    /* If the algorithm finds out that it was wrong, and that one of the
+            //    subsequent moves was better than the first PV move, it has to search again,
+            //    in the normal alpha-beta manner.  This happens sometimes, and it's a waste of time,
+            //    but generally not often enough to counteract the savings gained from doing the
+            //    "bad move proof" search referred to earlier. */
+            //    if (score > alpha) && (score < beta) {
+            //        // Check for failure.
+            //        /* re-search the move that has failed to be proved to be bad
+            //        with normal alpha beta score bounds*/
+            //        score = -self.negamax(chess_moved, -beta, -alpha, depth - 1);
+            //    }
+            //} else {
+            //    // for all other types of nodes
+            //    // do normal alpha beta search
+            //    score = -self.negamax(chess_moved, -beta, -alpha, depth - 1);
+            //};
+            score = -self.negamax(chess_moved, -beta, -alpha, depth - 1, true);
 
             self.ply -= 1;
-
-            eprintln!("alpha={} beta={} score={}", alpha, beta, score);
 
             // fail-hard beta cutoff
             if score >= beta {
@@ -311,7 +352,7 @@ impl Search {
         });
     }
 
-    fn evaluate(&mut self, position: &Chess) -> f32 {
+    fn evaluate(&mut self, position: &Chess) -> Value {
         // increase number of evals computed
         self.evals += 1;
 
@@ -346,11 +387,11 @@ impl Search {
                 .1;
             let value = scores[0];
 
-            return value;
+            return (value * 100.0) as Value;
         }
     }
 
-    fn basic_eval(position: &Chess) -> f32 {
+    fn basic_eval(position: &Chess) -> Value {
         use shakmaty::Role::*;
 
         // pawn positional score
@@ -414,7 +455,7 @@ impl Search {
             score += sign * (material_score + positional_score);
         }
 
-        score as f32
+        score
     }
 
     fn checkup(&mut self) {
