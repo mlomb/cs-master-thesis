@@ -28,10 +28,17 @@ impl PVTable {
 
     pub fn reset(&mut self, ply: usize) {
         assert!(ply < MAX_PLY - 1);
+        eprintln!("resetting PV ply={}", ply);
         self.length[ply] = ply;
     }
 
     pub fn write(&mut self, ply: usize, move_: Move) {
+        eprintln!(
+            "writing PV ply={} move={}",
+            ply,
+            move_.to_uci(shakmaty::CastlingMode::Standard)
+        );
+
         // write new PV move
         self.table[ply][ply] = MaybeUninit::new(move_);
 
@@ -43,6 +50,8 @@ impl PVTable {
 
         // update length
         self.length[ply] = self.length[ply + 1];
+
+        eprintln!("length[{}] = {}", ply, self.length[ply])
     }
 
     pub fn get_best_move(&self, ply: usize) -> &Move {

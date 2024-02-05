@@ -1,7 +1,6 @@
 use crate::{encoding::encode_board, pv::PVTable};
 use ndarray::Array2;
 use ort::{inputs, Session};
-use rand::seq::SliceRandom;
 use shakmaty::{CastlingMode, Chess, Color, Move, MoveList, Position};
 use std::{
     ops::Index,
@@ -21,8 +20,6 @@ pub struct Search {
 
     /// Current ply
     ply: usize,
-    /// Whether to follow the principal variation
-    // follow_pv: bool,
     /// Principal variation
     pv: PVTable,
 
@@ -42,7 +39,6 @@ impl Search {
             evals: 0,
             start_time: Instant::now(),
             ply: 0,
-            // follow_pv: false,
             pv: PVTable::new(),
             time_limit: None,
             aborted: false,
@@ -65,18 +61,17 @@ impl Search {
         self.aborted = false;
 
         let mut best_score = None;
-        let mut best_move = None;
+        let mut best_line = None;
 
-        for depth in 1..=max_depth.unwrap_or(60) {
-            // enable following the PV
-            // self.follow_pv = true;
-
+        for depth in 1..=max_depth.unwrap_or(2) {
             // try aspiration window close to the previous iteration's score
             // we assume that the score of this iteration will not be changing much
             const DELTA: f32 = 0.12;
             let mut alpha = (best_score.unwrap_or(-INFINITE) - DELTA).max(-INFINITE);
             let mut beta = (best_score.unwrap_or(INFINITE) + DELTA).min(INFINITE);
             let mut score;
+            alpha = -INFINITE;
+            beta = INFINITE;
 
             loop {
                 score = self.negamax(position.clone(), alpha, beta, depth);
@@ -98,7 +93,7 @@ impl Search {
                 break;
             }
 
-            best_move = self.pv.get_mainline().first().cloned();
+            best_line = Some(self.pv.get_mainline());
             best_score = Some(score);
 
             eprint!(
@@ -115,7 +110,7 @@ impl Search {
             eprint!("\n");
         }
 
-        best_move
+        best_line.iter().next()
     }
 
     fn quiescence(&mut self, position: Chess, mut alpha: f32, beta: f32) -> f32 {
@@ -234,10 +229,12 @@ impl Search {
             } else {
                 // for all other types of nodes
                 // do normal alpha beta search
-                score = -self.negamax(chess_moved, -beta, -alpha, depth - 1)
+                score = -self.negamax(chess_moved, -beta, -alpha, depth - 1);
             };
 
             self.ply -= 1;
+
+            eprintln!("alpha={} beta={} score={}", alpha, beta, score);
 
             // fail-hard beta cutoff
             if score >= beta {
@@ -318,6 +315,8 @@ impl Search {
         // increase number of evals computed
         self.evals += 1;
 
+        return Search::basic_eval(position);
+
         //let hash: Zobrist32 = position.zobrist_hash(shakmaty::EnPassantMode::Always);
         //return hash.0 as f32 / u32::MAX as f32;
 
@@ -349,6 +348,73 @@ impl Search {
 
             return value;
         }
+    }
+
+    fn basic_eval(position: &Chess) -> f32 {
+        use shakmaty::Role::*;
+
+        // pawn positional score
+        const PAWN_SCORE: [i32; 64] = [
+            90, 90, 90, 90, 90, 90, 90, 90, 30, 30, 30, 40, 40, 30, 30, 30, 20, 20, 20, 30, 30, 30,
+            20, 20, 10, 10, 10, 20, 20, 10, 10, 10, 5, 5, 10, 20, 20, 5, 5, 5, 0, 0, 0, 5, 5, 0, 0,
+            0, 0, 0, 0, -10, -10, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        ];
+        const KNIGHT_SCORE: [i32; 64] = [
+            -5, 0, 0, 0, 0, 0, 0, -5, -5, 0, 0, 10, 10, 0, 0, -5, -5, 5, 20, 20, 20, 20, 5, -5, -5,
+            10, 20, 30, 30, 20, 10, -5, -5, 10, 20, 30, 30, 20, 10, -5, -5, 5, 20, 10, 10, 20, 5,
+            -5, -5, 0, 0, 0, 0, 0, 0, -5, -5, -10, 0, 0, 0, 0, -10, -5,
+        ];
+        const BISHOP_SCORE: [i32; 64] = [
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 10, 0, 0, 0, 0, 0, 10, 20,
+            20, 10, 0, 0, 0, 0, 10, 20, 20, 10, 0, 0, 0, 10, 0, 0, 0, 0, 10, 0, 0, 30, 0, 0, 0, 0,
+            30, 0, 0, 0, -10, 0, 0, -10, 0, 0,
+        ];
+        const ROOK_SCORE: [i32; 64] = [
+            50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 0, 0, 10, 20, 20, 10,
+            0, 0, 0, 0, 10, 20, 20, 10, 0, 0, 0, 0, 10, 20, 20, 10, 0, 0, 0, 0, 10, 20, 20, 10, 0,
+            0, 0, 0, 10, 20, 20, 10, 0, 0, 0, 0, 0, 20, 20, 0, 0, 0,
+        ];
+        const KING_SCORE: [i32; 64] = [
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 5, 5, 5, 0, 0, 0, 5, 5, 10, 10, 5, 5, 0, 0, 5, 10, 20,
+            20, 10, 5, 0, 0, 5, 10, 20, 20, 10, 5, 0, 0, 0, 5, 10, 10, 5, 0, 0, 0, 5, 5, -5, -5, 0,
+            5, 0, 0, 0, 5, 0, -15, 0, 10, 0,
+        ];
+
+        let mut score = 0;
+
+        for (mut square, piece) in position.board().clone().into_iter() {
+            let material_score = match piece.role {
+                Pawn => 100,
+                Knight => 300,
+                Bishop => 350,
+                Rook => 500,
+                Queen => 1000,
+                King => 10000,
+            };
+
+            if piece.color == Color::Black {
+                square = square.flip_vertical();
+            }
+
+            let positional_score = match piece.role {
+                Pawn => PAWN_SCORE[square as usize],
+                Knight => KNIGHT_SCORE[square as usize],
+                Bishop => BISHOP_SCORE[square as usize],
+                Rook => ROOK_SCORE[square as usize],
+                Queen => 0,
+                King => KING_SCORE[square as usize],
+            };
+
+            let sign = if piece.color == position.turn() {
+                1
+            } else {
+                -1
+            };
+
+            score += sign * (material_score + positional_score);
+        }
+
+        score as f32
     }
 
     fn checkup(&mut self) {
