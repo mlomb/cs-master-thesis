@@ -7,6 +7,7 @@ use ndarray::Array2;
 use ort::{inputs, Session};
 use shakmaty::{CastlingMode, Chess, Color, Move, MoveList, Position};
 use std::{
+    mem::MaybeUninit,
     ops::Index,
     time::{Duration, Instant},
 };
@@ -14,6 +15,14 @@ use std::{
 type Value = i32;
 
 const INFINITE: Value = 50_000;
+const MAX_PLY: usize = 64;
+const INVALID_MOVE: Move = Move::Normal {
+    role: shakmaty::Role::Pawn,
+    from: shakmaty::Square::A1,
+    to: shakmaty::Square::A1,
+    capture: None,
+    promotion: None,
+};
 
 pub struct Search {
     /// ML model to evaluate positions
@@ -30,6 +39,10 @@ pub struct Search {
     pv: PVTable,
     /// Transposition table
     tt: TTable,
+    /// Killer moves
+    killer_moves: [[Move; 2]; MAX_PLY],
+    /// History moves
+    history_moves: [[Value; 8 * 8]; 12],
 
     /// Start search time
     start_time: Instant,
@@ -49,6 +62,8 @@ impl Search {
             ply: 0,
             pv: PVTable::new(),
             tt: TTable::new(1_000_000 * 20), // ~480MB
+            killer_moves: std::array::from_fn(|_| [INVALID_MOVE, INVALID_MOVE]),
+            history_moves: [[0; 8 * 8]; 12],
             time_limit: None,
             aborted: false,
         }
@@ -140,7 +155,7 @@ impl Search {
         }
 
         // node (move) fails low
-        return alpha;
+        alpha
     }
 
     fn negamax(
@@ -184,9 +199,7 @@ impl Search {
         if depth == 0 {
             // escape from recursion
             // run quiescence search
-            //return self.quiescence(position, alpha, beta);
-            self.nodes += 1;
-            return self.evaluate(&position);
+            return self.quiescence(position, alpha, beta);
         }
 
         let in_check = position.is_check();
@@ -232,6 +245,7 @@ impl Search {
         let mut best_score = -INFINITE;
 
         for move_ in moves {
+            let is_quiet = !move_.is_capture();
             let mut chess_moved = position.clone();
             chess_moved.play_unchecked(&move_);
 
@@ -247,10 +261,14 @@ impl Search {
 
             // fail-hard beta cutoff
             if score >= beta {
-                // store
-                self.tt.record(hash_key, move_, beta, depth, TFlag::Beta);
+                if is_quiet {
+                    // store killer moves
+                    self.killer_moves[self.ply][1] = self.killer_moves[self.ply][0].clone();
+                    self.killer_moves[self.ply][0] = move_.clone();
+                }
 
-                // TODO: killer moves
+                // store TT entry
+                self.tt.record(hash_key, move_, beta, depth, TFlag::Beta);
 
                 // fails high
                 return beta;
@@ -258,6 +276,11 @@ impl Search {
 
             // found a better move!
             if score > alpha {
+                if is_quiet {
+                    // store history moves
+                    self.history_moves[move_.role() as usize][move_.to() as usize] += depth;
+                }
+
                 tt_alpha_flag = TFlag::Exact;
 
                 // PV node
@@ -278,31 +301,18 @@ impl Search {
     }
 
     fn sort_moves(&self, moves: &mut MoveList, pv_move: Option<Move>) {
-        // sort using the NN (too slow)
-        // moves.sort_by_cached_key(|mv| {
-        //     let mut chess_moved = position.clone();
-        //     chess_moved.play_unchecked(&mv);
-        //     -(self.evaluate(&chess_moved) * 100000.0) as i32
-        // });
-
-        let pv_move2 = self.pv.get_best_move(self.ply);
-
         // sort using an heuristic
-        moves.sort_by_cached_key(|mv| {
+        moves.sort_by_cached_key(|move_| {
             let mut score = 0;
-
-            if mv == pv_move2 {
-                score += 30_000;
-            }
 
             // put the PV move first
             if let Some(pv_move) = &pv_move {
-                if *mv == *pv_move {
+                if *move_ == *pv_move {
                     score += 20_000;
                 }
             }
 
-            if mv.is_capture() {
+            if move_.is_capture() {
                 // MVV LVA [attacker][victim]
                 const MVV_LVA: [[i32; 12]; 12] = [
                     [105, 205, 305, 405, 505, 605, 105, 205, 305, 405, 505, 605],
@@ -320,16 +330,20 @@ impl Search {
                     [100, 200, 300, 400, 500, 600, 100, 200, 300, 400, 500, 600],
                 ];
 
-                let attacker = mv.role();
-                let victim = mv.capture().unwrap();
+                let attacker = move_.role();
+                let victim = move_.capture().unwrap();
 
                 score += MVV_LVA[attacker as usize][victim as usize] + 10_000;
+            } else {
+                // move is quiet
+                score += if self.killer_moves[self.ply][0] == *move_ {
+                    9000
+                } else if self.killer_moves[self.ply][1] == *move_ {
+                    8000
+                } else {
+                    self.history_moves[move_.role() as usize][move_.to() as usize]
+                }
             }
-
-            //eprintln!(
-            //    "ply={} mv={} truepv={} hashpv={:?} score={}",
-            //    self.ply, mv, pv_move2, pv_move, score
-            //);
 
             // sorts are from low to high, so flip
             -score
@@ -340,7 +354,7 @@ impl Search {
         // increase number of evals computed
         self.evals += 1;
 
-        return Search::basic_eval(position);
+        //return Search::basic_eval(position);
 
         //let hash: Zobrist32 = position.zobrist_hash(shakmaty::EnPassantMode::Always);
         //return hash.0 as f32 / u32::MAX as f32;
