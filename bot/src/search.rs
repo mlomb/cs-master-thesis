@@ -95,7 +95,7 @@ impl Search {
                 score
             );
             for mv in best_line.as_ref().unwrap() {
-                eprint!("{} ", mv.to_uci(CastlingMode::Standard).to_string());
+                eprint!("{} ", mv.to_uci(CastlingMode::Standard));
             }
             eprint!("\n");
         }

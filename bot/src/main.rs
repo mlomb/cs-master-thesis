@@ -8,7 +8,7 @@ use ort::Session;
 use search::Search;
 use shakmaty::fen::Fen;
 use shakmaty::uci::Uci;
-use shakmaty::{Chess, Color, File, Move, Position, Square};
+use shakmaty::{CastlingMode, Chess, Color, File, Move, Position, Square};
 use std::io::{self, BufRead};
 use std::time::Duration;
 use vampirc_uci::{parse_one, UciMessage, UciMove, UciPiece, UciSquare, UciTimeControl};
@@ -106,41 +106,14 @@ fn main() -> ort::Result<()> {
                     available_time.map(|t| t - Duration::from_millis(100)),
                 );
 
-                println!("{}", UciMessage::best_move(move_to_uci(best_move.unwrap())));
+                println!(
+                    "bestmove {}",
+                    best_move.unwrap().to_uci(CastlingMode::Standard)
+                );
             }
             _ => {}
         }
     }
 
     Ok(())
-}
-
-pub fn move_to_uci(mv: Move) -> UciMove {
-    UciMove {
-        from: square_to_uci(mv.from().unwrap()),
-        to: square_to_uci(mv.to()),
-        promotion: mv.promotion().map(|p| match p {
-            shakmaty::Role::Knight => UciPiece::Knight,
-            shakmaty::Role::Bishop => UciPiece::Bishop,
-            shakmaty::Role::Rook => UciPiece::Rook,
-            shakmaty::Role::Queen => UciPiece::Queen,
-            _ => panic!("Invalid promotion"),
-        }),
-    }
-}
-
-pub fn square_to_uci(sq: Square) -> UciSquare {
-    UciSquare {
-        file: match sq.file() {
-            File::A => 'a',
-            File::B => 'b',
-            File::C => 'c',
-            File::D => 'd',
-            File::E => 'e',
-            File::F => 'f',
-            File::G => 'g',
-            File::H => 'h',
-        },
-        rank: sq.rank() as u8 + 1,
-    }
 }
