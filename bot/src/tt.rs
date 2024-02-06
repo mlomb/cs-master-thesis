@@ -94,6 +94,8 @@ impl TTable {
         None
     }
 
+    /*
+
     pub fn probe_pv_line(&self, position: &Chess, mut max_depth: i32) -> Vec<Move> {
         let mut line = vec![];
         let mut position = position.clone();
@@ -125,4 +127,6 @@ impl TTable {
 
         None
     }
+
+    */
 }

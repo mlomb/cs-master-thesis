@@ -45,10 +45,6 @@ impl PVTable {
         self.length[ply] = self.length[ply + 1];
     }
 
-    pub fn get_best_move(&self, ply: usize) -> &Move {
-        unsafe { self.table[ply][ply].assume_init_ref() }
-    }
-
     pub fn get_mainline(&self) -> Vec<Move> {
         (0..self.length[0])
             .map(|ply| unsafe { self.table[0][ply].assume_init_read() })

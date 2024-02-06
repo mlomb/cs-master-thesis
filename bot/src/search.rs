@@ -1,4 +1,5 @@
 use crate::{
+    defs::{Value, INFINITE, INVALID_MOVE, MAX_PLY},
     encoding::encode_board,
     pv::PVTable,
     tt::{TFlag, TTable},
@@ -7,21 +8,8 @@ use ndarray::Array2;
 use ort::{inputs, Session};
 use shakmaty::{CastlingMode, Chess, Color, Move, MoveList, Position};
 use std::{
-    mem::MaybeUninit,
     ops::Index,
     time::{Duration, Instant},
-};
-
-type Value = i32;
-
-const INFINITE: Value = 50_000;
-const MAX_PLY: usize = 64;
-const INVALID_MOVE: Move = Move::Normal {
-    role: shakmaty::Role::Pawn,
-    from: shakmaty::Square::A1,
-    to: shakmaty::Square::A1,
-    capture: None,
-    promotion: None,
 };
 
 pub struct Search {
@@ -84,12 +72,14 @@ impl Search {
         self.time_limit = time_limit;
         self.aborted = false;
 
+        // best line found so far
         let mut best_line = None;
 
-        for depth in 1..=max_depth.unwrap_or(60) {
+        for depth in 1..=max_depth.unwrap_or(MAX_PLY as i32 - 1) {
             let score = self.negamax(position.clone(), -INFINITE, INFINITE, depth, false);
 
             if self.aborted {
+                // time limit
                 // do not replace best line since the search is incomplete
                 break;
             }
@@ -169,22 +159,25 @@ impl Search {
         assert!(-INFINITE <= alpha && alpha < beta && beta <= INFINITE);
         assert!(depth >= 0);
 
-        self.pv.reset(self.ply);
-
         // time control
         self.checkup();
 
         if self.aborted {
-            // abort search (most likely time limit)
+            // abort search (time limit)
             return 0;
         }
 
+        self.pv.reset(self.ply);
+
+        let is_pv = beta - alpha > 1;
         let hash_key = self.tt.hash(&position);
         let mut pv_move = None;
 
-        if let Some(score) = self.tt.probe(hash_key, alpha, beta, depth, &mut pv_move) {
-            // hit!
-            return score;
+        if !is_pv {
+            if let Some(score) = self.tt.probe(hash_key, alpha, beta, depth, &mut pv_move) {
+                // hit!
+                return score;
+            }
         }
 
         // TODO: optimize
@@ -301,7 +294,6 @@ impl Search {
     }
 
     fn sort_moves(&self, moves: &mut MoveList, pv_move: Option<Move>) {
-        // sort using an heuristic
         moves.sort_by_cached_key(|move_| {
             let mut score = 0;
 

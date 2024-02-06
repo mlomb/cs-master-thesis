@@ -1,3 +1,4 @@
+mod defs;
 mod encoding;
 mod pv;
 mod search;
