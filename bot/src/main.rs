@@ -54,10 +54,15 @@ fn main() -> ort::Result<()> {
                     position = fen.into_position(shakmaty::CastlingMode::Standard).unwrap();
                 }
 
+                search.reset_repetition();
+                search.record_repetition(&position);
+
                 for m in moves {
                     let uci: Uci = m.to_string().parse().unwrap();
                     let m = uci.to_move(&position).unwrap();
                     position = position.play(&m).unwrap();
+
+                    search.record_repetition(&position);
                 }
             }
             UciMessage::Go {

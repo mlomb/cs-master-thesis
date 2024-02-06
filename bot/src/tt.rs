@@ -1,8 +1,6 @@
-use std::mem::MaybeUninit;
+use shakmaty::{zobrist::ZobristHash, Chess, EnPassantMode, Move};
 
-use shakmaty::{zobrist::ZobristHash, Chess, EnPassantMode, Move, Position};
-
-type Key = shakmaty::zobrist::Zobrist64;
+pub type Key = shakmaty::zobrist::Zobrist64;
 
 #[derive(Clone)]
 pub enum TFlag {

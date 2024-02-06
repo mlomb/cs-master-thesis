@@ -6,7 +6,7 @@ use crate::{
 };
 use ndarray::Array2;
 use ort::{inputs, Session};
-use shakmaty::{CastlingMode, Chess, Color, Move, MoveList, Position};
+use shakmaty::{zobrist::Zobrist64, CastlingMode, Chess, Color, Move, MoveList, Position};
 use std::{
     ops::Index,
     time::{Duration, Instant},
@@ -31,6 +31,9 @@ pub struct Search {
     killer_moves: [[Move; 2]; MAX_PLY],
     /// History moves
     history_moves: [[Value; 8 * 8]; 12],
+    /// Repetition table
+    repetition_index: usize,
+    repetition_table: [Zobrist64; 1024],
 
     /// Start search time
     start_time: Instant,
@@ -46,12 +49,14 @@ impl Search {
             model,
             nodes: 0,
             evals: 0,
-            start_time: Instant::now(),
             ply: 0,
             pv: PVTable::new(),
             tt: TTable::new(1_000_000 * 20), // ~480MB
             killer_moves: std::array::from_fn(|_| [INVALID_MOVE, INVALID_MOVE]),
             history_moves: [[0; 8 * 8]; 12],
+            repetition_index: 0,
+            repetition_table: [Zobrist64(0); 1024],
+            start_time: Instant::now(),
             time_limit: None,
             aborted: false,
         }
@@ -180,6 +185,12 @@ impl Search {
             }
         }
 
+        // check three fold repetition
+        if self.ply > 0 && self.is_repetition(hash_key) {
+            // draw
+            return 0;
+        }
+
         // TODO: optimize
         if position.is_stalemate() {
             return 0;
@@ -217,7 +228,9 @@ impl Search {
             // (forfeit the move and let the opponent play)
             let null_position = unsafe { position.clone().swap_turn().unwrap_unchecked() };
 
+            self.ply += 1;
             let score = -self.negamax(null_position, -beta, -beta + 1, depth - R - 1, false);
+            self.ply -= 1;
 
             if score >= beta {
                 return beta;
@@ -243,7 +256,11 @@ impl Search {
             chess_moved.play_unchecked(&move_);
 
             self.ply += 1;
+            self.push_repetition_key(hash_key);
+
             let score = -self.negamax(chess_moved, -beta, -alpha, depth - 1, true);
+
+            self.pop_repetition_key();
             self.ply -= 1;
 
             // replace best
@@ -457,6 +474,41 @@ impl Search {
                 }
             }
         }
+    }
+}
+
+/// ==============================
+///       Repetition table
+/// ==============================
+impl Search {
+    /// Clears the repetition table
+    /// Most likely called at the start of a new game
+    pub fn reset_repetition(&mut self) {
+        self.repetition_index = 0;
+    }
+
+    /// Record a position in the repetition table
+    /// Called after Uci commands
+    pub fn record_repetition(&mut self, position: &Chess) {
+        let key = self.tt.hash(position);
+        self.push_repetition_key(key);
+    }
+
+    /// Push a key in the repetition table
+    /// Called when making a move
+    fn push_repetition_key(&mut self, key: Zobrist64) {
+        self.repetition_table[self.repetition_index] = key;
+        self.repetition_index += 1;
+    }
+
+    /// Pop a key from the repetition table
+    /// Called when undoing a move
+    fn pop_repetition_key(&mut self) {
+        self.repetition_index -= 1;
+    }
+
+    fn is_repetition(&self, key: Zobrist64) -> bool {
+        self.repetition_table[..self.repetition_index].contains(&key)
     }
 }
 
