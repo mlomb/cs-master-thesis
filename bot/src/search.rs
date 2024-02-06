@@ -288,7 +288,7 @@ impl Search {
             if score > alpha {
                 if is_quiet {
                     // store history moves
-                    self.history_moves[move_.role() as usize][move_.to() as usize] += depth;
+                    self.history_moves[move_.role() as usize][move_.to() as usize] += depth * depth;
                 }
 
                 tt_alpha_flag = TFlag::Exact;
