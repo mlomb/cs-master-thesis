@@ -1,9 +1,11 @@
 mod defs;
-mod encoding;
+mod eval;
+mod position;
 mod pv;
 mod search;
 mod tt;
 
+use eval::NNModel;
 use ort::Session;
 use search::Search;
 use shakmaty::fen::Fen;
@@ -13,16 +15,19 @@ use std::io::{self, BufRead};
 use std::time::Duration;
 use vampirc_uci::{parse_one, UciMessage, UciMove, UciPiece, UciSquare, UciTimeControl};
 
+impl Search {
+    pub fn pepe(&self) {
+        println!("pepe");
+    }
+}
+
 fn main() -> ort::Result<()> {
     //ort::init()
     //    .with_execution_providers([CUDAExecutionProvider::default().build()])
     //    .commit()?;
 
-    let session = Session::builder()?
-        .with_intra_threads(4)?
-        .with_model_from_memory(include_bytes!("../../models/rq-mse-256-0.470.onnx"))?;
-
-    let mut search = Search::new(session);
+    let nn_model = NNModel::from_memory(include_bytes!("../../models/rq-mse-256-0.470.onnx"))?;
+    let mut search = Search::new(nn_model);
 
     let mut position: Chess = Chess::default();
 
@@ -106,7 +111,7 @@ fn main() -> ort::Result<()> {
                 }
 
                 let best_move = search.go(
-                    &position,
+                    position.clone(),
                     max_depth,
                     available_time.map(|t| t - Duration::from_millis(100)),
                 );

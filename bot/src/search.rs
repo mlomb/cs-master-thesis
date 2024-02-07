@@ -1,55 +1,58 @@
 use crate::{
     defs::{Value, INFINITE, INVALID_MOVE, MAX_PLY},
-    encoding::encode_board,
+    eval::NNModel,
+    position::Position,
     pv::PVTable,
     tt::{TFlag, TTable},
 };
-use ndarray::Array2;
-use ort::{inputs, Session};
-use shakmaty::{zobrist::Zobrist64, CastlingMode, Chess, Color, Move, MoveList, Position};
-use std::{
-    ops::Index,
-    time::{Duration, Instant},
+use shakmaty::{
+    zobrist::{Zobrist64, ZobristHash},
+    CastlingMode, Chess, Move, MoveList,
 };
+use std::time::{Duration, Instant};
 
 pub struct Search {
-    /// ML model to evaluate positions
-    model: Session,
+    /// Current position
+    pub pos: Position,
+    /// Current ply
+    pub ply: usize,
+
+    /// Neural network model
+    nn_model: NNModel,
 
     /// Number of nodes searched
-    nodes: usize,
+    pub nodes: usize,
     /// Number of evals computed
-    evals: usize,
+    pub evals: usize,
 
-    /// Current ply
-    ply: usize,
     /// Principal variation table
-    pv: PVTable,
+    pub pv: PVTable,
     /// Transposition table
-    tt: TTable,
+    pub tt: TTable,
     /// Killer moves
-    killer_moves: [[Move; 2]; MAX_PLY],
+    pub killer_moves: [[Move; 2]; MAX_PLY],
     /// History moves
-    history_moves: [[Value; 8 * 8]; 12],
+    pub history_moves: [[Value; 8 * 8]; 12],
     /// Repetition table
-    repetition_index: usize,
-    repetition_table: [Zobrist64; 1024],
+    pub repetition_index: usize,
+    pub repetition_table: [Zobrist64; 1024],
 
     /// Start search time
-    start_time: Instant,
+    pub start_time: Instant,
     /// Time limit, do not exceed this time
-    time_limit: Option<Duration>,
+    pub time_limit: Option<Duration>,
     /// Whether the search was aborted
-    aborted: bool,
+    pub aborted: bool,
 }
 
 impl Search {
-    pub fn new(model: Session) -> Self {
+    pub fn new(nn_model: NNModel) -> Self {
         Search {
-            model,
+            pos: Position::start_pos(),
+            ply: 0,
+            nn_model,
             nodes: 0,
             evals: 0,
-            ply: 0,
             pv: PVTable::new(),
             tt: TTable::new(1_000_000 * 20), // ~480MB
             killer_moves: std::array::from_fn(|_| [INVALID_MOVE, INVALID_MOVE]),
@@ -64,13 +67,17 @@ impl Search {
 
     pub fn go(
         &mut self,
-        position: &Chess,
+        position: Chess,
         max_depth: Option<i32>,
         time_limit: Option<Duration>,
     ) -> Option<Move> {
+        // init position
+        self.pos = Position::from_chess(position);
+        self.ply = 0;
+
+        // reset stats
         self.nodes = 0;
         self.evals = 0;
-        self.ply = 0;
 
         // time control
         self.start_time = Instant::now();
@@ -81,7 +88,7 @@ impl Search {
         let mut best_line = None;
 
         for depth in 1..=max_depth.unwrap_or(MAX_PLY as i32 - 1) {
-            let score = self.negamax(position.clone(), -INFINITE, INFINITE, depth, false);
+            let score = self.negamax(-INFINITE, INFINITE, depth, false);
 
             if self.aborted {
                 // time limit
@@ -108,12 +115,14 @@ impl Search {
         best_line.unwrap().first().cloned()
     }
 
-    fn quiescence(&mut self, position: Chess, mut alpha: Value, beta: Value) -> Value {
+    fn quiescence(&mut self, mut alpha: Value, beta: Value) -> Value {
         // increment the number of nodes searched
         self.nodes += 1;
 
         // evaluate the position
-        let score = self.evaluate(&position);
+        let score = self.nn_model.evaluate(&self.pos);
+        // increase number of evals computed
+        self.evals += 1;
 
         // fail-hard beta cutoff
         if score >= beta {
@@ -127,14 +136,17 @@ impl Search {
             alpha = score;
         }
 
-        // only look at captures
-        for move_ in position.capture_moves() {
-            let mut chess_moved = position.clone();
-            chess_moved.play_unchecked(&move_);
+        for move_ in self.pos.legal_moves() {
+            if !move_.is_capture() {
+                // only look at captures
+                continue;
+            }
 
+            self.pos.do_move(Some(move_.clone()));
             self.ply += 1;
-            let score = -self.quiescence(chess_moved, -beta, -alpha);
+            let score = -self.quiescence(-beta, -alpha);
             self.ply -= 1;
+            self.pos.undo_move(Some(move_));
 
             // fail-hard beta cutoff
             if score >= beta {
@@ -153,14 +165,7 @@ impl Search {
         alpha
     }
 
-    fn negamax(
-        &mut self,
-        position: Chess,
-        mut alpha: Value,
-        beta: Value,
-        depth: i32,
-        allow_null: bool,
-    ) -> Value {
+    fn negamax(&mut self, mut alpha: Value, beta: Value, depth: i32, allow_null: bool) -> Value {
         assert!(-INFINITE <= alpha && alpha < beta && beta <= INFINITE);
         assert!(depth >= 0);
 
@@ -175,7 +180,7 @@ impl Search {
         self.pv.reset(self.ply);
 
         let is_pv = beta - alpha > 1;
-        let hash_key = self.tt.hash(&position);
+        let hash_key = self.pos.compute_hash();
         let mut pv_move = None;
 
         if !is_pv {
@@ -191,22 +196,13 @@ impl Search {
             return 0;
         }
 
-        // TODO: optimize
-        if position.is_stalemate() {
-            return 0;
-        }
-
-        if position.is_checkmate() {
-            return -10_000;
-        }
-
         if depth == 0 {
             // escape from recursion
             // run quiescence search
-            return self.quiescence(position, alpha, beta);
+            return self.quiescence(alpha, beta);
         }
 
-        let in_check = position.is_check();
+        let in_check = self.pos.is_check();
         let mut tt_alpha_flag = TFlag::Alpha;
 
         // Null Move Pruning
@@ -226,11 +222,11 @@ impl Search {
         if allow_null && self.ply > 0 && depth >= R + 1 && !in_check {
             // make a null move
             // (forfeit the move and let the opponent play)
-            let null_position = unsafe { position.clone().swap_turn().unwrap_unchecked() };
-
+            self.pos.do_move(None);
             self.ply += 1;
-            let score = -self.negamax(null_position, -beta, -beta + 1, depth - R - 1, false);
+            let score = -self.negamax(-beta, -beta + 1, depth - R - 1, false);
             self.ply -= 1;
+            self.pos.undo_move(None);
 
             if score >= beta {
                 return beta;
@@ -241,8 +237,7 @@ impl Search {
         self.nodes += 1;
 
         // generate legal moves
-        let mut moves = position.legal_moves();
-        assert!(moves.len() > 0, "at least one legal move");
+        let mut moves = self.pos.legal_moves();
 
         // sort moves
         self.sort_moves(&mut moves, pv_move);
@@ -252,14 +247,12 @@ impl Search {
 
         for move_ in moves {
             let is_quiet = !move_.is_capture();
-            let mut chess_moved = position.clone();
-            chess_moved.play_unchecked(&move_);
 
             self.ply += 1;
             self.push_repetition_key(hash_key);
-
-            let score = -self.negamax(chess_moved, -beta, -alpha, depth - 1, true);
-
+            self.pos.do_move(Some(move_.clone()));
+            let score = -self.negamax(-beta, -alpha, depth - 1, true);
+            self.pos.undo_move(Some(move_.clone()));
             self.pop_repetition_key();
             self.ply -= 1;
 
@@ -301,7 +294,15 @@ impl Search {
             }
         }
 
-        // TODO: checkmate?
+        if best_move.is_none() {
+            if in_check {
+                // checkmate
+                return -10_000;
+            } else {
+                // stalemate (draw)
+                return 0;
+            }
+        }
 
         self.tt
             .record(hash_key, best_move.unwrap(), alpha, depth, tt_alpha_flag);
@@ -359,112 +360,6 @@ impl Search {
         });
     }
 
-    fn evaluate(&mut self, position: &Chess) -> Value {
-        // increase number of evals computed
-        self.evals += 1;
-
-        //return Search::basic_eval(position);
-
-        //let hash: Zobrist32 = position.zobrist_hash(shakmaty::EnPassantMode::Always);
-        //return hash.0 as f32 / u32::MAX as f32;
-
-        let mut board = position.board().clone();
-        if position.turn() == Color::Black {
-            board.flip_vertical();
-            board.swap_colors();
-        }
-
-        let encoded = encode_board(&board);
-        let mut x = Array2::<i64>::zeros((1, 12));
-        let mut row = x.row_mut(0);
-
-        for j in 0..12 {
-            row[j] = encoded[j];
-        }
-
-        unsafe {
-            let outputs = self
-                .model
-                .run(inputs![x].unwrap_unchecked())
-                .unwrap_unchecked();
-            let scores = outputs
-                .index(0)
-                .extract_raw_tensor::<f32>()
-                .unwrap_unchecked()
-                .1;
-            let value = scores[0];
-
-            return (value * 100.0) as Value;
-        }
-    }
-
-    fn basic_eval(position: &Chess) -> Value {
-        use shakmaty::Role::*;
-
-        // pawn positional score
-        const PAWN_SCORE: [i32; 64] = [
-            90, 90, 90, 90, 90, 90, 90, 90, 30, 30, 30, 40, 40, 30, 30, 30, 20, 20, 20, 30, 30, 30,
-            20, 20, 10, 10, 10, 20, 20, 10, 10, 10, 5, 5, 10, 20, 20, 5, 5, 5, 0, 0, 0, 5, 5, 0, 0,
-            0, 0, 0, 0, -10, -10, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        ];
-        const KNIGHT_SCORE: [i32; 64] = [
-            -5, 0, 0, 0, 0, 0, 0, -5, -5, 0, 0, 10, 10, 0, 0, -5, -5, 5, 20, 20, 20, 20, 5, -5, -5,
-            10, 20, 30, 30, 20, 10, -5, -5, 10, 20, 30, 30, 20, 10, -5, -5, 5, 20, 10, 10, 20, 5,
-            -5, -5, 0, 0, 0, 0, 0, 0, -5, -5, -10, 0, 0, 0, 0, -10, -5,
-        ];
-        const BISHOP_SCORE: [i32; 64] = [
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 10, 0, 0, 0, 0, 0, 10, 20,
-            20, 10, 0, 0, 0, 0, 10, 20, 20, 10, 0, 0, 0, 10, 0, 0, 0, 0, 10, 0, 0, 30, 0, 0, 0, 0,
-            30, 0, 0, 0, -10, 0, 0, -10, 0, 0,
-        ];
-        const ROOK_SCORE: [i32; 64] = [
-            50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 0, 0, 10, 20, 20, 10,
-            0, 0, 0, 0, 10, 20, 20, 10, 0, 0, 0, 0, 10, 20, 20, 10, 0, 0, 0, 0, 10, 20, 20, 10, 0,
-            0, 0, 0, 10, 20, 20, 10, 0, 0, 0, 0, 0, 20, 20, 0, 0, 0,
-        ];
-        const KING_SCORE: [i32; 64] = [
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 5, 5, 5, 0, 0, 0, 5, 5, 10, 10, 5, 5, 0, 0, 5, 10, 20,
-            20, 10, 5, 0, 0, 5, 10, 20, 20, 10, 5, 0, 0, 0, 5, 10, 10, 5, 0, 0, 0, 5, 5, -5, -5, 0,
-            5, 0, 0, 0, 5, 0, -15, 0, 10, 0,
-        ];
-
-        let mut score = 0;
-
-        for (mut square, piece) in position.board().clone().into_iter() {
-            let material_score = match piece.role {
-                Pawn => 100,
-                Knight => 300,
-                Bishop => 350,
-                Rook => 500,
-                Queen => 1000,
-                King => 10000,
-            };
-
-            if piece.color == Color::Black {
-                square = square.flip_vertical();
-            }
-
-            let positional_score = match piece.role {
-                Pawn => PAWN_SCORE[square as usize],
-                Knight => KNIGHT_SCORE[square as usize],
-                Bishop => BISHOP_SCORE[square as usize],
-                Rook => ROOK_SCORE[square as usize],
-                Queen => 0,
-                King => KING_SCORE[square as usize],
-            };
-
-            let sign = if piece.color == position.turn() {
-                1
-            } else {
-                -1
-            };
-
-            score += sign * (material_score + positional_score);
-        }
-
-        score
-    }
-
     fn checkup(&mut self) {
         if self.nodes & 2047 == 0 {
             // make sure we are not exceeding the time limit
@@ -490,7 +385,7 @@ impl Search {
     /// Record a position in the repetition table
     /// Called after Uci commands
     pub fn record_repetition(&mut self, position: &Chess) {
-        let key = self.tt.hash(position);
+        let key = position.zobrist_hash(shakmaty::EnPassantMode::Legal);
         self.push_repetition_key(key);
     }
 

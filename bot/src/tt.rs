@@ -1,6 +1,5 @@
+use crate::position::HashKey;
 use shakmaty::{zobrist::ZobristHash, Chess, EnPassantMode, Move};
-
-pub type Key = shakmaty::zobrist::Zobrist64;
 
 #[derive(Clone)]
 pub enum TFlag {
@@ -11,7 +10,7 @@ pub enum TFlag {
 
 #[derive(Clone)]
 pub struct TEntry {
-    pub key: Key,
+    pub key: HashKey,
     pub flag: TFlag,
     pub depth: i8,
     pub score: i32,
@@ -39,11 +38,7 @@ impl TTable {
         }
     }
 
-    pub fn hash(&self, position: &Chess) -> Key {
-        position.zobrist_hash(EnPassantMode::Legal)
-    }
-
-    pub fn record(&mut self, key: Key, move_: Move, score: i32, depth: i32, flag: TFlag) {
+    pub fn record(&mut self, key: HashKey, move_: Move, score: i32, depth: i32, flag: TFlag) {
         let len = self.entries.len();
         let entry = &mut self.entries[key.0 as usize % len];
 
@@ -60,7 +55,7 @@ impl TTable {
 
     pub fn probe(
         &self,
-        key: Key,
+        key: HashKey,
         alpha: i32,
         beta: i32,
         depth: i32,
