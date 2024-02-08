@@ -1,3 +1,7 @@
+#![feature(generic_const_exprs)]
+
+extern crate openblas_src;
+
 mod defs;
 mod eval;
 mod position;
@@ -21,6 +25,7 @@ impl Search {
     }
 }
 
+// Don't forget OPENBLAS_NUM_THREADS=1 !!!!!
 fn main() -> ort::Result<()> {
     //ort::init()
     //    .with_execution_providers([CUDAExecutionProvider::default().build()])
