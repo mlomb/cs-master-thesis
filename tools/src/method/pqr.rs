@@ -1,4 +1,4 @@
-use super::TrainingMethod;
+use super::Method;
 use rand::{seq::SliceRandom, Rng};
 use shakmaty::{fen::Fen, Chess, EnPassantMode, Position};
 use std::{
@@ -14,7 +14,7 @@ impl PQR {
     }
 }
 
-impl TrainingMethod for PQR {
+impl Method for PQR {
     fn write_sample(&mut self, file: &mut File, positions: &Vec<Chess>) -> io::Result<()> {
         let mut rng = rand::thread_rng();
 

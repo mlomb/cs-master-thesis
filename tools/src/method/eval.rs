@@ -1,6 +1,6 @@
 use crate::uci_engine::{Score, UciEngine};
 
-use super::TrainingMethod;
+use super::Method;
 use clap::Args;
 use rand::seq::SliceRandom;
 use shakmaty::{fen::Fen, Chess, EnPassantMode, Position};
@@ -31,7 +31,7 @@ impl Eval {
     }
 }
 
-impl TrainingMethod for Eval {
+impl Method for Eval {
     fn write_sample(&mut self, file: &mut File, positions: &Vec<Chess>) -> io::Result<()> {
         let mut rng = rand::thread_rng();
 

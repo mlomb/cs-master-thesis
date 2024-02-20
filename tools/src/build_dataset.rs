@@ -3,7 +3,8 @@ use crate::game_visitor::VisitorConfig;
 use crate::method::eval::Eval;
 use crate::method::eval::EvalArgs;
 use crate::method::pqr::PQR;
-use crate::method::TrainingMethod;
+use crate::method::stats_topk::StatsTopK;
+use crate::method::Method;
 use clap::Args;
 use clap::Subcommand;
 use indicatif::{HumanCount, ProgressBar, ProgressStyle};
@@ -26,18 +27,20 @@ pub struct BuildDatasetCommand {
     #[clap(flatten)]
     visitor_config: VisitorConfig,
 
-    /// Training method to use
+    /// Method to use
     #[command(subcommand)]
-    subcommand: TrainMethodSubcommand,
+    subcommand: MethodSubcommand,
 }
 
 #[derive(Subcommand)]
-pub enum TrainMethodSubcommand {
+pub enum MethodSubcommand {
     /// Generates a dataset with three columns: FEN strings of the positions P, Q and R.
     /// Given a transition P → Q in a game, R is selected from a legal move from P while R != Q.
     PQR,
     /// Generates a dataset with three columns: FEN string of a position, its score and the best move (both given by the engine)
     Eval(EvalArgs),
+    /// Extracts statistics to build the TopK feature set
+    StatsTopK,
 }
 
 pub fn build_dataset(cmd: BuildDatasetCommand) -> Result<(), Box<dyn Error>> {
@@ -64,9 +67,10 @@ pub fn build_dataset(cmd: BuildDatasetCommand) -> Result<(), Box<dyn Error>> {
     let mut out_file = File::create(cmd.output)?;
     let mut count = 0;
 
-    let mut method: Box<dyn TrainingMethod> = match &cmd.subcommand {
-        TrainMethodSubcommand::PQR => Box::new(PQR::new()),
-        TrainMethodSubcommand::Eval(args) => Box::new(Eval::new(args.clone())),
+    let mut method: Box<dyn Method> = match &cmd.subcommand {
+        MethodSubcommand::PQR => Box::new(PQR::new()),
+        MethodSubcommand::Eval(args) => Box::new(Eval::new(args.clone())),
+        MethodSubcommand::StatsTopK => Box::new(StatsTopK::new()),
     };
 
     let bar = ProgressBar::new_spinner()

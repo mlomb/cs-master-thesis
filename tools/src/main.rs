@@ -23,8 +23,6 @@ enum Commands {
     BuildDataset(BuildDatasetCommand),
     /// Starts a process that writes samples to a shared memory file on demand (e.g. for training)
     SamplesService(SamplesServiceCommand),
-    /// This command collects information about samples. This is used to create the TopK feature set.
-    CollectStats,
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -33,6 +31,5 @@ fn main() -> Result<(), Box<dyn Error>> {
     match args.command {
         Commands::BuildDataset(cmd) => build_dataset(cmd),
         Commands::SamplesService(cmd) => samples_service(cmd),
-        Commands::CollectStats => todo!(),
     }
 }

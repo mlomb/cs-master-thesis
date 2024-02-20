@@ -1,11 +1,12 @@
-use std::error::Error;
-
 use clap::{Args, ValueEnum};
+use shared_memory::ShmemConf;
+use std::error::Error;
 
 #[derive(ValueEnum, Clone)]
 enum FeatureSetChoice {
     Basic,
     HalfKP,
+    TopK20,
 }
 
 #[derive(Args)]
@@ -15,6 +16,7 @@ pub struct SamplesServiceCommand {
     inputs: Vec<String>,
 
     /// The shared memory file to write the samples. Must have the correct size, otherwise it will panic
+    #[arg(long, value_name = "shmem")]
     shmem: String,
 
     /// The feature set to use
@@ -28,6 +30,8 @@ pub struct SamplesServiceCommand {
 }
 
 pub fn samples_service(cmd: SamplesServiceCommand) -> Result<(), Box<dyn Error>> {
+    let shmem = ShmemConf::new().flink(cmd.shmem).open()?;
+
     /*
     let count = 0;
     let start = std::time::Instant::now();
