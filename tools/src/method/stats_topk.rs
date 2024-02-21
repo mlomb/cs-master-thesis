@@ -1,23 +1,58 @@
 use super::Method;
-use rand::{seq::SliceRandom, Rng};
-use shakmaty::{Chess, Color, Position};
+use rand::seq::SliceRandom;
+use shakmaty::{Chess, Color, Position, Role, Square};
 use std::{
     fs::File,
-    io::{self, Write},
+    io::{self, BufWriter, Seek, Write},
 };
 
-const MAX_TUPLES: usize = 64 * 6 * 64 * 6 * 2;
+struct Tuple(Square, Role, Square, Role, Color);
+
+impl Tuple {
+    fn index(&self) -> usize {
+        // reference piece
+        let square1 = self.0;
+        let role1 = self.1;
+
+        // board piece
+        let square2 = self.2;
+        let role2 = self.3;
+        let color2 = self.4;
+
+        (square1 as usize * 6 * 64 * 6 * 2)
+            + ((role1 as usize - 1) * 64 * 6 * 2)
+            + (square2 as usize * 6 * 2)
+            + ((role2 as usize - 1) * 2)
+            + (color2 as usize)
+    }
+}
 
 pub struct StatsTopK {
     total: u32,
-    counts: [u32; MAX_TUPLES],
+    counts: Vec<u32>,
+    tuples: Vec<Tuple>,
 }
 
 impl StatsTopK {
     pub fn new() -> Self {
+        let mut tuples = Vec::new();
+
+        for square1 in Square::ALL {
+            for role1 in Role::ALL {
+                for square2 in Square::ALL {
+                    for role2 in Role::ALL {
+                        for color2 in Color::ALL {
+                            tuples.push(Tuple(square1, role1, square2, role2, color2));
+                        }
+                    }
+                }
+            }
+        }
+
         StatsTopK {
             total: 0,
-            counts: [0; MAX_TUPLES],
+            counts: vec![0; tuples.len()],
+            tuples,
         }
     }
 }
@@ -49,11 +84,8 @@ impl Method for StatsTopK {
                         continue;
                     }
 
-                    let index = (square1 as usize * 6 * 64 * 6 * 2)
-                        + (piece1.role as usize * 64 * 6 * 2)
-                        + (square2 as usize * 6 * 2)
-                        + (piece2.role as usize * 2)
-                        + (piece2.color as usize);
+                    let index =
+                        Tuple(square1, piece1.role, square2, piece2.role, piece2.color).index();
 
                     self.counts[index] += 1;
                 }
@@ -65,30 +97,35 @@ impl Method for StatsTopK {
         }
 
         // write file
-        if self.total % 100 == 0 {
-            file.set_len(0)?; // reset file
+        if self.total % 100_000 == 0 {
+            // reset file
+            file.seek(io::SeekFrom::Start(0))?;
+            file.set_len(0)?;
 
-            for square1 in 0..64 {
-                for piece1 in 0..6 {
-                    for square2 in 0..64 {
-                        for piece2 in 0..6 {
-                            for color in 0..2 {
-                                let index = (square1 * 6 * 64 * 6 * 2)
-                                    + (piece1 * 64 * 6 * 2)
-                                    + (square2 * 6 * 2)
-                                    + (piece2 * 2)
-                                    + color;
+            let mut f = BufWriter::new(file);
 
-                                writeln!(
-                                    file,
-                                    "{},{},{},{},{},{}",
-                                    square1, piece1, square2, piece2, color, self.counts[index]
-                                )?;
-                            }
-                        }
-                    }
+            self.tuples
+                .sort_by(|a, b| self.counts[b.index()].cmp(&self.counts[a.index()]));
+
+            for t in &self.tuples {
+                if self.counts[t.index()] == 0 {
+                    // skip zero counts
+                    continue;
                 }
+
+                writeln!(
+                    f,
+                    "{:?},{:?},{:?},{:?},{:?},{}",
+                    t.0,
+                    t.1,
+                    t.2,
+                    t.3,
+                    t.4,
+                    self.counts[t.index()]
+                )?;
             }
+
+            f.flush()?;
         }
 
         Ok(())
