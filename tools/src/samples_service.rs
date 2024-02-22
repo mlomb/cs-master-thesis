@@ -52,8 +52,8 @@ pub fn samples_service(cmd: SamplesServiceCommand) -> Result<(), Box<dyn Error>>
     //let shmem = ShmemConf::new().flink(cmd.shmem).open()?;
 
     // initialize feature set
-    let feature_set = match cmd.feature_set {
-        FeatureSetChoice::Basic => Basic::new(),
+    let feature_set: Box<dyn FeatureSet> = match cmd.feature_set {
+        FeatureSetChoice::Basic => Box::new(Basic::new()),
         FeatureSetChoice::HalfKP => todo!(),
         FeatureSetChoice::TopK20 => todo!(),
     };

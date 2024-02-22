@@ -1,4 +1,5 @@
 use super::{ReadSample, WriteSample};
+use nn::feature_set::FeatureSet;
 use rand::{seq::SliceRandom, Rng};
 use shakmaty::CastlingMode;
 use shakmaty::{fen::Fen, Chess, EnPassantMode, Position};
@@ -71,7 +72,7 @@ impl ReadSample for PQR {
         &mut self,
         read: &mut BufReader<File>,
         buffer: &mut [u64],
-        feature_set: &dyn nn::feature_set::FeatureSet,
+        feature_set: &Box<dyn FeatureSet>,
     ) -> usize {
         let mut p_bytes = Vec::with_capacity(128);
         let mut q_bytes = Vec::with_capacity(128);
@@ -94,7 +95,10 @@ impl ReadSample for PQR {
         let q_position: Chess = q_fen.into_position(CastlingMode::Standard).unwrap();
         let r_position: Chess = r_fen.into_position(CastlingMode::Standard).unwrap();
 
+        // buffer offset etc
         feature_set.write_inputs(&p_position, buffer);
+        feature_set.write_inputs(&q_position, buffer);
+        feature_set.write_inputs(&r_position, buffer);
 
         todo!()
     }
