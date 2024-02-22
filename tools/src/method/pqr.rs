@@ -1,11 +1,13 @@
-use super::Method;
+use super::{ReadSample, WriteSample};
 use rand::{seq::SliceRandom, Rng};
+use shakmaty::CastlingMode;
 use shakmaty::{fen::Fen, Chess, EnPassantMode, Position};
+use std::io::BufRead;
+use std::io::BufReader;
 use std::{
     fs::File,
     io::{self, Write},
 };
-
 pub struct PQR;
 
 impl PQR {
@@ -14,7 +16,7 @@ impl PQR {
     }
 }
 
-impl Method for PQR {
+impl WriteSample for PQR {
     fn write_sample(&mut self, file: &mut File, positions: &Vec<Chess>) -> io::Result<()> {
         let mut rng = rand::thread_rng();
 
@@ -62,4 +64,38 @@ impl Method for PQR {
                parent.swap_colors();
            }
     */
+}
+
+impl ReadSample for PQR {
+    fn read_sample(
+        &mut self,
+        read: &mut BufReader<File>,
+        buffer: &mut [u64],
+        feature_set: &dyn nn::feature_set::FeatureSet,
+    ) -> usize {
+        let mut p_bytes = Vec::with_capacity(128);
+        let mut q_bytes = Vec::with_capacity(128);
+        let mut r_bytes = Vec::with_capacity(128);
+
+        read.read_until(b',', &mut p_bytes).unwrap();
+        read.read_until(b',', &mut q_bytes).unwrap();
+        read.read_until(b'\n', &mut r_bytes).unwrap();
+
+        // remove trailing comma and newline
+        p_bytes.pop();
+        q_bytes.pop();
+        r_bytes.pop();
+
+        let p_fen = Fen::from_ascii(p_bytes.as_slice()).unwrap();
+        let q_fen = Fen::from_ascii(q_bytes.as_slice()).unwrap();
+        let r_fen = Fen::from_ascii(r_bytes.as_slice()).unwrap();
+
+        let p_position: Chess = p_fen.into_position(CastlingMode::Standard).unwrap();
+        let q_position: Chess = q_fen.into_position(CastlingMode::Standard).unwrap();
+        let r_position: Chess = r_fen.into_position(CastlingMode::Standard).unwrap();
+
+        feature_set.write_inputs(&p_position, buffer);
+
+        todo!()
+    }
 }

@@ -5,12 +5,18 @@ use shakmaty::{Board, Color, Role};
 /// Tuple: <piece_square, piece_role>
 pub struct Basic;
 
+impl Basic {
+    pub fn new() -> Self {
+        Basic
+    }
+}
+
 impl FeatureSet for Basic {
-    fn num_features() -> usize {
+    fn num_features(&self) -> usize {
         64 * 6 // 384
     }
 
-    fn init(board: &Board, color: Color, active_features: &mut Vec<u16>) {
+    fn init(&self, board: &Board, color: Color, active_features: &mut Vec<u16>) {
         active_features.clear();
 
         for (square, piece) in board.clone().into_iter() {

@@ -6,11 +6,11 @@ use shakmaty::{Board, Color, Role};
 pub struct HalfKP;
 
 impl FeatureSet for HalfKP {
-    fn num_features() -> usize {
+    fn num_features(&self) -> usize {
         64 * 64 * 5 * 2 // 40960
     }
 
-    fn init(board: &Board, color: Color, active_features: &mut Vec<u16>) {
+    fn init(&self, board: &Board, color: Color, active_features: &mut Vec<u16>) {
         active_features.clear();
 
         let king_square = board.king_of(color).unwrap();

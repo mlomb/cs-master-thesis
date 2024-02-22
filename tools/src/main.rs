@@ -1,3 +1,5 @@
+#![feature(buf_read_has_data_left)]
+
 mod build_dataset;
 mod game_visitor;
 mod method;

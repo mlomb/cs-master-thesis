@@ -1,6 +1,14 @@
-use clap::{Args, ValueEnum};
+use crate::method::ReadSample;
+use clap::{Args, Subcommand, ValueEnum};
+use nn::feature_set::{basic::Basic, FeatureSet};
 use shared_memory::ShmemConf;
-use std::error::Error;
+use std::{
+    error::Error,
+    fs::File,
+    io::{BufRead, BufReader},
+};
+
+use crate::method::pqr::PQR;
 
 #[derive(ValueEnum, Clone)]
 enum FeatureSetChoice {
@@ -13,6 +21,7 @@ enum FeatureSetChoice {
 pub struct SamplesServiceCommand {
     /// List of CSV files to read games.
     /// CSVs must be generated using the `build-dataset` command
+    #[arg(long, value_name = "input", required = true)]
     inputs: Vec<String>,
 
     /// The shared memory file to write the samples. Must have the correct size, otherwise it will panic
@@ -27,10 +36,44 @@ pub struct SamplesServiceCommand {
     /// Batch size
     #[arg(long, default_value = "4096")]
     batch_size: usize,
+
+    /// Method to use
+    #[command(subcommand)]
+    subcommand: MethodSubcommand,
+}
+
+#[derive(Subcommand)]
+pub enum MethodSubcommand {
+    PQR,
 }
 
 pub fn samples_service(cmd: SamplesServiceCommand) -> Result<(), Box<dyn Error>> {
-    let shmem = ShmemConf::new().flink(cmd.shmem).open()?;
+    // open shared memory file
+    //let shmem = ShmemConf::new().flink(cmd.shmem).open()?;
+
+    // initialize feature set
+    let feature_set = match cmd.feature_set {
+        FeatureSetChoice::Basic => Basic::new(),
+        FeatureSetChoice::HalfKP => todo!(),
+        FeatureSetChoice::TopK20 => todo!(),
+    };
+
+    let mut method = match cmd.subcommand {
+        MethodSubcommand::PQR => PQR::new(),
+    };
+
+    let buffer_size = feature_set.num_features().div_ceil(64) * cmd.batch_size;
+    // assert_eq!(shmem.len(), buffer_size);
+    let mut buffer = [0u64; 1 * 41000]; // TODO: put this on the heap
+
+    for filename in cmd.inputs {
+        let file = File::open(filename)?;
+        let mut file_buffer = BufReader::new(file);
+
+        while file_buffer.has_data_left()? {
+            method.read_sample(&mut file_buffer, &mut buffer, &feature_set);
+        }
+    }
 
     /*
     let count = 0;

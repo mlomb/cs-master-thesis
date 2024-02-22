@@ -1,4 +1,4 @@
-use super::Method;
+use super::WriteSample;
 use rand::seq::SliceRandom;
 use shakmaty::{Chess, Color, Position, Role, Square};
 use std::{
@@ -57,7 +57,7 @@ impl StatsTopK {
     }
 }
 
-impl Method for StatsTopK {
+impl WriteSample for StatsTopK {
     fn write_sample(&mut self, file: &mut File, positions: &Vec<Chess>) -> io::Result<()> {
         let mut rng = rand::thread_rng();
         let mut tries = 0;

@@ -4,7 +4,7 @@ use crate::method::eval::Eval;
 use crate::method::eval::EvalArgs;
 use crate::method::pqr::PQR;
 use crate::method::stats_topk::StatsTopK;
-use crate::method::Method;
+use crate::method::WriteSample;
 use clap::Args;
 use clap::Subcommand;
 use indicatif::{HumanCount, ProgressBar, ProgressStyle};
@@ -67,7 +67,7 @@ pub fn build_dataset(cmd: BuildDatasetCommand) -> Result<(), Box<dyn Error>> {
     let mut out_file = File::create(cmd.output)?;
     let mut count = 0;
 
-    let mut method: Box<dyn Method> = match &cmd.subcommand {
+    let mut method: Box<dyn WriteSample> = match &cmd.subcommand {
         MethodSubcommand::PQR => Box::new(PQR::new()),
         MethodSubcommand::Eval(args) => Box::new(Eval::new(args.clone())),
         MethodSubcommand::StatsTopK => Box::new(StatsTopK::new()),
