@@ -3,8 +3,8 @@ use nn::feature_set::FeatureSet;
 use rand::{seq::SliceRandom, Rng};
 use shakmaty::CastlingMode;
 use shakmaty::{fen::Fen, Chess, EnPassantMode, Position};
-use std::io::BufRead;
-use std::io::BufReader;
+use std::io::{BufRead, Cursor};
+use std::io::{BufReader, Read};
 use std::{
     fs::File,
     io::{self, Write},
@@ -68,12 +68,16 @@ impl WriteSample for PQR {
 }
 
 impl ReadSample for PQR {
+    fn sample_size(&self, feature_set: &Box<dyn FeatureSet>) -> usize {
+        feature_set.encoded_size() * 3
+    }
+
     fn read_sample(
         &mut self,
         read: &mut BufReader<File>,
-        buffer: &mut [u64],
+        write: &mut Cursor<&mut [u8]>,
         feature_set: &Box<dyn FeatureSet>,
-    ) -> usize {
+    ) {
         let mut p_bytes = Vec::with_capacity(128);
         let mut q_bytes = Vec::with_capacity(128);
         let mut r_bytes = Vec::with_capacity(128);
@@ -95,11 +99,8 @@ impl ReadSample for PQR {
         let q_position: Chess = q_fen.into_position(CastlingMode::Standard).unwrap();
         let r_position: Chess = r_fen.into_position(CastlingMode::Standard).unwrap();
 
-        // buffer offset etc
-        feature_set.write_inputs(&p_position, buffer);
-        feature_set.write_inputs(&q_position, buffer);
-        feature_set.write_inputs(&r_position, buffer);
-
-        todo!()
+        feature_set.encode(&p_position, write);
+        feature_set.encode(&q_position, write);
+        feature_set.encode(&r_position, write);
     }
 }

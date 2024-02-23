@@ -5,7 +5,7 @@ pub mod stats_topk;
 use nn::feature_set::FeatureSet;
 use shakmaty::Chess;
 use std::io::BufReader;
-use std::io::Read;
+use std::io::Cursor;
 use std::{fs::File, io};
 
 pub trait WriteSample {
@@ -13,10 +13,12 @@ pub trait WriteSample {
 }
 
 pub trait ReadSample {
+    fn sample_size(&self, feature_set: &Box<dyn FeatureSet>) -> usize;
+
     fn read_sample(
         &mut self,
-        file: &mut BufReader<File>,
-        buffer: &mut [u64],
+        read: &mut BufReader<File>,
+        write: &mut Cursor<&mut [u8]>,
         feature_set: &Box<dyn FeatureSet>,
-    ) -> usize;
+    );
 }

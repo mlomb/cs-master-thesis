@@ -5,7 +5,7 @@ use shared_memory::ShmemConf;
 use std::{
     error::Error,
     fs::File,
-    io::{BufRead, BufReader},
+    io::{self, BufRead, BufReader, Cursor, Read, Seek, SeekFrom, Write},
 };
 
 use crate::method::pqr::PQR;
@@ -49,7 +49,7 @@ pub enum MethodSubcommand {
 
 pub fn samples_service(cmd: SamplesServiceCommand) -> Result<(), Box<dyn Error>> {
     // open shared memory file
-    //let shmem = ShmemConf::new().flink(cmd.shmem).open()?;
+    let mut shmem = ShmemConf::new().os_id(cmd.shmem).open()?;
 
     // initialize feature set
     let feature_set: Box<dyn FeatureSet> = match cmd.feature_set {
@@ -62,75 +62,43 @@ pub fn samples_service(cmd: SamplesServiceCommand) -> Result<(), Box<dyn Error>>
         MethodSubcommand::PQR => PQR::new(),
     };
 
-    let buffer_size = feature_set.num_features().div_ceil(64) * cmd.batch_size;
-    // assert_eq!(shmem.len(), buffer_size);
-    let mut buffer = [0u64; 1 * 41000]; // TODO: put this on the heap
+    let expected_size = method.sample_size(&feature_set) * cmd.batch_size;
 
-    for filename in cmd.inputs {
-        let file = File::open(filename)?;
-        let mut file_buffer = BufReader::new(file);
+    assert_eq!(shmem.len(), expected_size);
+    let mut cursor = Cursor::new(unsafe { shmem.as_slice_mut() });
 
-        while file_buffer.has_data_left()? {
-            method.read_sample(&mut file_buffer, &mut buffer, &feature_set);
-        }
-    }
+    //let mut a = vec![0u8; expected_size];
+    //let mut cursor = Cursor::new(a.as_mut_slice());
 
-    /*
-    let count = 0;
-    let start = std::time::Instant::now();
+    let mut in_batch = 0;
 
-    for filename in args.inputs {
-        let file = File::open(filename)?;
-        let mut buffer = BufReader::new(file);
+    // loop over the dataset indefinitely
+    loop {
+        // loop over every input file
+        for filename in &cmd.inputs {
+            let file = File::open(filename)?;
+            let mut file_buffer = BufReader::with_capacity(32 * 8192, file);
 
-        let mut fen_bytes = Vec::with_capacity(128);
-        let mut score_bytes = Vec::with_capacity(128);
-        let mut bestmove_bytes = Vec::with_capacity(128);
+            // loop for every sample in file
+            while file_buffer.has_data_left()? {
+                // write sample
+                method.read_sample(&mut file_buffer, &mut cursor, &feature_set);
+                in_batch += 1;
 
-        let mut to_move_features = Vec::with_capacity(100_000);
-        let mut other_features = Vec::with_capacity(100_000);
+                if in_batch == cmd.batch_size {
+                    // we have filled the current batch with samples
+                    // send a signal to the consumer (1 byte)
+                    io::stdout().write_all(&[64])?;
+                    io::stdout().flush()?;
 
-        loop {
-            fen_bytes.clear();
-            score_bytes.clear();
-            bestmove_bytes.clear();
+                    // now we wait for the consumer to signal that it has finished copying the data (1 byte)
+                    io::stdin().read_exact(&mut [0])?;
 
-            buffer.read_until(b',', &mut fen_bytes).unwrap();
-            buffer.read_until(b',', &mut score_bytes).unwrap();
-            buffer.read_until(b'\n', &mut bestmove_bytes).unwrap();
-
-            if fen_bytes.is_empty() {
-                break;
+                    // reset cursor to the beginning
+                    cursor.rewind()?;
+                    in_batch = 0;
+                }
             }
-
-            // remove trailing comma and newline
-            fen_bytes.pop();
-            score_bytes.pop();
-            bestmove_bytes.pop();
-
-            let fen = Fen::from_ascii(fen_bytes.as_slice())?;
-            //let score = parts[1].parse::<f32>()?;
-            let bestmove = Uci::from_ascii(bestmove_bytes.as_slice())?;
-
-            let position: Chess = fen.into_position(CastlingMode::Standard)?;
-            let board = position.board();
-
-            nn::feature_set::basic::Basic::init(board, position.turn(), &mut to_move_features);
-            nn::feature_set::basic::Basic::init(
-                board,
-                position.turn().other(),
-                &mut other_features,
-            );
-
-            //count += 1;
-            //if count % 100_000 == 0 {
-            //    println!("Processed {} positions in {:?}", count, start.elapsed());
-            //}
         }
     }
-
-    println!("Processed {} positions", count);
-
-    */
-    todo!()
 }
