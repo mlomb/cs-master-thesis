@@ -5,7 +5,7 @@ use shared_memory::ShmemConf;
 use std::{
     error::Error,
     fs::File,
-    io::{self, BufRead, BufReader, Cursor, Read, Seek, SeekFrom, Write},
+    io::{self, BufRead, BufReader, Cursor, Read, Seek, Write},
 };
 
 use crate::method::pqr::PQR;

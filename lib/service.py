@@ -24,7 +24,8 @@ class SamplesService:
         args = [
             "../tools/target/release/tools",
             "samples-service",
-            "--inputs=../tools/pqr.csv",
+            "--inputs=/mnt/c/pqr/2023-12.csv",
+            "--inputs=/mnt/c/pqr/2023-11.csv",
             "--shmem=" + self.shmem.name,
             "--batch-size=" + str(batch_size),
             "--feature-set=basic",

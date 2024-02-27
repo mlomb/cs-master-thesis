@@ -1,10 +1,10 @@
 use super::{ReadSample, WriteSample};
 use nn::feature_set::FeatureSet;
 use rand::{seq::SliceRandom, Rng};
-use shakmaty::CastlingMode;
 use shakmaty::{fen::Fen, Chess, EnPassantMode, Position};
-use std::io::{BufRead, Cursor};
-use std::io::{BufReader, Read};
+use shakmaty::{CastlingMode, Color};
+use std::io::BufReader;
+use std::io::{BufRead, BufWriter, Cursor};
 use std::{
     fs::File,
     io::{self, Write},
@@ -18,7 +18,11 @@ impl PQR {
 }
 
 impl WriteSample for PQR {
-    fn write_sample(&mut self, file: &mut File, positions: &Vec<Chess>) -> io::Result<()> {
+    fn write_sample(
+        &mut self,
+        write: &mut BufWriter<File>,
+        positions: &Vec<Chess>,
+    ) -> io::Result<()> {
         let mut rng = rand::thread_rng();
 
         loop {
@@ -42,7 +46,7 @@ impl WriteSample for PQR {
             };
 
             return writeln!(
-                file,
+                write,
                 "{},{},{}",
                 Fen(parent.clone().into_setup(EnPassantMode::Legal)),
                 Fen(observed.clone().into_setup(EnPassantMode::Legal)),
@@ -50,21 +54,6 @@ impl WriteSample for PQR {
             );
         }
     }
-
-    /*
-           //  flip boards to be from white's POV
-           if (index % 2) == 0 {
-               // W B B
-               observed.flip_vertical();
-               observed.swap_colors();
-               random.flip_vertical();
-               random.swap_colors();
-           } else {
-               // B W W
-               parent.flip_vertical();
-               parent.swap_colors();
-           }
-    */
 }
 
 impl ReadSample for PQR {
@@ -99,8 +88,31 @@ impl ReadSample for PQR {
         let q_position: Chess = q_fen.into_position(CastlingMode::Standard).unwrap();
         let r_position: Chess = r_fen.into_position(CastlingMode::Standard).unwrap();
 
-        feature_set.encode(&p_position, write);
-        feature_set.encode(&q_position, write);
-        feature_set.encode(&r_position, write);
+        let mut parent = p_position.board().clone();
+        let mut observed = q_position.board().clone();
+        let mut random = r_position.board().clone();
+
+        //  flip boards to be from white's POV
+        if p_position.turn() == Color::White {
+            // W B B
+            assert_eq!(q_position.turn(), Color::Black);
+            assert_eq!(r_position.turn(), Color::Black);
+
+            observed.flip_vertical();
+            observed.swap_colors();
+            random.flip_vertical();
+            random.swap_colors();
+        } else {
+            // B W W
+            assert_eq!(q_position.turn(), Color::White);
+            assert_eq!(r_position.turn(), Color::White);
+
+            parent.flip_vertical();
+            parent.swap_colors();
+        }
+
+        feature_set.encode(&parent, Color::White, write);
+        feature_set.encode(&observed, Color::White, write);
+        feature_set.encode(&random, Color::White, write);
     }
 }

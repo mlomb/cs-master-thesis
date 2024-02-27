@@ -1,7 +1,8 @@
 pub mod basic;
 pub mod halfkp;
 
-use shakmaty::{Board, Chess, Color};
+use shakmaty::{Board, Chess, Color, Position};
+use std::io::{Cursor, Write};
 
 /// A set of features for a neural network
 pub trait FeatureSet {
@@ -15,7 +16,31 @@ pub trait FeatureSet {
 }
 
 impl dyn FeatureSet {
-    pub fn write_inputs(&self, position: &Chess, buffer: &mut [u64]) {
-        //
+    pub fn encoded_size(&self) -> usize {
+        self.num_features().div_ceil(64) * 8
+    }
+
+    pub fn encode(&self, board: &Board, color: Color, cursor: &mut Cursor<&mut [u8]>) {
+        // extract features from position
+        let mut features = vec![];
+        self.init(board, color, &mut features);
+
+        // write into bits of a u64 buffer
+        let mut buffer = vec![0u64; self.num_features().div_ceil(64)];
+
+        for feature_index in features.into_iter() {
+            assert!(feature_index < self.num_features() as u16);
+
+            let elem_index = (feature_index / 64) as usize;
+            let bit_index = (feature_index % 64) as usize;
+            buffer[elem_index] |= 1 << bit_index;
+        }
+
+        // write buffer into cursor
+        cursor
+            .write_all(unsafe {
+                std::slice::from_raw_parts(buffer.as_ptr() as *const u8, buffer.len() * 8)
+            })
+            .unwrap();
     }
 }

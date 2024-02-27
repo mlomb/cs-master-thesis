@@ -12,6 +12,7 @@ use pgn_reader::BufferedReader;
 use std::error::Error;
 use std::fs::File;
 use std::io;
+use std::io::BufWriter;
 
 #[derive(Args)]
 pub struct BuildDatasetCommand {
@@ -64,7 +65,7 @@ pub fn build_dataset(cmd: BuildDatasetCommand) -> Result<(), Box<dyn Error>> {
     //let engine = UciEngine::new(cmd.);
     let mut visitor = GameVisitor::new(cmd.visitor_config);
     let mut game_reader = BufferedReader::new(reader);
-    let mut out_file = File::create(cmd.output)?;
+    let mut writer = BufWriter::new(File::create(cmd.output)?);
     let mut count = 0;
 
     let mut method: Box<dyn WriteSample> = match &cmd.subcommand {
@@ -86,7 +87,7 @@ pub fn build_dataset(cmd: BuildDatasetCommand) -> Result<(), Box<dyn Error>> {
         if let Some(positions) = sample {
             assert!(positions.len() > 0);
 
-            method.write_sample(&mut out_file, &positions)?;
+            method.write_sample(&mut writer, &positions)?;
 
             count += 1;
             bar.set_message(format!("[Samples {}]", HumanCount(count).to_string()));

@@ -58,7 +58,11 @@ impl StatsTopK {
 }
 
 impl WriteSample for StatsTopK {
-    fn write_sample(&mut self, file: &mut File, positions: &Vec<Chess>) -> io::Result<()> {
+    fn write_sample(
+        &mut self,
+        file: &mut BufWriter<File>,
+        positions: &Vec<Chess>,
+    ) -> io::Result<()> {
         let mut rng = rand::thread_rng();
         let mut tries = 0;
 
@@ -100,7 +104,7 @@ impl WriteSample for StatsTopK {
         if self.total % 100_000 == 0 {
             // reset file
             file.seek(io::SeekFrom::Start(0))?;
-            file.set_len(0)?;
+            // file.set_len(0)?; // TODO!
 
             let mut f = BufWriter::new(file);
 

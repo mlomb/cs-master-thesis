@@ -13,7 +13,7 @@ impl Basic {
 
 impl FeatureSet for Basic {
     fn num_features(&self) -> usize {
-        64 * 6 // 384
+        64 * 6 * 2 // 768
     }
 
     fn init(&self, board: &Board, color: Color, active_features: &mut Vec<u16>) {
