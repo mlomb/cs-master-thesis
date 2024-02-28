@@ -7,6 +7,7 @@ use shakmaty::Chess;
 use std::io::BufReader;
 use std::io::BufWriter;
 use std::io::Cursor;
+use std::io::Read;
 use std::{fs::File, io};
 
 pub trait WriteSample {
@@ -22,7 +23,7 @@ pub trait ReadSample {
 
     fn read_sample(
         &mut self,
-        read: &mut BufReader<File>,
+        read: &mut BufReader<Box<dyn Read>>,
         write: &mut Cursor<&mut [u8]>,
         feature_set: &Box<dyn FeatureSet>,
     );

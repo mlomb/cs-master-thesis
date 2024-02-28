@@ -3,8 +3,8 @@ use nn::feature_set::FeatureSet;
 use rand::{seq::SliceRandom, Rng};
 use shakmaty::{fen::Fen, Chess, EnPassantMode, Position};
 use shakmaty::{CastlingMode, Color};
-use std::io::BufReader;
 use std::io::{BufRead, BufWriter, Cursor};
+use std::io::{BufReader, Read};
 use std::{
     fs::File,
     io::{self, Write},
@@ -63,7 +63,7 @@ impl ReadSample for PQR {
 
     fn read_sample(
         &mut self,
-        read: &mut BufReader<File>,
+        read: &mut BufReader<Box<dyn Read>>,
         write: &mut Cursor<&mut [u8]>,
         feature_set: &Box<dyn FeatureSet>,
     ) {

@@ -77,12 +77,20 @@ pub fn samples_service(cmd: SamplesServiceCommand) -> Result<(), Box<dyn Error>>
         // loop over every input file
         for filename in &cmd.inputs {
             let file = File::open(filename)?;
-            let mut file_buffer = BufReader::with_capacity(32 * 8192, file);
+
+            // decompress if necessary
+            let reader: Box<dyn io::Read> = if filename.ends_with(".zst") {
+                Box::new(zstd::Decoder::new(file)?)
+            } else {
+                Box::new(file)
+            };
+
+            let mut reader = BufReader::with_capacity(32 * 8192, reader);
 
             // loop for every sample in file
-            while file_buffer.has_data_left()? {
+            while reader.has_data_left()? {
                 // write sample
-                method.read_sample(&mut file_buffer, &mut cursor, &feature_set);
+                method.read_sample(&mut reader, &mut cursor, &feature_set);
                 in_batch += 1;
 
                 if in_batch == cmd.batch_size {
