@@ -1,29 +1,11 @@
-#![feature(generic_const_exprs)]
-
-extern crate openblas_src;
-
-mod defs;
-mod eval;
-mod position;
-mod pv;
-mod search;
-mod tt;
-
 use eval::NNModel;
-use ort::Session;
 use search::Search;
 use shakmaty::fen::Fen;
 use shakmaty::uci::Uci;
-use shakmaty::{CastlingMode, Chess, Color, File, Move, Position, Square};
+use shakmaty::{CastlingMode, Chess, Color, Position};
 use std::io::{self, BufRead};
 use std::time::Duration;
-use vampirc_uci::{parse_one, UciMessage, UciMove, UciPiece, UciSquare, UciTimeControl};
-
-impl Search {
-    pub fn pepe(&self) {
-        println!("pepe");
-    }
-}
+use vampirc_uci::{parse_one, UciMessage, UciTimeControl};
 
 // Don't forget OPENBLAS_NUM_THREADS=1 !!!!!
 fn main() -> ort::Result<()> {
@@ -31,7 +13,8 @@ fn main() -> ort::Result<()> {
     //    .with_execution_providers([CUDAExecutionProvider::default().build()])
     //    .commit()?;
 
-    let nn_model = NNModel::from_memory(include_bytes!("../../models/rq-mse-256-0.470.onnx"))?;
+    let nn_model =
+        NNModel::from_memory(include_bytes!("../../models/rq-mse-256-clipped-0.496.onnx"))?;
     let mut search = Search::new(nn_model);
 
     let mut position: Chess = Chess::default();

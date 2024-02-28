@@ -1,77 +1,10 @@
+use crate::nn2::{Activation, DenseLayer};
 use crate::{defs::Value, position::Position};
 use ort::{inputs, Session};
 use shakmaty::{Board, Color, Role};
 use std::{ops::Index, usize};
 
-// BLAS
-use cblas_sys;
-use cblas_sys::{CblasRowMajor, CblasTrans};
-
 pub struct NNAccumulator {}
-
-enum Activation {
-    None,
-    ReLU,
-}
-
-struct DenseLayer<const R: usize, const C: usize> {
-    weights: Vec<f32>,
-    bias: Vec<f32>,
-    activation: Activation,
-}
-
-impl<const R: usize, const C: usize> DenseLayer<R, C> {
-    fn new(weights: Vec<f32>, bias: Vec<f32>, activation: Activation) -> Self {
-        assert!(weights.len() == R * C);
-        assert!(bias.len() == C);
-        Self {
-            weights,
-            bias,
-            activation,
-        }
-    }
-
-    fn forward(&self, input: &[f32], output: &mut [f32]) {
-        debug_assert!(input.len() == R);
-        debug_assert!(output.len() == C);
-
-        unsafe {
-            cblas_sys::cblas_sgemv(
-                CblasRowMajor,
-                CblasTrans,
-                R as i32,
-                C as i32,
-                1.0,
-                self.weights.as_ptr(),
-                C as i32,
-                input.as_ptr(),
-                1,
-                0.0,
-                output.as_mut_ptr(),
-                1,
-            );
-        }
-
-        // use cols because weights are transposed
-
-        match self.activation {
-            Activation::None => {
-                for i in 0..C {
-                    let o = unsafe { output.get_unchecked_mut(i) };
-                    let b = unsafe { self.bias.get_unchecked(i) };
-                    *o += *b;
-                }
-            }
-            Activation::ReLU => {
-                for i in 0..C {
-                    let o = unsafe { output.get_unchecked_mut(i) };
-                    let b = unsafe { self.bias.get_unchecked(i) };
-                    *o = (*o + *b).max(0.0);
-                }
-            }
-        }
-    }
-}
 
 fn to_f32_vec(bytes: &[u8]) -> Vec<f32> {
     assert!(bytes.len() % 4 == 0);
@@ -84,8 +17,12 @@ fn to_f32_vec(bytes: &[u8]) -> Vec<f32> {
 
 pub struct NNModel {
     /// ML model to evaluate positions
-    model: Session,
+    onnx_model: Session,
 
+    /// TF Lite model
+    //model: FlatBufferModel,
+    //resolver: BuiltinOpResolver,
+    //interpreter: Interpreter<'a, &'b BuiltinOpResolver>,
     dense1: DenseLayer<768, 256>,
     dense2: DenseLayer<256, 256>,
     dense3: DenseLayer<256, 256>,
@@ -105,7 +42,7 @@ impl NNModel {
             .with_model_from_memory(buffer)?;
 
         Ok(Self {
-            model: session,
+            onnx_model: session,
 
             dense1: DenseLayer::new(
                 to_f32_vec(include_bytes!(
@@ -153,9 +90,15 @@ impl NNModel {
     }
 
     pub fn evaluate(&mut self, pos: &Position) -> Value {
-        return (self.new_eval(pos) * 100.0) as Value;
+        //return basic_eval(pos);
+        return (self.ref_eval(pos) * 100.0) as Value;
 
-        println!("ref: {} new: {}", self.ref_eval(pos), self.new_eval(pos));
+        println!(
+            "ref: {} mine: {} tflite: {}",
+            self.ref_eval(pos),
+            self.new_eval(pos),
+            self.tflite_eval(pos)
+        );
 
         {
             let start = std::time::Instant::now();
@@ -170,6 +113,13 @@ impl NNModel {
                 self.ref_eval(pos);
             }
             println!("ref: {:?}", start.elapsed());
+        }
+        {
+            let start = std::time::Instant::now();
+            for _ in 0..1000 {
+                self.tflite_eval(pos);
+            }
+            println!("tflite: {:?}", start.elapsed());
         }
 
         return basic_eval(pos);
@@ -216,7 +166,7 @@ impl NNModel {
         self.h4[0]
     }
 
-    fn ref_eval(&self, pos: &Position) -> f32 {
+    fn ref_eval(&mut self, pos: &Position) -> f32 {
         use ndarray::Array2;
 
         let mut board = pos.board().clone();
@@ -235,8 +185,8 @@ impl NNModel {
 
         unsafe {
             let outputs = self
-                .model
-                .run(inputs![x].unwrap_unchecked())
+                .onnx_model
+                .run(inputs![x.clone()].unwrap_unchecked())
                 .unwrap_unchecked();
             let scores = outputs
                 .index(0)
@@ -245,8 +195,85 @@ impl NNModel {
                 .1;
             let value = scores[0];
 
+            ///
+            self.x.fill(0.0);
+            for (square, piece) in board.clone().into_iter() {
+                let channel = match piece.color {
+                    Color::White => match piece.role {
+                        Role::Pawn => 0,
+                        Role::Knight => 1,
+                        Role::Bishop => 2,
+                        Role::Rook => 3,
+                        Role::Queen => 4,
+                        Role::King => 5,
+                    },
+                    Color::Black => match piece.role {
+                        Role::Pawn => 6,
+                        Role::Knight => 7,
+                        Role::Bishop => 8,
+                        Role::Rook => 9,
+                        Role::Queen => 10,
+                        Role::King => 11,
+                    },
+                };
+
+                self.x
+                    [channel * 64 + (square.file() as usize + (7 - square.rank() as usize) * 8)] =
+                    1.0;
+            }
+            ///
+
+            println!("input={:?} output={:?}", self.x, value);
+
             return value;
         }
+    }
+
+    fn tflite_eval(&mut self, pos: &Position) -> f32 {
+        0.0
+        //{
+        //    let input = self
+        //        .interpreter
+        //        .tensor_data_mut::<f32>(self.interpreter.inputs().to_vec()[0])
+        //        .unwrap();
+        //
+        //    let mut board = pos.board().clone();
+        //    if pos.turn() == Color::Black {
+        //        board.flip_vertical();
+        //        board.swap_colors();
+        //    }
+        //
+        //    input.fill(0.0);
+        //    for (square, piece) in board.clone().into_iter() {
+        //        let channel = match piece.color {
+        //            Color::White => match piece.role {
+        //                Role::Pawn => 0,
+        //                Role::Knight => 1,
+        //                Role::Bishop => 2,
+        //                Role::Rook => 3,
+        //                Role::Queen => 4,
+        //                Role::King => 5,
+        //            },
+        //            Color::Black => match piece.role {
+        //                Role::Pawn => 6,
+        //                Role::Knight => 7,
+        //                Role::Bishop => 8,
+        //                Role::Rook => 9,
+        //                Role::Queen => 10,
+        //                Role::King => 11,
+        //            },
+        //        };
+        //
+        //        input[channel * 64 + (square.file() as usize + (7 - square.rank() as usize) * 8)] =
+        //            1.0;
+        //    }
+        //}
+        //
+        //let output = self
+        //    .interpreter
+        //    .tensor_data::<f32>(self.interpreter.outputs().to_vec()[0])
+        //    .unwrap();
+        //output[0]
     }
 }
 

@@ -88,31 +88,6 @@ impl ReadSample for PQR {
         let q_position: Chess = q_fen.into_position(CastlingMode::Standard).unwrap();
         let r_position: Chess = r_fen.into_position(CastlingMode::Standard).unwrap();
 
-        /*
-        let mut parent = p_position.board().clone();
-        let mut observed = q_position.board().clone();
-        let mut random = r_position.board().clone();
-
-        //  flip boards to be from white's POV
-        if p_position.turn() == Color::White {
-            // W B B
-            assert_eq!(q_position.turn(), Color::Black);
-            assert_eq!(r_position.turn(), Color::Black);
-
-            observed.flip_vertical();
-            observed.swap_colors();
-            random.flip_vertical();
-            random.swap_colors();
-        } else {
-            // B W W
-            assert_eq!(q_position.turn(), Color::White);
-            assert_eq!(r_position.turn(), Color::White);
-
-            parent.flip_vertical();
-            parent.swap_colors();
-        }
-        */
-
         feature_set.encode(p_position.board(), p_position.turn(), write);
         feature_set.encode(q_position.board(), q_position.turn(), write);
         feature_set.encode(r_position.board(), r_position.turn(), write);

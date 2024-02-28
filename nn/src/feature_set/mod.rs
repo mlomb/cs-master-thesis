@@ -1,7 +1,7 @@
 pub mod basic;
 pub mod halfkp;
 
-use shakmaty::{Board, Chess, Color, Position};
+use shakmaty::{Board, Color};
 use std::io::{Cursor, Write};
 
 /// A set of features for a neural network
