@@ -88,6 +88,7 @@ impl ReadSample for PQR {
         let q_position: Chess = q_fen.into_position(CastlingMode::Standard).unwrap();
         let r_position: Chess = r_fen.into_position(CastlingMode::Standard).unwrap();
 
+        /*
         let mut parent = p_position.board().clone();
         let mut observed = q_position.board().clone();
         let mut random = r_position.board().clone();
@@ -110,9 +111,10 @@ impl ReadSample for PQR {
             parent.flip_vertical();
             parent.swap_colors();
         }
+        */
 
-        feature_set.encode(&parent, Color::White, write);
-        feature_set.encode(&observed, Color::White, write);
-        feature_set.encode(&random, Color::White, write);
+        feature_set.encode(p_position.board(), p_position.turn(), write);
+        feature_set.encode(q_position.board(), q_position.turn(), write);
+        feature_set.encode(r_position.board(), r_position.turn(), write);
     }
 }

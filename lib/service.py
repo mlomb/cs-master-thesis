@@ -1,9 +1,7 @@
 import subprocess
 import numpy as np
-# import tensorflow as tf
 import torch
 from multiprocessing.shared_memory import SharedMemory
-
 
 class SamplesService:
     def __init__(self, batch_size):
@@ -50,14 +48,9 @@ class SamplesService:
         # Wait until there is a byte in the stdout of the program (meaning data is ready).
         self.program.stdout.read(1)
 
-        # Create a TensorFlow tensor using the numpy array.
-        #with tf.device('/GPU:0'):
-        #    tensor = tf.constant(self.data, dtype=tf.uint64)
-        #    assert "GPU" in tensor.device
-        
         # Create a PyTorch tensor using the numpy array.
+        # This will copy the data into the device, so after this line we don't care about self.data
         tensor = torch.tensor(self.data, dtype=torch.int64, device='cuda')
-        assert tensor.is_cuda
 
         # Write a byte into the program's stdin, so it can start working on the next batch.
         self.program.stdin.write(b'\x00')
