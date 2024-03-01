@@ -1,14 +1,12 @@
 use super::{ReadSample, WriteSample};
 use nn::feature_set::FeatureSet;
 use rand::{seq::SliceRandom, Rng};
+use shakmaty::CastlingMode;
 use shakmaty::{fen::Fen, Chess, EnPassantMode, Position};
-use shakmaty::{CastlingMode, Color};
-use std::io::{BufRead, BufWriter, Cursor};
+use std::io::{self, Write};
+use std::io::{BufRead, Cursor};
 use std::io::{BufReader, Read};
-use std::{
-    fs::File,
-    io::{self, Write},
-};
+
 pub struct PQR;
 
 impl PQR {
@@ -18,11 +16,7 @@ impl PQR {
 }
 
 impl WriteSample for PQR {
-    fn write_sample(
-        &mut self,
-        write: &mut BufWriter<File>,
-        positions: &Vec<Chess>,
-    ) -> io::Result<()> {
+    fn write_sample(&mut self, write: &mut dyn Write, positions: &Vec<Chess>) -> io::Result<()> {
         let mut rng = rand::thread_rng();
 
         loop {

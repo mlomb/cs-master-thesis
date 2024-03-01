@@ -4,18 +4,14 @@ pub mod stats_topk;
 
 use nn::feature_set::FeatureSet;
 use shakmaty::Chess;
+use std::io;
 use std::io::BufReader;
-use std::io::BufWriter;
 use std::io::Cursor;
 use std::io::Read;
-use std::{fs::File, io};
+use std::io::Write;
 
 pub trait WriteSample {
-    fn write_sample(
-        &mut self,
-        write: &mut BufWriter<File>,
-        positions: &Vec<Chess>,
-    ) -> io::Result<()>;
+    fn write_sample(&mut self, write: &mut dyn Write, positions: &Vec<Chess>) -> io::Result<()>;
 }
 
 pub trait ReadSample {

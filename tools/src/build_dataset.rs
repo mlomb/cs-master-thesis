@@ -13,6 +13,7 @@ use std::error::Error;
 use std::fs::File;
 use std::io;
 use std::io::BufWriter;
+use zstd::Encoder;
 
 #[derive(Args)]
 pub struct BuildDatasetCommand {
@@ -20,9 +21,13 @@ pub struct BuildDatasetCommand {
     #[arg(long, value_name = "input")]
     input: String,
 
-    /// Output CSV file to write the samples
+    /// Output .csv (or csv.zst) file to write the samples
     #[arg(long, value_name = "output")]
     output: String,
+
+    /// Whether to compress the output CSV with the ZSTD algorithm
+    #[arg(long, default_value = "false")]
+    compress: bool,
 
     /// Game visitor configuration
     #[clap(flatten)]
@@ -59,13 +64,21 @@ pub fn build_dataset(cmd: BuildDatasetCommand) -> Result<(), Box<dyn Error>> {
         raw_reader
     };
 
+    // compress output if asked
+    let output_file = File::create(cmd.output.clone())?;
+    let mut writer: Box<dyn io::Write> = if cmd.compress {
+        // the encoder is buffered internally
+        Box::new(Encoder::new(output_file, 3)?)
+    } else {
+        Box::new(BufWriter::new(output_file))
+    };
+
     println!("Input: {}", cmd.input);
     println!("Output: {}", cmd.output);
+    println!("Write compressed: {}", cmd.compress);
 
-    //let engine = UciEngine::new(cmd.);
     let mut visitor = GameVisitor::new(cmd.visitor_config);
     let mut game_reader = BufferedReader::new(reader);
-    let mut writer = BufWriter::new(File::create(cmd.output)?);
     let mut count = 0;
 
     let mut method: Box<dyn WriteSample> = match &cmd.subcommand {

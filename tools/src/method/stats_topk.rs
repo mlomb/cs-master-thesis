@@ -1,10 +1,7 @@
 use super::WriteSample;
 use rand::seq::SliceRandom;
 use shakmaty::{Chess, Color, Position, Role, Square};
-use std::{
-    fs::File,
-    io::{self, BufWriter, Seek, Write},
-};
+use std::io::{self, Write};
 
 struct Tuple(Square, Role, Square, Role, Color);
 
@@ -58,11 +55,7 @@ impl StatsTopK {
 }
 
 impl WriteSample for StatsTopK {
-    fn write_sample(
-        &mut self,
-        file: &mut BufWriter<File>,
-        positions: &Vec<Chess>,
-    ) -> io::Result<()> {
+    fn write_sample(&mut self, write: &mut dyn Write, positions: &Vec<Chess>) -> io::Result<()> {
         let mut rng = rand::thread_rng();
         let mut tries = 0;
 
@@ -103,6 +96,7 @@ impl WriteSample for StatsTopK {
         // write file
         if self.total % 100_000 == 0 {
             // reset file
+            /*
             file.seek(io::SeekFrom::Start(0))?;
             // file.set_len(0)?; // TODO!
 
@@ -118,7 +112,7 @@ impl WriteSample for StatsTopK {
                 }
 
                 writeln!(
-                    f,
+                    write,
                     "{:?},{:?},{:?},{:?},{:?},{}",
                     t.0,
                     t.1,
@@ -128,8 +122,8 @@ impl WriteSample for StatsTopK {
                     self.counts[t.index()]
                 )?;
             }
-
             f.flush()?;
+            */
         }
 
         Ok(())

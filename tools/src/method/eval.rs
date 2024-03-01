@@ -4,8 +4,7 @@ use super::WriteSample;
 use clap::Args;
 use rand::seq::SliceRandom;
 use shakmaty::{fen::Fen, Chess, EnPassantMode, Position};
-use std::fs::File;
-use std::io::{self, BufWriter, Write};
+use std::io::{self, Write};
 
 #[derive(Args, Clone)]
 pub struct EvalArgs {
@@ -32,11 +31,7 @@ impl Eval {
 }
 
 impl WriteSample for Eval {
-    fn write_sample(
-        &mut self,
-        write: &mut BufWriter<File>,
-        positions: &Vec<Chess>,
-    ) -> io::Result<()> {
+    fn write_sample(&mut self, write: &mut dyn Write, positions: &Vec<Chess>) -> io::Result<()> {
         let mut rng = rand::thread_rng();
 
         // choose random position
