@@ -9,5 +9,5 @@ do
   filename="${filename%%.*}" # remove .pgn.zst
 
   echo "Processing $filename..."
-  echo ../tools/target/release/tools build-dataset --min-elo 1700 --input "$fullfile" --output "$OUTPUTS/$filename.csv.zst" --compress pqr
+  ../tools/target/release/tools build-dataset --min-elo 1700 --input "$fullfile" --output "$OUTPUTS/$filename.csv.zst" --compress pqr
 done
