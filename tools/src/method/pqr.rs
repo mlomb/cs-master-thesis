@@ -1,6 +1,7 @@
 use super::{ReadSample, WriteSample};
 use nn::feature_set::FeatureSet;
 use rand::{seq::SliceRandom, Rng};
+use shakmaty::uci::Uci;
 use shakmaty::CastlingMode;
 use shakmaty::{fen::Fen, Chess, EnPassantMode, Position};
 use std::io::{self, Write};
@@ -31,21 +32,18 @@ impl WriteSample for PQR {
                 continue;
             }
 
-            let random = loop {
-                let mov = moves.choose(&mut rng).unwrap().clone();
-                let pos = parent.clone().play(&mov).unwrap();
-                if pos != *observed {
-                    break pos;
+            for _move in parent.legal_moves() {
+                if parent.clone().play(&_move).unwrap() == *observed {
+                    return writeln!(
+                        write,
+                        "{},{}",
+                        Fen(parent.clone().into_setup(EnPassantMode::Legal)),
+                        _move.to_uci(CastlingMode::Standard)
+                    );
                 }
-            };
+            }
 
-            return writeln!(
-                write,
-                "{},{},{}",
-                Fen(parent.clone().into_setup(EnPassantMode::Legal)),
-                Fen(observed.clone().into_setup(EnPassantMode::Legal)),
-                Fen(random.into_setup(EnPassantMode::Legal))
-            );
+            unreachable!("No legal move found");
         }
     }
 }
@@ -61,26 +59,49 @@ impl ReadSample for PQR {
         write: &mut Cursor<&mut [u8]>,
         feature_set: &Box<dyn FeatureSet>,
     ) {
-        let mut p_bytes = Vec::with_capacity(128);
-        let mut q_bytes = Vec::with_capacity(128);
-        let mut r_bytes = Vec::with_capacity(128);
+        let mut rng = rand::thread_rng();
+        let mut p_fen_bytes = Vec::with_capacity(128);
+        let mut q_move_bytes = Vec::with_capacity(16);
 
-        read.read_until(b',', &mut p_bytes).unwrap();
-        read.read_until(b',', &mut q_bytes).unwrap();
-        read.read_until(b'\n', &mut r_bytes).unwrap();
+        read.read_until(b',', &mut p_fen_bytes).unwrap();
+        read.read_until(b'\n', &mut q_move_bytes).unwrap();
 
         // remove trailing comma and newline
-        p_bytes.pop();
-        q_bytes.pop();
-        r_bytes.pop();
+        p_fen_bytes.pop();
+        if q_move_bytes.last() == Some(&b'\n') {
+            // it may not be present if EOF
+            q_move_bytes.pop();
+        }
 
-        let p_fen = Fen::from_ascii(p_bytes.as_slice()).unwrap();
-        let q_fen = Fen::from_ascii(q_bytes.as_slice()).unwrap();
-        let r_fen = Fen::from_ascii(r_bytes.as_slice()).unwrap();
-
+        let p_fen = Fen::from_ascii(p_fen_bytes.as_slice()).unwrap();
         let p_position: Chess = p_fen.into_position(CastlingMode::Standard).unwrap();
-        let q_position: Chess = q_fen.into_position(CastlingMode::Standard).unwrap();
-        let r_position: Chess = r_fen.into_position(CastlingMode::Standard).unwrap();
+        let moves = p_position.legal_moves();
+
+        if Uci::from_ascii(q_move_bytes.as_slice()).is_err() {
+            eprintln!(
+                "Invalid UCI move fen={} move={:?}",
+                Fen(p_position.clone().into_setup(EnPassantMode::Legal)),
+                q_move_bytes
+            );
+            panic!("Invalid UCI move: {:?}", q_move_bytes);
+        }
+
+        let q_move = Uci::from_ascii(q_move_bytes.as_slice())
+            .unwrap()
+            .to_move(&p_position)
+            .unwrap();
+        let q_position = p_position.clone().play(&q_move).unwrap();
+
+        // find a random r position
+        let r_position = loop {
+            let r_move = moves.choose(&mut rng).unwrap().clone();
+            if r_move == q_move {
+                // r != q
+                continue;
+            }
+
+            break p_position.clone().play(&r_move).unwrap();
+        };
 
         feature_set.encode(p_position.board(), p_position.turn(), write);
         feature_set.encode(q_position.board(), q_position.turn(), write);

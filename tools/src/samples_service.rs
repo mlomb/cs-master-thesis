@@ -44,6 +44,7 @@ pub struct SamplesServiceCommand {
 
 #[derive(Subcommand)]
 pub enum MethodSubcommand {
+    /// Given a transition P → Q in a game, R is selected from a legal move from P while R != Q.
     PQR,
 }
 

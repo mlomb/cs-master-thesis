@@ -40,8 +40,7 @@ pub struct BuildDatasetCommand {
 
 #[derive(Subcommand)]
 pub enum MethodSubcommand {
-    /// Generates a dataset with three columns: FEN strings of the positions P, Q and R.
-    /// Given a transition P → Q in a game, R is selected from a legal move from P while R != Q.
+    /// Generates a dataset with two columns: FEN string of a position, the observed move for the position.
     PQR,
     /// Generates a dataset with three columns: FEN string of a position, its score and the best move (both given by the engine)
     Eval(EvalArgs),
