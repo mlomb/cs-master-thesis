@@ -1,41 +1,38 @@
-import subprocess
-import numpy as np
+import math
 import torch
+import numpy as np
+import subprocess
 from multiprocessing.shared_memory import SharedMemory
 
 class SamplesService:
-    def __init__(self, batch_size):
+    def __init__(self, batch_shape: tuple, feature_set: str):
         """
         Initializes the SamplesService class.
 
         Args:
             batch_size: The batch size to use.
         """
-
-        
-        size = batch_size * 3 * 12 * 8
+        batch_size = batch_shape[0]
+        buffer_size = math.prod(batch_shape) * 8 # Method for now is PQR
 
         # Create the shared memory file.
-        self.shmem = SharedMemory(create=True, size=size)
+        self.shmem = SharedMemory(create=True, size=buffer_size)
 
         # Start the program subprocess.
         args = [
             "../tools/target/release/tools",
             "samples-service",
-            "--inputs=/mnt/c/pqr/2023-12.csv",
-            "--inputs=/mnt/c/pqr/2023-11.csv",
+
+            "--inputs=/mnt/d/datasets/pqr-1700/lichess_db_standard_rated_2013-01.csv",
             "--shmem=" + self.shmem.name,
             "--batch-size=" + str(batch_size),
-            "--feature-set=basic",
+            "--feature-set=" + feature_set,
             "pqr"
         ]
         self.program = subprocess.Popen(args, stdout=subprocess.PIPE, stdin=subprocess.PIPE)
 
         # Initialize the numpy array using the shared memory as buffer.
-        self.data = np.frombuffer(
-            buffer=self.shmem.buf,
-            dtype=np.int64
-        ).reshape((batch_size, 3 * 12))
+        self.data = np.frombuffer(buffer=self.shmem.buf, dtype=np.int64).reshape(batch_shape)
 
     def next_batch(self):
         """

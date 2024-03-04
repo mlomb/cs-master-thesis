@@ -1,6 +1,6 @@
 use crate::method::ReadSample;
 use clap::{Args, Subcommand, ValueEnum};
-use nn::feature_set::{basic::Basic, FeatureSet};
+use nn::feature_set::{basic::Basic, halfkp::HalfKP, FeatureSet};
 use shared_memory::ShmemConf;
 use std::{
     error::Error,
@@ -55,7 +55,7 @@ pub fn samples_service(cmd: SamplesServiceCommand) -> Result<(), Box<dyn Error>>
     // initialize feature set
     let feature_set: Box<dyn FeatureSet> = match cmd.feature_set {
         FeatureSetChoice::Basic => Box::new(Basic::new()),
-        FeatureSetChoice::HalfKP => todo!(),
+        FeatureSetChoice::HalfKP => Box::new(HalfKP::new()),
         FeatureSetChoice::TopK20 => todo!(),
     };
 

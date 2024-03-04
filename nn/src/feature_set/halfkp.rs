@@ -5,6 +5,12 @@ use shakmaty::{Board, Color, Role};
 /// Tuple: <our_king_square, piece_square, piece_role (w/o king), piece_color>
 pub struct HalfKP;
 
+impl HalfKP {
+    pub fn new() -> Self {
+        HalfKP
+    }
+}
+
 impl FeatureSet for HalfKP {
     fn num_features(&self) -> usize {
         64 * 64 * 5 * 2 // 40960
@@ -20,7 +26,7 @@ impl FeatureSet for HalfKP {
                 continue;
             }
 
-            let p_idx = piece.role as u16 * 2 + piece.color as u16;
+            let p_idx = (piece.role as u16 - 1) * 2 + piece.color as u16;
             let halfkp_idx = square as u16 + (p_idx + king_square as u16 * 10) * 64;
 
             active_features.push(halfkp_idx);
