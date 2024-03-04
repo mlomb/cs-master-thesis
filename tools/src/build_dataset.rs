@@ -67,7 +67,7 @@ pub fn build_dataset(cmd: BuildDatasetCommand) -> Result<(), Box<dyn Error>> {
     let output_file = File::create(cmd.output.clone())?;
     let mut writer: Box<dyn io::Write> = if cmd.compress {
         // the encoder is buffered internally
-        Box::new(Encoder::new(output_file, 3)?)
+        Box::new(Encoder::new(output_file, 3)?.auto_finish())
     } else {
         Box::new(BufWriter::new(output_file))
     };
