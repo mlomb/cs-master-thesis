@@ -19,7 +19,7 @@ enum FeatureSetChoice {
 
 #[derive(Args)]
 pub struct SamplesServiceCommand {
-    /// List of CSV files to read games.
+    /// List of .csv or .csv.zst files to read samples.
     /// CSVs must be generated using the `build-dataset` command
     #[arg(long, value_name = "input", required = true)]
     inputs: Vec<String>,
@@ -34,7 +34,7 @@ pub struct SamplesServiceCommand {
     feature_set: FeatureSetChoice,
 
     /// Batch size
-    #[arg(long, default_value = "4096")]
+    #[arg(long, default_value = "32")]
     batch_size: usize,
 
     /// Method to use
