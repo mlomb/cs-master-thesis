@@ -4,9 +4,8 @@ use rand::{seq::SliceRandom, Rng};
 use shakmaty::uci::Uci;
 use shakmaty::CastlingMode;
 use shakmaty::{fen::Fen, Chess, EnPassantMode, Position};
+use std::io::BufRead;
 use std::io::{self, Write};
-use std::io::{BufRead, Cursor};
-use std::io::{BufReader, Read};
 
 pub struct PQR;
 
@@ -55,8 +54,8 @@ impl ReadSample for PQR {
 
     fn read_sample(
         &mut self,
-        read: &mut BufReader<Box<dyn Read>>,
-        write: &mut Cursor<&mut [u8]>,
+        read: &mut dyn BufRead,
+        write: &mut dyn Write,
         feature_set: &Box<dyn FeatureSet>,
     ) {
         let mut rng = rand::thread_rng();
@@ -76,15 +75,6 @@ impl ReadSample for PQR {
         let p_fen = Fen::from_ascii(p_fen_bytes.as_slice()).unwrap();
         let p_position: Chess = p_fen.into_position(CastlingMode::Standard).unwrap();
         let moves = p_position.legal_moves();
-
-        if Uci::from_ascii(q_move_bytes.as_slice()).is_err() {
-            eprintln!(
-                "Invalid UCI move fen={} move={:?}",
-                Fen(p_position.clone().into_setup(EnPassantMode::Legal)),
-                q_move_bytes
-            );
-            panic!("Invalid UCI move: {:?}", q_move_bytes);
-        }
 
         let q_move = Uci::from_ascii(q_move_bytes.as_slice())
             .unwrap()
