@@ -49,9 +49,6 @@ pub enum MethodSubcommand {
 }
 
 pub fn samples_service(cmd: SamplesServiceCommand) -> Result<(), Box<dyn Error>> {
-    // open shared memory file
-    let mut shmem = ShmemConf::new().os_id(cmd.shmem).open()?;
-
     // initialize feature set
     let feature_set: Box<dyn FeatureSet> = match cmd.feature_set {
         FeatureSetChoice::Basic => Box::new(Basic::new()),
@@ -63,14 +60,15 @@ pub fn samples_service(cmd: SamplesServiceCommand) -> Result<(), Box<dyn Error>>
         MethodSubcommand::PQR => PQR::new(),
     };
 
-    let expected_size = method.sample_size(&feature_set) * cmd.batch_size;
+    // open shared memory file
+    let mut shmem = ShmemConf::new().os_id(cmd.shmem).open()?;
 
-    assert_eq!(shmem.len(), expected_size);
-    let mut cursor = Cursor::new(unsafe { shmem.as_slice_mut() });
+    // initialize backbuffer
+    let buffer = vec![0u8; method.sample_size(&feature_set) * cmd.batch_size];
+    // make sure sizes match
+    assert_eq!(shmem.len(), buffer.len());
 
-    //let mut a = vec![0u8; expected_size];
-    //let mut cursor = Cursor::new(a.as_mut_slice());
-
+    let mut cursor = Cursor::new(buffer);
     let mut in_batch = 0;
 
     // loop over the dataset indefinitely
@@ -95,17 +93,19 @@ pub fn samples_service(cmd: SamplesServiceCommand) -> Result<(), Box<dyn Error>>
                 in_batch += 1;
 
                 if in_batch == cmd.batch_size {
+                    // now we wait for the consumer to signal that it has finished copying the data (1 byte)
+                    io::stdin().read_exact(&mut [0])?;
+
+                    // copy buffer into shared memory and reset
+                    cursor.rewind()?;
+                    cursor.read_exact(unsafe { shmem.as_slice_mut() })?;
+                    cursor.rewind()?;
+                    in_batch = 0;
+
                     // we have filled the current batch with samples
                     // send a signal to the consumer (1 byte)
                     io::stdout().write_all(&[64])?;
                     io::stdout().flush()?;
-
-                    // now we wait for the consumer to signal that it has finished copying the data (1 byte)
-                    io::stdin().read_exact(&mut [0])?;
-
-                    // reset cursor to the beginning
-                    cursor.rewind()?;
-                    in_batch = 0;
                 }
             }
         }

@@ -33,6 +33,23 @@ class SamplesService:
         # Initialize the numpy array using the shared memory as buffer.
         self.data = np.frombuffer(buffer=self.shmem.buf, dtype=np.int64).reshape(batch_shape)
 
+        # allow the generator to write the first batch
+        self.notify_ready_for_next()
+
+    def wait_until_ready(self):
+        """
+        Waits until the generator has written the next batch of samples into the shared memory.
+        """
+        self.program.stdout.read(1)
+
+    def notify_ready_for_next(self):
+        """
+        Notifies the generator that the shared memory is no longer being used (data already copied).
+        The generator can write a new batch into the shared memory.
+        """
+        self.program.stdin.write(b'\x00')
+        self.program.stdin.flush()
+
     def next_batch(self):
         """
         Gets the next batch of samples.
@@ -40,17 +57,15 @@ class SamplesService:
         Returns:
             A TensorFlow tensor containing the next batch of samples.
         """
-
-        # Wait until there is a byte in the stdout of the program (meaning data is ready).
-        self.program.stdout.read(1)
+        # Wait until batch is ready
+        self.wait_until_ready()
 
         # Create a PyTorch tensor using the numpy array.
         # This will copy the data into the device, so after this line we don't care about self.data
         tensor = torch.tensor(self.data, dtype=torch.int64, device='cuda')
 
-        # Write a byte into the program's stdin, so it can start working on the next batch.
-        self.program.stdin.write(b'\x00')
-        self.program.stdin.flush()
+        # Liberate the shared memory for the generator to use.
+        self.notify_ready_for_next()
 
         # Return the TensorFlow tensor.
         return tensor
