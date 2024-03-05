@@ -48,14 +48,19 @@ impl WriteSample for PQR {
 }
 
 impl ReadSample for PQR {
-    fn sample_size(&self, feature_set: &Box<dyn FeatureSet>) -> usize {
+    fn x_size(&self, feature_set: &Box<dyn FeatureSet>) -> usize {
         feature_set.encoded_size() * 3
+    }
+
+    fn y_size(&self) -> usize {
+        0
     }
 
     fn read_sample(
         &mut self,
         read: &mut dyn BufRead,
-        write: &mut dyn Write,
+        write_x: &mut dyn Write,
+        write_y: &mut dyn Write,
         feature_set: &Box<dyn FeatureSet>,
     ) {
         let mut rng = rand::thread_rng();
@@ -93,8 +98,8 @@ impl ReadSample for PQR {
             break p_position.clone().play(&r_move).unwrap();
         };
 
-        feature_set.encode(p_position.board(), p_position.turn(), write);
-        feature_set.encode(q_position.board(), q_position.turn(), write);
-        feature_set.encode(r_position.board(), r_position.turn(), write);
+        feature_set.encode(p_position.board(), p_position.turn(), write_x);
+        feature_set.encode(q_position.board(), q_position.turn(), write_x);
+        feature_set.encode(r_position.board(), r_position.turn(), write_x);
     }
 }

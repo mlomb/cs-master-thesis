@@ -1,10 +1,10 @@
+use super::{ReadSample, WriteSample};
 use crate::uci_engine::{Score, UciEngine};
-
-use super::WriteSample;
 use clap::Args;
+use nn::feature_set::FeatureSet;
 use rand::seq::SliceRandom;
-use shakmaty::{fen::Fen, Chess, EnPassantMode, Position};
-use std::io::{self, Write};
+use shakmaty::{fen::Fen, CastlingMode, Chess, EnPassantMode, Position};
+use std::io::{self, BufRead, Write};
 
 #[derive(Args, Clone)]
 pub struct EvalArgs {
@@ -53,5 +53,58 @@ impl WriteSample for Eval {
             },
             res.best_move
         )
+    }
+}
+
+impl ReadSample for Eval {
+    fn x_size(&self, feature_set: &Box<dyn FeatureSet>) -> usize {
+        feature_set.encoded_size() * 3
+    }
+
+    fn y_size(&self) -> usize {
+        4
+    }
+
+    fn read_sample(
+        &mut self,
+        read: &mut dyn BufRead,
+        write_x: &mut dyn Write,
+        write_y: &mut dyn Write,
+        feature_set: &Box<dyn FeatureSet>,
+    ) {
+        loop {
+            let mut fen_bytes = Vec::with_capacity(128);
+            let mut score_bytes = Vec::with_capacity(16);
+            let mut bestmove_bytes = Vec::with_capacity(16); // unused
+
+            read.read_until(b',', &mut fen_bytes).unwrap();
+            read.read_until(b',', &mut score_bytes).unwrap();
+            read.read_until(b'\n', &mut bestmove_bytes).unwrap();
+
+            // remove trailing comma
+            fen_bytes.pop();
+            score_bytes.pop();
+
+            let score_str = String::from_utf8_lossy(&score_bytes);
+            let score = if let Ok(score) = score_str.parse::<i32>() {
+                Score::Cp(score)
+            } else {
+                Score::Mate(score_str[1..].parse::<i32>().unwrap())
+            };
+
+            if let Score::Cp(cp_score) = score {
+                let p_fen = Fen::from_ascii(fen_bytes.as_slice()).unwrap();
+                let p_position: Chess = p_fen.into_position(CastlingMode::Standard).unwrap();
+
+                feature_set.encode(p_position.board(), p_position.turn(), write_x);
+                write_y
+                    .write_all(&f32::to_le_bytes(cp_score as f32))
+                    .unwrap();
+
+                return;
+            }
+
+            // else skip mate scores
+        }
     }
 }

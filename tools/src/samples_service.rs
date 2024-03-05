@@ -62,13 +62,19 @@ pub fn samples_service(cmd: SamplesServiceCommand) -> Result<(), Box<dyn Error>>
 
     // open shared memory file
     let mut shmem = ShmemConf::new().os_id(cmd.shmem).open()?;
+    let mut shmem_slice = unsafe { shmem.as_slice_mut() };
+
+    let x_size = method.x_size(&feature_set) * cmd.batch_size;
+    let y_size = method.y_size() * cmd.batch_size;
 
     // initialize backbuffer
-    let buffer = vec![0u8; method.sample_size(&feature_set) * cmd.batch_size];
+    let x_buffer = vec![0u8; x_size];
+    let y_buffer = vec![0u8; y_size];
     // make sure sizes match
-    assert_eq!(shmem.len(), buffer.len());
+    assert_eq!(shmem_slice.len(), x_buffer.len() + y_buffer.len());
 
-    let mut cursor = Cursor::new(buffer);
+    let mut x_cursor = Cursor::new(x_buffer);
+    let mut y_cursor = Cursor::new(y_buffer);
     let mut in_batch = 0;
 
     // loop over the dataset indefinitely
@@ -89,7 +95,7 @@ pub fn samples_service(cmd: SamplesServiceCommand) -> Result<(), Box<dyn Error>>
             // loop for every sample in file
             while reader.has_data_left()? {
                 // write sample
-                method.read_sample(&mut reader, &mut cursor, &feature_set);
+                method.read_sample(&mut reader, &mut x_cursor, &mut y_cursor, &feature_set);
                 in_batch += 1;
 
                 if in_batch == cmd.batch_size {
@@ -97,9 +103,14 @@ pub fn samples_service(cmd: SamplesServiceCommand) -> Result<(), Box<dyn Error>>
                     io::stdin().read_exact(&mut [0])?;
 
                     // copy buffer into shared memory and reset
-                    cursor.rewind()?;
-                    cursor.read_exact(unsafe { shmem.as_slice_mut() })?;
-                    cursor.rewind()?;
+                    x_cursor.rewind()?;
+                    y_cursor.rewind()?;
+
+                    x_cursor.read_exact(&mut shmem_slice[..x_size])?;
+                    y_cursor.read_exact(&mut shmem_slice[x_size..])?;
+
+                    x_cursor.rewind()?;
+                    y_cursor.rewind()?;
                     in_batch = 0;
 
                     // we have filled the current batch with samples

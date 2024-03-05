@@ -13,12 +13,14 @@ pub trait WriteSample {
 }
 
 pub trait ReadSample {
-    fn sample_size(&self, feature_set: &Box<dyn FeatureSet>) -> usize;
+    fn x_size(&self, feature_set: &Box<dyn FeatureSet>) -> usize;
+    fn y_size(&self) -> usize;
 
     fn read_sample(
         &mut self,
         read: &mut dyn BufRead,
-        write: &mut dyn Write,
+        write_x: &mut dyn Write,
+        write_y: &mut dyn Write,
         feature_set: &Box<dyn FeatureSet>,
     );
 }
