@@ -5,7 +5,7 @@ import subprocess
 from multiprocessing.shared_memory import SharedMemory
 
 class SamplesService:
-    def __init__(self, batch_shape: tuple, feature_set: str):
+    def __init__(self, batch_shape: tuple, feature_set: str, inputs: list[str]):
         """
         Initializes the SamplesService class.
 
@@ -22,8 +22,7 @@ class SamplesService:
         args = [
             "../tools/target/release/tools",
             "samples-service",
-
-            "--inputs=/mnt/d/datasets/pqr-1700/lichess_db_standard_rated_2013-01.csv",
+        ] + [f"--inputs={i}" for i in inputs] + [
             "--shmem=" + self.shmem.name,
             "--batch-size=" + str(batch_size),
             "--feature-set=" + feature_set,
