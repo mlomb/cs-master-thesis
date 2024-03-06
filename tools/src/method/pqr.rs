@@ -9,12 +9,6 @@ use std::io::{self, Write};
 
 pub struct PQR;
 
-impl PQR {
-    pub fn new() -> Self {
-        PQR
-    }
-}
-
 impl WriteSample for PQR {
     fn write_sample(&mut self, write: &mut dyn Write, positions: &Vec<Chess>) -> io::Result<()> {
         let mut rng = rand::thread_rng();

@@ -5,18 +5,13 @@ import subprocess
 from multiprocessing.shared_memory import SharedMemory
 
 class SamplesService:
-    def __init__(self, batch_shape: tuple, feature_set: str, inputs: list[str]):
-        """
-        Initializes the SamplesService class.
-
-        Args:
-            batch_size: The batch size to use.
-        """
-        batch_size = batch_shape[0]
-        buffer_size = math.prod(batch_shape) * 8 # Method for now is PQR
+    def __init__(self, x_shape: tuple, y_shape: tuple, inputs: list[str], feature_set: str, method: str):
+        batch_size = x_shape[0]
+        x_size = math.prod(x_shape) * 8 # 8 bytes per int64
+        y_size = math.prod(y_shape) * 4 # 4 bytes per float32
 
         # Create the shared memory file.
-        self.shmem = SharedMemory(create=True, size=buffer_size)
+        self.shmem = SharedMemory(create=True, size=x_size + y_size)
 
         # Start the program subprocess.
         args = [
@@ -26,12 +21,19 @@ class SamplesService:
             "--shmem=" + self.shmem.name,
             "--batch-size=" + str(batch_size),
             "--feature-set=" + feature_set,
-            "pqr"
+            method
         ]
         self.program = subprocess.Popen(args, stdout=subprocess.PIPE, stdin=subprocess.PIPE)
 
         # Initialize the numpy array using the shared memory as buffer.
-        self.data = np.frombuffer(buffer=self.shmem.buf, dtype=np.int64).reshape(batch_shape)
+        self.data = np.frombuffer(buffer=self.shmem.buf, dtype=np.int8)
+        r = np.split(self.data, np.array([
+            x_size,
+            x_size + y_size
+        ]))
+
+        self.x = r[0].view(dtype=np.int64).reshape(x_shape)
+        self.y = r[1].view(dtype=np.float32).reshape(y_shape)
 
         # allow the generator to write the first batch
         self.notify_ready_for_next()
@@ -60,15 +62,16 @@ class SamplesService:
         # Wait until batch is ready
         self.wait_until_ready()
 
-        # Create a PyTorch tensor using the numpy array.
-        # This will copy the data into the device, so after this line we don't care about self.data
-        tensor = torch.tensor(self.data, dtype=torch.int64, device='cuda')
+        # Create PyTorch tensors using the numpy arrays.
+        # This will copy the data into the device, so after this line we don't care about self.data/x/y
+        x_tensor = torch.tensor(self.x, dtype=torch.int64, device='cuda')
+        y_tensor = torch.tensor(self.y, dtype=torch.float32, device='cuda')
 
         # Liberate the shared memory for the generator to use.
         self.notify_ready_for_next()
 
-        # Return the TensorFlow tensor.
-        return tensor
+        # Return the TensorFlow tensors.
+        return x_tensor, y_tensor
 
     def __del__(self):
         """
@@ -77,7 +80,9 @@ class SamplesService:
         print("Samples service cleanup")
 
         # Kill the subprocess and close the shared memory.
-        self.data = None
         self.program.kill()
         self.program.wait()
+        self.x = None
+        self.y = None
+        self.data = None
         self.shmem.close()

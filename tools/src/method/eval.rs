@@ -56,9 +56,11 @@ impl WriteSample for Eval {
     }
 }
 
-impl ReadSample for Eval {
+pub struct EvalRead;
+
+impl ReadSample for EvalRead {
     fn x_size(&self, feature_set: &Box<dyn FeatureSet>) -> usize {
-        feature_set.encoded_size() * 3
+        feature_set.encoded_size() * 1
     }
 
     fn y_size(&self) -> usize {

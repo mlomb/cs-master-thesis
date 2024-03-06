@@ -81,7 +81,7 @@ pub fn build_dataset(cmd: BuildDatasetCommand) -> Result<(), Box<dyn Error>> {
     let mut count = 0;
 
     let mut method: Box<dyn WriteSample> = match &cmd.subcommand {
-        MethodSubcommand::PQR => Box::new(PQR::new()),
+        MethodSubcommand::PQR => Box::new(PQR {}),
         MethodSubcommand::Eval(args) => Box::new(Eval::new(args.clone())),
         MethodSubcommand::StatsTopK => Box::new(StatsTopK::new()),
     };

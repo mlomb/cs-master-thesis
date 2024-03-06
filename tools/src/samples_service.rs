@@ -1,4 +1,4 @@
-use crate::method::ReadSample;
+use crate::method::{eval::EvalRead, ReadSample};
 use clap::{Args, Subcommand, ValueEnum};
 use nn::feature_set::{basic::Basic, halfkp::HalfKP, FeatureSet};
 use shared_memory::ShmemConf;
@@ -46,6 +46,8 @@ pub struct SamplesServiceCommand {
 pub enum MethodSubcommand {
     /// Given a transition P → Q in a game, R is selected from a legal move from P while R != Q.
     PQR,
+    ///
+    Eval,
 }
 
 pub fn samples_service(cmd: SamplesServiceCommand) -> Result<(), Box<dyn Error>> {
@@ -56,13 +58,14 @@ pub fn samples_service(cmd: SamplesServiceCommand) -> Result<(), Box<dyn Error>>
         FeatureSetChoice::TopK20 => todo!(),
     };
 
-    let mut method = match cmd.subcommand {
-        MethodSubcommand::PQR => PQR::new(),
+    let mut method: Box<dyn ReadSample> = match cmd.subcommand {
+        MethodSubcommand::PQR => Box::new(PQR {}),
+        MethodSubcommand::Eval => Box::new(EvalRead {}),
     };
 
     // open shared memory file
     let mut shmem = ShmemConf::new().os_id(cmd.shmem).open()?;
-    let mut shmem_slice = unsafe { shmem.as_slice_mut() };
+    let shmem_slice = unsafe { shmem.as_slice_mut() };
 
     let x_size = method.x_size(&feature_set) * cmd.batch_size;
     let y_size = method.y_size() * cmd.batch_size;
