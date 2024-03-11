@@ -41,6 +41,8 @@ impl NNModel {
             .with_intra_threads(1)?
             .with_model_from_memory(buffer)?;
 
+        unreachable!()
+        /*
         Ok(Self {
             onnx_model: session,
 
@@ -87,6 +89,7 @@ impl NNModel {
             h3: [0.0; 256],
             h4: [0.0; 1],
         })
+         */
     }
 
     pub fn evaluate(&mut self, pos: &Position) -> Value {

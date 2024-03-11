@@ -1,3 +1,12 @@
+mod defs;
+mod eval;
+mod nn2;
+mod nn3;
+mod position;
+mod pv;
+mod search;
+mod tt;
+
 use eval::NNModel;
 use search::Search;
 use shakmaty::fen::Fen;
@@ -14,7 +23,7 @@ fn main() -> ort::Result<()> {
     //    .commit()?;
 
     let nn_model =
-        NNModel::from_memory(include_bytes!("../../models/rq-mse-256-clipped-0.496.onnx"))?;
+        NNModel::from_memory(include_bytes!("/mnt/c/Users/mlomb/Desktop/Tesis/cs-master-thesis/notebooks/runs/20240309_133406_eval_basic_4096/models/343.json"))?;
     let mut search = Search::new(nn_model);
 
     let mut position: Chess = Chess::default();

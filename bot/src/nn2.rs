@@ -269,6 +269,8 @@ mod tests {
 
     #[test]
     fn test_dense_layer() {
+        unreachable!();
+        /*
         let v: Value = serde_json::from_str(include_str!(
             //"/mnt/c/Users/mlomb/Desktop/Tesis/cs-master-thesis/notebooks/tflite_model.json"
             "/mnt/c/Users/mlomb/Desktop/Tesis/cs-master-thesis/notebooks/rq-mse-256-clipped-0.496.json"
@@ -459,5 +461,6 @@ mod tests {
 
         println!("ms = {}", ms as f32 / 1000.0);
         println!("output = {:?}", h4.as_slice());
+         */
     }
 }
