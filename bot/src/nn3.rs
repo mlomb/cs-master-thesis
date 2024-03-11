@@ -7,6 +7,8 @@ use std::{
 #[cfg(target_arch = "x86_64")]
 use std::arch::x86_64::*;
 
+use serde_json::Value;
+
 /// Memory is aligned to 32 bits
 pub struct Tensor<T> {
     layout: Layout,
@@ -175,6 +177,8 @@ impl FullyConnectedQuantized {
                 }
             }
 
+            println!("intermediate = {:?}", self.intermediate.as_slice());
+
             assert!(self.activation == Activation::ClippedReLU);
             /*
             for i in 0..self.num_outputs {
@@ -204,20 +208,18 @@ impl FullyConnectedQuantized {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use serde_json::Value;
-    use std::fs::File;
+struct SequentialModel {
+    layers: Vec<FullyConnectedQuantized>,
+    buffers: Vec<Tensor<i8>>,
+}
 
-    #[test]
-    fn test_nn3() {
-        let model_path = "/mnt/c/Users/mlomb/Desktop/Tesis/cs-master-thesis/notebooks/runs/20240310_220627_eval_basic_4096/models/0.json";
+impl SequentialModel {
+    pub fn load(model_path: &str) -> Self {
         let content = std::fs::read_to_string(model_path).expect("file should be read");
         let json: serde_json::Value =
             serde_json::from_str(&content.as_str()).expect("file should be proper JSON");
 
-        let layers = json
+        let layers_data = json
             .get("layers")
             .expect("layers missing from json")
             .as_array()
@@ -242,7 +244,10 @@ mod tests {
             )
         }
 
-        for layer_data in layers {
+        let mut layers = vec![];
+        let mut buffers = vec![];
+
+        for layer_data in layers_data {
             let num_inputs = layer_data
                 .get("num_inputs")
                 .expect("num_inputs missing")
@@ -264,9 +269,80 @@ mod tests {
             };
 
             let layer = FullyConnectedQuantized::new(weights, bias, activation);
-
             assert_eq!(layer.num_inputs, num_inputs as usize);
             assert_eq!(layer.num_outputs, num_outputs as usize);
+            layers.push(layer);
+
+            buffers.push(Tensor::zeros(num_outputs as usize));
         }
+
+        Self { layers, buffers }
+    }
+
+    pub fn forward(&self, input: &Tensor<i8>) -> &Tensor<i8> {
+        let mut input = input.as_slice();
+        for i in 0..self.layers.len() {
+            self.layers[i].forward(input, self.buffers[i].as_mut_slice());
+            input = self.buffers[i].as_slice();
+        }
+        self.buffers.last().unwrap()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::Value;
+    use std::fs::File;
+
+    #[test]
+    fn test_nn3() {
+        let model = SequentialModel::load("/mnt/c/Users/mlomb/Desktop/Tesis/cs-master-thesis/notebooks/runs/20240310_220627_eval_basic_4096/models/0.json");
+
+        let mut ms = 0;
+
+        for _ in 0..1000 {
+            let start = std::time::Instant::now();
+            for _ in 0..1000 {
+                model.forward(&Tensor::from_slice(&[
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 127, 127, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 127, 127,
+                    127, 0, 0, 127, 127, 127, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 127, 0, 0, 0, 0,
+                    127, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 127, 0, 0, 127, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 127, 0, 0, 0, 0, 0, 0,
+                    127, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 127, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 127, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 127, 127, 127, 127, 0, 127, 127, 127, 0, 0, 0, 0, 127, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 127, 0, 0, 0, 0, 127, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 127, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 127, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 127, 0, 0, 0, 0, 0, 0, 127, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 127, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    127, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                ]));
+
+                break;
+            }
+            ms += start.elapsed().as_millis();
+            break;
+        }
+
+        println!("ms = {}", ms as f32 / 1000.0);
     }
 }
