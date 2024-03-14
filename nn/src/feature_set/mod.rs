@@ -10,7 +10,7 @@ pub trait FeatureSet {
     fn num_features(&self) -> usize;
 
     /// Computes the initial features for the given board and perspective (potentially expensive)
-    fn init(&self, board: &Board, color: Color, features: &mut Vec<u16>);
+    fn init(&self, board: &Board, features: &mut Vec<u16>);
 
     // TODO: accum
 }
@@ -20,10 +20,10 @@ impl dyn FeatureSet {
         self.num_features().div_ceil(64) * 8
     }
 
-    pub fn encode(&self, board: &Board, color: Color, write: &mut dyn Write) {
+    pub fn encode(&self, board: &Board, write: &mut dyn Write) {
         // extract features from position
         let mut features = vec![];
-        self.init(board, color, &mut features);
+        self.init(board, &mut features);
 
         // write into bits of a u64 buffer
         let mut buffer = vec![0u64; self.num_features().div_ceil(64)];

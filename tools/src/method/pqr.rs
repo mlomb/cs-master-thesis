@@ -92,8 +92,8 @@ impl ReadSample for PQR {
             break p_position.clone().play(&r_move).unwrap();
         };
 
-        feature_set.encode(p_position.board(), p_position.turn(), write_x);
-        feature_set.encode(q_position.board(), q_position.turn(), write_x);
-        feature_set.encode(r_position.board(), r_position.turn(), write_x);
+        //feature_set.encode(p_position.board(), p_position.turn(), write_x);
+        //feature_set.encode(q_position.board(), q_position.turn(), write_x);
+        //feature_set.encode(r_position.board(), r_position.turn(), write_x);
     }
 }

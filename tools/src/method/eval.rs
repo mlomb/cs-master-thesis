@@ -3,7 +3,7 @@ use crate::uci_engine::{Score, UciEngine};
 use clap::Args;
 use nn::feature_set::FeatureSet;
 use rand::seq::SliceRandom;
-use shakmaty::{fen::Fen, CastlingMode, Chess, EnPassantMode, Position};
+use shakmaty::{fen::Fen, CastlingMode, Chess, Color, EnPassantMode, Position};
 use std::io::{self, BufRead, Write};
 
 #[derive(Args, Clone)]
@@ -60,7 +60,7 @@ pub struct EvalRead;
 
 impl ReadSample for EvalRead {
     fn x_size(&self, feature_set: &Box<dyn FeatureSet>) -> usize {
-        feature_set.encoded_size() * 1
+        feature_set.encoded_size() * 2
     }
 
     fn y_size(&self) -> usize {
@@ -98,7 +98,24 @@ impl ReadSample for EvalRead {
                 let p_fen = Fen::from_ascii(fen_bytes.as_slice()).unwrap();
                 let p_position: Chess = p_fen.into_position(CastlingMode::Standard).unwrap();
 
-                feature_set.encode(p_position.board(), p_position.turn(), write_x);
+                let mut board = p_position.board().clone();
+                if p_position.turn() == Color::Black {
+                    // make sure to flip the board vertically and swap colors if black is to play
+                    // so it's always from white's POV
+                    board.flip_vertical();
+                    board.swap_colors();
+                }
+
+                // write side to move
+                feature_set.encode(&board, write_x);
+
+                // write side not to move
+                // flip board and swap colors
+                board.flip_vertical();
+                board.swap_colors();
+                feature_set.encode(&board, write_x);
+
+                // side to move score
                 write_y
                     .write_all(&f32::to_le_bytes(cp_score as f32))
                     .unwrap();

@@ -16,17 +16,8 @@ impl FeatureSet for Basic {
         64 * 6 * 2 // 768
     }
 
-    fn init(&self, board: &Board, color: Color, active_features: &mut Vec<u16>) {
+    fn init(&self, board: &Board, active_features: &mut Vec<u16>) {
         assert!(active_features.is_empty());
-
-        let mut board = board.clone();
-
-        if color == Color::Black {
-            // make sure to flip the board vertically and swap colors if black is to play
-            // so it's always from white's POV
-            board.flip_vertical();
-            board.swap_colors();
-        }
 
         for (square, piece) in board.clone().into_iter() {
             let channel = match piece.color {

@@ -16,10 +16,10 @@ impl FeatureSet for HalfKP {
         64 * 64 * 5 * 2 // 40960
     }
 
-    fn init(&self, board: &Board, color: Color, active_features: &mut Vec<u16>) {
+    fn init(&self, board: &Board, active_features: &mut Vec<u16>) {
         active_features.clear();
 
-        let king_square = board.king_of(color).unwrap();
+        let king_square = board.king_of(Color::White).unwrap();
 
         for (square, piece) in board.clone().into_iter() {
             if piece.role == Role::King {
