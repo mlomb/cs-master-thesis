@@ -1,2 +1,2 @@
-pub mod accumulator;
 pub mod feature_set;
+pub mod nnue;
