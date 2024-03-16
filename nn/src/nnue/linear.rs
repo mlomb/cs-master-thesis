@@ -3,7 +3,7 @@ use std::arch::x86_64::*;
 
 const LOG2_WEIGHT_SCALE: i32 = 6; // 2^6 = 64
 
-/// Linear layer
+/// Quantized linear layer with 8-bit weights and 32-bits bias
 /// https://github.com/official-stockfish/nnue-pytorch/blob/master/docs/nnue.md#linear-layer-4
 pub unsafe fn linear(
     num_inputs: usize,
@@ -13,6 +13,19 @@ pub unsafe fn linear(
     bias: *const i32,
     output: *mut i32,
 ) {
+    if num_outputs == 1 {
+        // special case when there is only one output (probably final layer)
+        let mut outval = *bias;
+        for i in 0..num_inputs {
+            let val1 = *input.add(i);
+            let val2 = *weight.add(i);
+            outval += (val1 as i32) * (val2 as i32); // NOTE: it is important to do calculations in i32
+        }
+        // account for weight scaling
+        *output = outval >> 4; // /16
+        return;
+    }
+
     const REGISTER_WIDTH: usize = 256 / 8;
 
     assert!(num_inputs % REGISTER_WIDTH == 0); // processing 32 elements at a time

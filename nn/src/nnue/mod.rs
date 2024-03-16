@@ -4,28 +4,76 @@ mod linear;
 mod tensor;
 
 use self::accumulator::NnueAccumulator;
-use self::crelu::crelu_16;
+use self::crelu::{crelu_16, crelu_32};
 use self::linear::linear;
 use self::tensor::Tensor;
 use shakmaty::Color;
 use std::fs::File;
 use std::io::{Cursor, Read};
 
-#[cfg(target_arch = "x86_64")]
-use std::arch::x86_64::*;
-
 const FT: usize = 256;
 const L1: usize = 32;
 const L2: usize = 32;
 const LO: usize = 1;
 
-struct NnueModel {
-    accum: NnueAccumulator,
-    buffer1: Tensor<i8>,
+struct LinearLayer {
+    num_inputs: usize,
+    num_outputs: usize,
 
-    linear1_weight: Tensor<i8>,
-    linear1_bias: Tensor<i32>,
-    linear1_buffer: Tensor<i32>,
+    // This buffer is used by the previous layer to prepare the data for this layer
+    input_buffer: Tensor<i8>,
+    // This buffer is used just after computing the linear layer, before applying the activation
+    intermediate_buffer: Tensor<i32>,
+
+    weight: Tensor<i8>,
+    bias: Tensor<i32>,
+}
+
+impl LinearLayer {
+    fn new(cursor: &mut Cursor<Vec<u8>>, num_inputs: usize, num_outputs: usize) -> Self {
+        Self {
+            num_inputs,
+            num_outputs,
+
+            input_buffer: Tensor::zeros(num_inputs),
+            intermediate_buffer: Tensor::zeros(num_outputs),
+
+            weight: Tensor::from_cursor(cursor, num_inputs * num_outputs).unwrap(),
+            bias: Tensor::from_cursor(cursor, num_outputs).unwrap(),
+        }
+    }
+
+    fn forward_linear(&self) {
+        unsafe {
+            linear(
+                self.num_inputs,
+                self.num_outputs,
+                self.input_buffer.as_ptr(),
+                self.weight.as_ptr(),
+                self.bias.as_ptr(),
+                self.intermediate_buffer.as_mut_ptr(),
+            );
+        }
+    }
+
+    fn forward_relu(&self, output: &Tensor<i8>) {
+        unsafe {
+            crelu_32(
+                self.num_outputs,
+                self.intermediate_buffer.as_ptr(),
+                output.as_mut_ptr(),
+            );
+        }
+    }
+}
+
+pub struct NnueModel {
+    accum: NnueAccumulator,
+
+    linear1: LinearLayer,
+    linear2: LinearLayer,
+    linear_out: LinearLayer,
+    output: Tensor<i32>,
 }
 
 impl NnueModel {
@@ -39,44 +87,33 @@ impl NnueModel {
         let ft_b: Tensor<i16> = Tensor::from_cursor(&mut cursor, FT)?;
         let accum = NnueAccumulator::new(ft_w, ft_b);
 
-        let linear1_weight: Tensor<i8> = Tensor::from_cursor(&mut cursor, 2 * FT * L1)?; // row-major
-        let linear1_bias: Tensor<i32> = Tensor::from_cursor(&mut cursor, L1)?;
-
         Ok(Self {
             accum,
-
-            buffer1: Tensor::zeros(2 * FT),
-            linear1_weight,
-            linear1_bias,
-            linear1_buffer: Tensor::zeros(L1),
+            linear1: LinearLayer::new(&mut cursor, 2 * FT, L1),
+            linear2: LinearLayer::new(&mut cursor, L1, L2),
+            linear_out: LinearLayer::new(&mut cursor, L2, LO),
+            output: Tensor::zeros(LO),
         })
     }
 
-    pub fn forward(&mut self, perspective: Color) {
+    pub fn forward(&mut self, perspective: Color) -> i32 {
         unsafe {
             let to_move_ft = self.accum.perspective(perspective).as_ptr();
             let not_to_move_ft = self.accum.perspective(perspective.other()).as_ptr();
 
-            let (to_move, not_to_move) = self.buffer1.as_mut_slice().split_at_mut(FT);
+            let (to_move, not_to_move) = self.linear1.input_buffer.as_mut_slice().split_at_mut(FT);
             crelu_16(FT, to_move_ft, to_move.as_mut_ptr());
             crelu_16(FT, not_to_move_ft, not_to_move.as_mut_ptr());
 
-            println!("to_move = {:?}", to_move);
-            println!("not_to_move = {:?}", not_to_move);
+            self.linear1.forward_linear();
+            self.linear1.forward_relu(&self.linear2.input_buffer);
 
-            println!("self.linear1_weight = {:?}", self.linear1_weight);
-            println!("self.linear1_bias = {:?}", self.linear1_bias);
+            self.linear2.forward_linear();
+            self.linear2.forward_relu(&self.linear_out.input_buffer);
 
-            linear(
-                2 * FT,
-                L1,
-                self.buffer1.as_ptr(),
-                self.linear1_weight.as_ptr(),
-                self.linear1_bias.as_ptr(),
-                self.linear1_buffer.as_mut_ptr(),
-            );
+            self.linear_out.forward_linear();
 
-            println!("linear1 = {:?}", self.linear1_buffer);
+            return self.linear_out.intermediate_buffer.as_slice()[0];
         }
     }
 
@@ -105,25 +142,24 @@ mod tests {
             137, 350, 81, 468, 405, 470, 250, 490, 220, 76, 548, 290, 72, 244, 394, 620, 63, 716,
             659, 314, 118, 728, 49, 662, 411, 605, 227, 168, 513, 7, 196, 275, 23,
         ];
+        nnue_model
+            .get_accumulator()
+            .refresh(&active_features, Color::White);
+        nnue_model
+            .get_accumulator()
+            .refresh(&active_features, Color::Black);
 
         let mut ms = 0;
 
         for _ in 0..1000 {
             let start = std::time::Instant::now();
             for _ in 0..1000 {
-                nnue_model
-                    .get_accumulator()
-                    .refresh(&active_features, Color::White);
-                nnue_model
-                    .get_accumulator()
-                    .refresh(&active_features, Color::Black);
                 nnue_model.forward(Color::White);
-                break;
             }
             ms += start.elapsed().as_millis();
-            break;
         }
 
+        println!("model output = {}", nnue_model.forward(Color::White));
         println!("ms = {}", ms as f32 / 1000.0);
     }
 }

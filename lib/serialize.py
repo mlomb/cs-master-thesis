@@ -1,7 +1,9 @@
 import torch
+import numpy as np
+from model import NnueModel
 
-class NNWriter:
-    def __init__(self, model):
+class NnueWriter:
+    def __init__(self, model: NnueModel):
         self.buf = bytearray()
 
         self.write_linear(
@@ -17,11 +19,20 @@ class NNWriter:
             self.write_linear(
                 layer,
                 weightType=torch.int8,
-                weightScale=model.weight_scale,
+                weightScale=model.weight_scale_hidden,
                 weightOrder='C', # row-major
                 biasType=torch.int32,
-                biasScale=model.quantized_one * model.weight_scale
+                biasScale=model.weight_scale_hidden * model.quantized_one
             )
+        
+        self.write_linear(
+            model.output,
+            weightType=torch.int8,
+            weightScale=model.weight_scale_output * model.nnue2score / model.quantized_one,
+            weightOrder='C', # (does not matter, a dimension is 1)
+            biasType=torch.int32,
+            biasScale=model.weight_scale_output * model.nnue2score
+        )
 
     def write_linear(self, layer, weightType, weightScale, weightOrder, biasType, biasScale):
         weight = layer.weight.data
@@ -36,13 +47,12 @@ class NNWriter:
         self.buf.extend(tensor.numpy().tobytes(order))
 
 if __name__ == "__main__":
-    import numpy as np
-    from model import ChessModel
 
-    model = ChessModel(768)
+    model = NnueModel(768)
     model.clip_weights()
+    model.load_state_dict(torch.load('/mnt/c/Users/mlomb/Desktop/Tesis/cs-master-thesis/notebooks/runs/20240314_000247_eval_basic_4096/models/0.pth'))
 
-    writer = NNWriter(model)
+    writer = NnueWriter(model)
     with open("../test_model.nn", "wb") as f:
         f.write(writer.buf)
 
@@ -53,9 +63,9 @@ if __name__ == "__main__":
     sample_input = torch.zeros(768)
     sample_input[features] = 1
 
-    # ---------------------------------------------------------
-    # This part is to compare the quantized implementation side
-    # ---------------------------------------------------------
+    # --------------------------------------------------------------
+    # Following code is to compare with the quantized implementation
+    # --------------------------------------------------------------
 
     print("model length:", len(writer.buf))
     print("features:", features.tolist())
@@ -63,7 +73,14 @@ if __name__ == "__main__":
     ft = model.ft(sample_input)
     ft_crelu = torch.clamp(ft, 0, 1)
     linear1 = model.linear1(torch.concat([ft_crelu, ft_crelu], dim=0))
+    linear1_crelu = torch.clamp(linear1, 0, 1)
+    linear2 = model.linear2(linear1_crelu)
+    linear2_crelu = torch.clamp(linear2, 0, 1)
+    linear_out = model.output(linear2_crelu)
+
+    assert linear_out.item() - model(torch.concat([sample_input, sample_input], dim=0).reshape((2, 768))) < 1e-6
 
     print("ft+crelu:", torch.round(ft_crelu * model.quantized_one))
-    print("linear1:", torch.round(linear1 * model.quantized_one))
-
+    print("linear1+crelu:", torch.round(linear1_crelu * model.quantized_one))
+    print("linear2+crelu:", torch.round(linear2_crelu * model.quantized_one))
+    print("output:", linear_out, torch.round(linear_out * model.nnue2score))

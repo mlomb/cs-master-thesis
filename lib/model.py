@@ -9,13 +9,14 @@ def decode_int64_bitset(x: torch.Tensor):
     expanded = torch.bitwise_and(x.unsqueeze(-1), masks).ne(0).to(torch.float32)
     return expanded
 
-class ChessModel(nn.Module):
+class NnueModel(nn.Module):
     def __init__(self, num_features: int = 768):
-        super(ChessModel, self).__init__()
+        super(NnueModel, self).__init__()
 
         self.quantized_one = 127
-        self.weight_scale = 64
-        self.output_scale = 16
+        self.weight_scale_hidden = 64
+        self.weight_scale_output = 16
+        self.nnue2score = 600
 
         self.ft = nn.Linear(num_features, 256)
         self.linear1 = nn.Linear(512, 32)
@@ -38,8 +39,8 @@ class ChessModel(nn.Module):
         # ft weights are NOT clamped, since they are stored with 16 bits
         # and we don't expect them to be very large
 
-        hidden_clip = self.quantized_one / self.weight_scale
-        output_clip = (self.quantized_one * self.quantized_one) * self.output_scale
+        hidden_clip = self.quantized_one / self.weight_scale_hidden
+        output_clip = (self.quantized_one * self.quantized_one) * self.weight_scale_output
 
         self.linear1.weight.data.clamp(-hidden_clip, hidden_clip)
         self.linear2.weight.data.clamp(-hidden_clip, hidden_clip)
