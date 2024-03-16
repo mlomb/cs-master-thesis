@@ -18,6 +18,7 @@ struct LinearLayer<W, B> {
     num_outputs: usize,
 
     // this buffer is used by the previous layer to prepare the data for this layer
+    // note: this is unused in the feature transform layer :(
     input_buffer: Tensor<W>,
     // this buffer is used just after computing the linear layer, before applying the activation
     intermediate_buffer: Tensor<B>,
