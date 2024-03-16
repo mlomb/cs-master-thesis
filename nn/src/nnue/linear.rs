@@ -1,7 +1,9 @@
 #[cfg(target_arch = "x86_64")]
 use std::arch::x86_64::*;
 
-const LOG2_WEIGHT_SCALE: i32 = 6; // 2^6 = 64
+// These are constants because `_mm_srai_epi32` requires a constant shift value
+const LOG2_HIDDEN_WEIGHT_SCALE: i32 = 6;
+const LOG2_OUTPUT_WEIGHT_SCALE: i32 = 4;
 
 /// Quantized linear layer with 8-bit weights and 32-bits bias
 /// https://github.com/official-stockfish/nnue-pytorch/blob/master/docs/nnue.md#linear-layer-4
@@ -13,8 +15,8 @@ pub unsafe fn linear(
     bias: *const i32,
     output: *mut i32,
 ) {
+    // special case when there is only one output (output layer)
     if num_outputs == 1 {
-        // special case when there is only one output (probably final layer)
         let mut outval = *bias;
         for i in 0..num_inputs {
             let val1 = *input.add(i);
@@ -22,14 +24,14 @@ pub unsafe fn linear(
             outval += (val1 as i32) * (val2 as i32); // NOTE: it is important to do calculations in i32
         }
         // account for weight scaling
-        *output = outval >> 4; // /16
+        *output = outval >> LOG2_OUTPUT_WEIGHT_SCALE;
         return;
     }
 
     const REGISTER_WIDTH: usize = 256 / 8;
 
-    assert!(num_inputs % REGISTER_WIDTH == 0); // processing 32 elements at a time
-    assert!(num_outputs % 4 == 0); // processing 4 elements at a time
+    debug_assert!(num_inputs % REGISTER_WIDTH == 0); // processing 32 elements at a time
+    debug_assert!(num_outputs % 4 == 0); // processing 4 elements at a time
 
     let num_in_chunks: usize = num_inputs / REGISTER_WIDTH;
     let num_out_chunks: usize = num_outputs / 4;
@@ -75,7 +77,7 @@ pub unsafe fn linear(
         // -------------------------------------
 
         // account for weight scaling
-        outval = _mm_srai_epi32(outval, LOG2_WEIGHT_SCALE);
+        outval = _mm_srai_epi32(outval, LOG2_HIDDEN_WEIGHT_SCALE);
 
         _mm_store_si128(output.add(i * 4) as *mut __m128i, outval);
     }
@@ -111,8 +113,8 @@ pub unsafe fn linear_partial_refresh(
     const REGISTER_WIDTH: usize = 256 / 16;
     const NUM_CHUNKS: usize = 16;
 
-    assert!(num_inputs % REGISTER_WIDTH == 0); // processing 16 elements at a time
-    assert!(NUM_CHUNKS == num_outputs / REGISTER_WIDTH); // we expect only 16 chunks
+    debug_assert!(num_inputs % REGISTER_WIDTH == 0); // processing 16 elements at a time
+    debug_assert!(NUM_CHUNKS == num_outputs / REGISTER_WIDTH); // we expect only 16 chunks
 
     let mut regs: [__m256i; NUM_CHUNKS] = unsafe { std::mem::zeroed() };
 
@@ -121,7 +123,7 @@ pub unsafe fn linear_partial_refresh(
         regs[i] = _mm256_load_si256(bias.add(i * REGISTER_WIDTH) as *const __m256i);
     }
 
-    // accumulate enabled rows
+    // accumulate active rows
     for &a in active_rows {
         for i in 0..NUM_CHUNKS {
             regs[i] = _mm256_add_epi16(
@@ -152,8 +154,8 @@ pub unsafe fn linear_partial_update(
     const REGISTER_WIDTH: usize = 256 / 16;
     const NUM_CHUNKS: usize = 16;
 
-    assert!(num_inputs % REGISTER_WIDTH == 0); // processing 16 elements at a time
-    assert!(NUM_CHUNKS == num_outputs / REGISTER_WIDTH); // we expect only 16 chunks
+    debug_assert!(num_inputs % REGISTER_WIDTH == 0); // processing 16 elements at a time
+    debug_assert!(NUM_CHUNKS == num_outputs / REGISTER_WIDTH); // we expect only 16 chunks
 
     let mut regs: [__m256i; NUM_CHUNKS] = unsafe { std::mem::zeroed() };
 

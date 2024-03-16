@@ -7,7 +7,7 @@ pub unsafe fn crelu_16(size: usize, input: *const i16, output: *mut i8) {
     const IN_REG_WIDTH: usize = 256 / 16;
     const OUT_REG_WIDTH: usize = 256 / 8;
 
-    assert!(size % OUT_REG_WIDTH == 0); // processing 32 elements at a time
+    debug_assert!(size % OUT_REG_WIDTH == 0); // processing 32 elements at a time
 
     let num_out_chunks = size / OUT_REG_WIDTH;
 
@@ -19,16 +19,7 @@ pub unsafe fn crelu_16(size: usize, input: *const i16, output: *mut i8) {
         let in1 = _mm256_load_si256(input.add((i * 2 + 1) * IN_REG_WIDTH) as *const __m256i);
 
         let result =
-                // packs changes the order, so we need to fix that with a permute
-                _mm256_permute4x64_epi64(
-                    // clamp from below
-                    _mm256_max_epi8(
-                        // packs saturates to 127, so we only need to clamp from below
-                        _mm256_packs_epi16(in0, in1),
-                        zero
-                    ),
-                    CONTROL
-                );
+            _mm256_permute4x64_epi64(_mm256_max_epi8(_mm256_packs_epi16(in0, in1), zero), CONTROL);
 
         _mm256_store_si256(output.add(i * OUT_REG_WIDTH) as *mut __m256i, result);
     }
@@ -40,7 +31,7 @@ pub unsafe fn crelu_32(size: usize, input: *const i32, output: *mut i8) {
     const IN_REG_WIDTH: usize = 256 / 32;
     const OUT_REG_WIDTH: usize = 256 / 8;
 
-    assert!(size % OUT_REG_WIDTH == 0); // processing 32 elements at a time
+    debug_assert!(size % OUT_REG_WIDTH == 0); // processing 32 elements at a time
 
     let num_out_chunks = size / OUT_REG_WIDTH;
 
