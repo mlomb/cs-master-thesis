@@ -17,6 +17,11 @@ struct LinearLayer<W, B> {
     num_inputs: usize,
     num_outputs: usize,
 
+    // this buffer is used by the previous layer to prepare the data for this layer
+    input_buffer: Tensor<W>,
+    // this buffer is used just after computing the linear layer, before applying the activation
+    intermediate_buffer: Tensor<B>,
+
     weight: Tensor<W>,
     bias: Tensor<B>,
 }
@@ -26,6 +31,9 @@ impl<W, B> LinearLayer<W, B> {
         Self {
             num_inputs,
             num_outputs,
+
+            input_buffer: Tensor::zeros(num_inputs),
+            intermediate_buffer: Tensor::zeros(num_outputs),
 
             weight: Tensor::from_cursor(cursor, num_inputs * num_outputs).unwrap(),
             bias: Tensor::from_cursor(cursor, num_outputs).unwrap(),
@@ -44,14 +52,6 @@ pub struct NnueModel {
     linear1: LinearLayer<i8, i32>,
     linear2: LinearLayer<i8, i32>,
     linear_out: LinearLayer<i8, i32>,
-
-    // Buffers
-    buffer_ft: Tensor<i8>,
-    buffer1_32: Tensor<i32>,
-    buffer1_8: Tensor<i8>,
-    buffer2_32: Tensor<i32>,
-    buffer2_8: Tensor<i8>,
-    buffer_out: Tensor<i32>,
 }
 
 impl NnueModel {
@@ -68,14 +68,49 @@ impl NnueModel {
             linear1: LinearLayer::new(&mut cursor, 2 * FT, L1),
             linear2: LinearLayer::new(&mut cursor, L1, L2),
             linear_out: LinearLayer::new(&mut cursor, L2, 1),
-
-            buffer_ft: Tensor::zeros(2 * FT),
-            buffer1_32: Tensor::zeros(L1),
-            buffer1_8: Tensor::zeros(L1),
-            buffer2_32: Tensor::zeros(L2),
-            buffer2_8: Tensor::zeros(L2),
-            buffer_out: Tensor::zeros(1),
         })
+    }
+
+    pub fn forward(&mut self, perspective: Color) -> i32 {
+        unsafe {
+            let to_move_ft = self.accumulator[perspective as usize].as_ptr();
+            let not_to_move_ft = self.accumulator[perspective.other() as usize].as_ptr();
+
+            let (to_move, not_to_move) = self.linear1.input_buffer.as_mut_slice().split_at_mut(FT);
+            crelu_16(FT, to_move_ft, to_move.as_mut_ptr());
+            crelu_16(FT, not_to_move_ft, not_to_move.as_mut_ptr());
+
+            Self::forward_hidden(&self.linear1);
+            crelu_32(
+                L1,
+                self.linear1.intermediate_buffer.as_ptr(),
+                self.linear2.input_buffer.as_mut_ptr(),
+            );
+
+            Self::forward_hidden(&self.linear2);
+            crelu_32(
+                L2,
+                self.linear2.intermediate_buffer.as_ptr(),
+                self.linear_out.input_buffer.as_mut_ptr(),
+            );
+
+            Self::forward_hidden(&self.linear_out);
+
+            self.linear_out.intermediate_buffer.as_slice()[0]
+        }
+    }
+
+    fn forward_hidden(layer: &LinearLayer<i8, i32>) {
+        unsafe {
+            linear(
+                layer.num_inputs,
+                layer.num_outputs,
+                layer.input_buffer.as_ptr(),
+                layer.weight.as_ptr(),
+                layer.bias.as_ptr(),
+                layer.intermediate_buffer.as_mut_ptr(),
+            );
+        }
     }
 
     pub fn refresh(&mut self, active_features: &[u16], perspective: Color) {
@@ -100,40 +135,6 @@ impl NnueModel {
                 removed_features,
                 self.feature_transform.weight.as_ptr(),
                 self.accumulator[perspective as usize].as_mut_ptr(),
-            );
-        }
-    }
-
-    pub fn forward(&mut self, perspective: Color) -> i32 {
-        unsafe {
-            let to_move_ft = self.accumulator[perspective as usize].as_ptr();
-            let not_to_move_ft = self.accumulator[perspective.other() as usize].as_ptr();
-
-            let (to_move, not_to_move) = self.buffer_ft.as_mut_slice().split_at_mut(FT);
-            crelu_16(FT, to_move_ft, to_move.as_mut_ptr());
-            crelu_16(FT, not_to_move_ft, not_to_move.as_mut_ptr());
-
-            Self::forward_hidden(&self.linear1, &self.buffer_ft, &mut self.buffer1_32);
-            crelu_32(L1, self.buffer1_32.as_ptr(), self.buffer1_8.as_mut_ptr());
-
-            Self::forward_hidden(&self.linear2, &self.buffer1_8, &mut self.buffer2_32);
-            crelu_32(L2, self.buffer2_32.as_ptr(), self.buffer2_8.as_mut_ptr());
-
-            Self::forward_hidden(&self.linear_out, &self.buffer2_8, &mut self.buffer_out);
-
-            return self.buffer_out.as_slice()[0];
-        }
-    }
-
-    fn forward_hidden(layer: &LinearLayer<i8, i32>, input: &Tensor<i8>, output: &mut Tensor<i32>) {
-        unsafe {
-            linear(
-                layer.num_inputs,
-                layer.num_outputs,
-                input.as_ptr(),
-                layer.weight.as_ptr(),
-                layer.bias.as_ptr(),
-                output.as_mut_ptr(),
             );
         }
     }
