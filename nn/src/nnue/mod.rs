@@ -13,67 +13,45 @@ const FT: usize = 256;
 const L1: usize = 32;
 const L2: usize = 32;
 
-struct LinearLayer {
+struct LinearLayer<W, B> {
     num_inputs: usize,
     num_outputs: usize,
 
-    // This buffer is used by the previous layer to prepare the data for this layer
-    input_buffer: Tensor<i8>,
-    // This buffer is used just after computing the linear layer, before applying the activation
-    intermediate_buffer: Tensor<i32>,
-
-    weight: Tensor<i8>,
-    bias: Tensor<i32>,
+    weight: Tensor<W>,
+    bias: Tensor<B>,
 }
 
-impl LinearLayer {
+impl<W, B> LinearLayer<W, B> {
     fn new(cursor: &mut Cursor<Vec<u8>>, num_inputs: usize, num_outputs: usize) -> Self {
         Self {
             num_inputs,
             num_outputs,
 
-            input_buffer: Tensor::zeros(num_inputs),
-            intermediate_buffer: Tensor::zeros(num_outputs),
-
             weight: Tensor::from_cursor(cursor, num_inputs * num_outputs).unwrap(),
             bias: Tensor::from_cursor(cursor, num_outputs).unwrap(),
         }
     }
-
-    fn forward_linear(&self) {
-        unsafe {
-            linear(
-                self.num_inputs,
-                self.num_outputs,
-                self.input_buffer.as_ptr(),
-                self.weight.as_ptr(),
-                self.bias.as_ptr(),
-                self.intermediate_buffer.as_mut_ptr(),
-            );
-        }
-    }
-
-    fn forward_relu(&self, output: &Tensor<i8>) {
-        unsafe {
-            crelu_32(
-                self.num_outputs,
-                self.intermediate_buffer.as_ptr(),
-                output.as_mut_ptr(),
-            );
-        }
-    }
 }
 
+/// Neural Network Update Efficent (NNUE)
+/// https://github.com/official-stockfish/nnue-pytorch/blob/master/docs/nnue.md
 pub struct NnueModel {
     // Feature transformer accumulator
     accumulator: [Tensor<i16>; 2], // indexed by color
-    ft_weight: Tensor<i16>,
-    ft_bias: Tensor<i16>,
 
     // Linear layers
-    linear1: LinearLayer,
-    linear2: LinearLayer,
-    linear_out: LinearLayer,
+    feature_transform: LinearLayer<i16, i16>,
+    linear1: LinearLayer<i8, i32>,
+    linear2: LinearLayer<i8, i32>,
+    linear_out: LinearLayer<i8, i32>,
+
+    // Buffers
+    buffer_ft: Tensor<i8>,
+    buffer1_32: Tensor<i32>,
+    buffer1_8: Tensor<i8>,
+    buffer2_32: Tensor<i32>,
+    buffer2_8: Tensor<i8>,
+    buffer_out: Tensor<i32>,
 }
 
 impl NnueModel {
@@ -85,23 +63,29 @@ impl NnueModel {
 
         Ok(Self {
             accumulator: [Tensor::zeros(FT), Tensor::zeros(FT)],
-            ft_weight: Tensor::from_cursor(&mut cursor, num_features * FT)?,
-            ft_bias: Tensor::from_cursor(&mut cursor, FT)?,
 
+            feature_transform: LinearLayer::new(&mut cursor, num_features, FT),
             linear1: LinearLayer::new(&mut cursor, 2 * FT, L1),
             linear2: LinearLayer::new(&mut cursor, L1, L2),
             linear_out: LinearLayer::new(&mut cursor, L2, 1),
+
+            buffer_ft: Tensor::zeros(2 * FT),
+            buffer1_32: Tensor::zeros(L1),
+            buffer1_8: Tensor::zeros(L1),
+            buffer2_32: Tensor::zeros(L2),
+            buffer2_8: Tensor::zeros(L2),
+            buffer_out: Tensor::zeros(1),
         })
     }
 
     pub fn refresh(&mut self, active_features: &[u16], perspective: Color) {
         unsafe {
             linear_partial_refresh(
-                self.ft_weight.len() / FT,
-                FT,
+                self.feature_transform.num_inputs,
+                self.feature_transform.num_outputs,
                 active_features,
-                self.ft_weight.as_ptr(),
-                self.ft_bias.as_ptr(),
+                self.feature_transform.weight.as_ptr(),
+                self.feature_transform.bias.as_ptr(),
                 self.accumulator[perspective as usize].as_mut_ptr(),
             );
         }
@@ -110,11 +94,11 @@ impl NnueModel {
     pub fn update(&mut self, added_features: &[u16], removed_features: &[u16], perspective: Color) {
         unsafe {
             linear_partial_update(
-                self.ft_weight.len() / FT,
-                FT,
+                self.feature_transform.num_inputs,
+                self.feature_transform.num_outputs,
                 added_features,
                 removed_features,
-                self.ft_weight.as_ptr(),
+                self.feature_transform.weight.as_ptr(),
                 self.accumulator[perspective as usize].as_mut_ptr(),
             );
         }
@@ -125,19 +109,32 @@ impl NnueModel {
             let to_move_ft = self.accumulator[perspective as usize].as_ptr();
             let not_to_move_ft = self.accumulator[perspective.other() as usize].as_ptr();
 
-            let (to_move, not_to_move) = self.linear1.input_buffer.as_mut_slice().split_at_mut(FT);
+            let (to_move, not_to_move) = self.buffer_ft.as_mut_slice().split_at_mut(FT);
             crelu_16(FT, to_move_ft, to_move.as_mut_ptr());
             crelu_16(FT, not_to_move_ft, not_to_move.as_mut_ptr());
 
-            self.linear1.forward_linear();
-            self.linear1.forward_relu(&self.linear2.input_buffer);
+            Self::forward_hidden(&self.linear1, &self.buffer_ft, &mut self.buffer1_32);
+            crelu_32(L1, self.buffer1_32.as_ptr(), self.buffer1_8.as_mut_ptr());
 
-            self.linear2.forward_linear();
-            self.linear2.forward_relu(&self.linear_out.input_buffer);
+            Self::forward_hidden(&self.linear2, &self.buffer1_8, &mut self.buffer2_32);
+            crelu_32(L2, self.buffer2_32.as_ptr(), self.buffer2_8.as_mut_ptr());
 
-            self.linear_out.forward_linear();
+            Self::forward_hidden(&self.linear_out, &self.buffer2_8, &mut self.buffer_out);
 
-            return self.linear_out.intermediate_buffer.as_slice()[0];
+            return self.buffer_out.as_slice()[0];
+        }
+    }
+
+    fn forward_hidden(layer: &LinearLayer<i8, i32>, input: &Tensor<i8>, output: &mut Tensor<i32>) {
+        unsafe {
+            linear(
+                layer.num_inputs,
+                layer.num_outputs,
+                input.as_ptr(),
+                layer.weight.as_ptr(),
+                layer.bias.as_ptr(),
+                output.as_mut_ptr(),
+            );
         }
     }
 }
