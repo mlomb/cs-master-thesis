@@ -97,3 +97,42 @@ unsafe fn m256_add_dpbusd_epi32(acc: &mut __m256i, a: __m256i, b: __m256i) {
         *acc = _mm256_add_epi32(*acc, product0);
     }
 }
+
+pub unsafe fn linear_partial_init(
+    num_inputs: usize,
+    num_outputs: usize,
+    active_rows: &[u16],
+    weight: *const i16,
+    bias: *const i16,
+    output: *mut i16,
+) {
+    const REGISTER_WIDTH: usize = 256 / 16;
+    const NUM_CHUNKS: usize = 16;
+
+    assert!(num_inputs % REGISTER_WIDTH == 0); // processing 16 elements at a time
+    assert!(NUM_CHUNKS == num_outputs / REGISTER_WIDTH); // we expect only 16 chunks
+
+    let mut regs: [__m256i; NUM_CHUNKS] = unsafe { std::mem::zeroed() };
+
+    // init registers with bias
+    for i in 0..NUM_CHUNKS {
+        regs[i] = _mm256_load_si256(bias.add(i * REGISTER_WIDTH) as *const __m256i);
+    }
+
+    // accumulate enabled rows
+    for &a in active_rows {
+        for i in 0..NUM_CHUNKS {
+            regs[i] = _mm256_add_epi16(
+                regs[i],
+                _mm256_load_si256(
+                    weight.add((a as usize) * num_outputs + i * REGISTER_WIDTH) as *const __m256i
+                ),
+            );
+        }
+    }
+
+    // copy to output
+    for i in 0..NUM_CHUNKS {
+        _mm256_store_si256(output.add(i * REGISTER_WIDTH) as *mut __m256i, regs[i]);
+    }
+}

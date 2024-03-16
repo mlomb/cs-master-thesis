@@ -142,18 +142,18 @@ mod tests {
             137, 350, 81, 468, 405, 470, 250, 490, 220, 76, 548, 290, 72, 244, 394, 620, 63, 716,
             659, 314, 118, 728, 49, 662, 411, 605, 227, 168, 513, 7, 196, 275, 23,
         ];
-        nnue_model
-            .get_accumulator()
-            .refresh(&active_features, Color::White);
-        nnue_model
-            .get_accumulator()
-            .refresh(&active_features, Color::Black);
 
         let mut ms = 0;
 
         for _ in 0..1000 {
             let start = std::time::Instant::now();
             for _ in 0..1000 {
+                nnue_model
+                    .get_accumulator()
+                    .refresh(&active_features, Color::White);
+                nnue_model
+                    .get_accumulator()
+                    .refresh(&active_features, Color::Black);
                 nnue_model.forward(Color::White);
             }
             ms += start.elapsed().as_millis();

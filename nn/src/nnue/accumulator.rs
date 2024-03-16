@@ -1,6 +1,6 @@
 use shakmaty::Color;
 
-use super::Tensor;
+use super::{linear::linear_partial_init, Tensor};
 
 pub struct NnueAccumulator {
     accum: [Tensor<i16>; 2],
@@ -23,8 +23,21 @@ impl NnueAccumulator {
     }
 
     pub fn refresh(&mut self, active_features: &Vec<u16>, perspective: Color) {
-        let num_outs = self.bias.len();
+        let num_outputs = self.bias.len();
+        let num_inputs = self.weight.len() / num_outputs;
 
+        unsafe {
+            linear_partial_init(
+                num_inputs,
+                num_outputs,
+                active_features.as_slice(),
+                self.weight.as_ptr(),
+                self.bias.as_ptr(),
+                self.accum[perspective as usize].as_mut_ptr(),
+            )
+        }
+
+        /*
         let weight_slice = self.weight.as_slice();
         let bias_slice = self.bias.as_slice();
         let accum_slice = self.accum[perspective as usize].as_mut_slice();
@@ -38,5 +51,6 @@ impl NnueAccumulator {
                 accum_slice[i] += weight_slice[a as usize * num_outs + i];
             }
         }
+        */
     }
 }
