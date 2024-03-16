@@ -17,14 +17,14 @@ struct LinearLayer<W, B> {
     num_inputs: usize,
     num_outputs: usize,
 
+    weight: Tensor<W>,
+    bias: Tensor<B>,
+
     // this buffer is used by the previous layer to prepare the data for this layer
     // note: this is unused in the feature transform layer :(
     input_buffer: Tensor<W>,
     // this buffer is used just after computing the linear layer, before applying the activation
     intermediate_buffer: Tensor<B>,
-
-    weight: Tensor<W>,
-    bias: Tensor<B>,
 }
 
 impl<W, B> LinearLayer<W, B> {
@@ -33,11 +33,11 @@ impl<W, B> LinearLayer<W, B> {
             num_inputs,
             num_outputs,
 
-            input_buffer: Tensor::zeros(num_inputs),
-            intermediate_buffer: Tensor::zeros(num_outputs),
-
             weight: Tensor::from_cursor(cursor, num_inputs * num_outputs).unwrap(),
             bias: Tensor::from_cursor(cursor, num_outputs).unwrap(),
+
+            input_buffer: Tensor::zeros(num_inputs),
+            intermediate_buffer: Tensor::zeros(num_outputs),
         }
     }
 }
@@ -46,7 +46,7 @@ impl<W, B> LinearLayer<W, B> {
 /// https://github.com/official-stockfish/nnue-pytorch/blob/master/docs/nnue.md
 pub struct NnueModel {
     // Feature transformer accumulator
-    accumulator: [Tensor<i16>; 2], // indexed by color
+    accumulator: [Tensor<i16>; 2], // indexed by perspective (color)
 
     // Linear layers
     feature_transform: LinearLayer<i16, i16>,
@@ -230,6 +230,6 @@ mod tests {
         }
 
         println!("model output = {}", nnue_model.forward(Color::White));
-        println!("ms = {}", ms as f32 / 1000.0);
+        println!("time for 1000 = {}", ms as f32 / 1000.0);
     }
 }
