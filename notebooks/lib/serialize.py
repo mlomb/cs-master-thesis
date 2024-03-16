@@ -1,9 +1,8 @@
 import torch
 import numpy as np
-from model import NnueModel
 
 class NnueWriter:
-    def __init__(self, model: NnueModel):
+    def __init__(self, model):
         self.buf = bytearray()
 
         self.write_linear(
@@ -44,9 +43,10 @@ class NnueWriter:
         self.write_tensor(bias)
 
     def write_tensor(self, tensor, order='C'):
-        self.buf.extend(tensor.numpy().tobytes(order))
+        self.buf.extend(tensor.cpu().numpy().tobytes(order))
 
 if __name__ == "__main__":
+    from model import NnueModel
 
     model = NnueModel(768)
     model.clip_weights()

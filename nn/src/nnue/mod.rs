@@ -101,17 +101,15 @@ impl NnueModel {
         }
     }
 
-    fn forward_hidden(layer: &LinearLayer<i8, i32>) {
-        unsafe {
-            linear(
-                layer.num_inputs,
-                layer.num_outputs,
-                layer.input_buffer.as_ptr(),
-                layer.weight.as_ptr(),
-                layer.bias.as_ptr(),
-                layer.intermediate_buffer.as_mut_ptr(),
-            );
-        }
+    unsafe fn forward_hidden(layer: &LinearLayer<i8, i32>) {
+        linear(
+            layer.num_inputs,
+            layer.num_outputs,
+            layer.input_buffer.as_ptr(),
+            layer.weight.as_ptr(),
+            layer.bias.as_ptr(),
+            layer.intermediate_buffer.as_mut_ptr(),
+        );
     }
 
     pub fn refresh(&mut self, active_features: &[u16], perspective: Color) {
