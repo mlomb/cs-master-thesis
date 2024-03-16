@@ -1,13 +1,10 @@
 mod defs;
-mod eval;
-mod nn2;
-mod nn3;
 mod position;
 mod pv;
 mod search;
 mod tt;
 
-use eval::NNModel;
+use nn::nnue::NnueModel;
 use search::Search;
 use shakmaty::fen::Fen;
 use shakmaty::uci::Uci;
@@ -16,15 +13,9 @@ use std::io::{self, BufRead};
 use std::time::Duration;
 use vampirc_uci::{parse_one, UciMessage, UciTimeControl};
 
-// Don't forget OPENBLAS_NUM_THREADS=1 !!!!!
-fn main() -> ort::Result<()> {
-    //ort::init()
-    //    .with_execution_providers([CUDAExecutionProvider::default().build()])
-    //    .commit()?;
-
-    let nn_model =
-        NNModel::from_memory(include_bytes!("/mnt/c/Users/mlomb/Desktop/Tesis/cs-master-thesis/notebooks/runs/20240309_133406_eval_basic_4096/models/343.json"))?;
-    let mut search = Search::new(nn_model);
+fn main() {
+    let model = NnueModel::load(768,"/mnt/c/Users/mlomb/Desktop/Tesis/cs-master-thesis/notebooks/runs/20240316_151919_eval_basic_4096/models/300.nn").unwrap();
+    let mut search = Search::new(model);
 
     let mut position: Chess = Chess::default();
 
@@ -121,6 +112,4 @@ fn main() -> ort::Result<()> {
             _ => {}
         }
     }
-
-    Ok(())
 }

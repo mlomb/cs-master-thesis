@@ -150,7 +150,7 @@ mod tests {
     fn test_update() {
         let mut nnue_model = NnueModel::load(
             768,
-            "/mnt/c/Users/mlomb/Desktop/Tesis/cs-master-thesis/test_model.nn",
+            "/mnt/c/Users/mlomb/Desktop/Tesis/cs-master-thesis/notebooks/runs/20240316_151919_eval_basic_4096/models/30.nn",
         )
         .unwrap();
 
@@ -200,7 +200,7 @@ mod tests {
     fn test_nn3() {
         let mut nnue_model = NnueModel::load(
             768,
-            "/mnt/c/Users/mlomb/Desktop/Tesis/cs-master-thesis/test_model.nn",
+            "/mnt/c/Users/mlomb/Desktop/Tesis/cs-master-thesis/notebooks/runs/20240316_151919_eval_basic_4096/models/247.nn",
         )
         .unwrap();
 

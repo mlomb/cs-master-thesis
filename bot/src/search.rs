@@ -1,10 +1,10 @@
 use crate::{
     defs::{Value, INFINITE, INVALID_MOVE, MAX_PLY},
-    eval::NNModel,
     position::Position,
     pv::PVTable,
     tt::{TFlag, TTable},
 };
+use nn::nnue::NnueModel;
 use shakmaty::{
     zobrist::{Zobrist64, ZobristHash},
     CastlingMode, Chess, Move, MoveList,
@@ -18,7 +18,7 @@ pub struct Search {
     pub ply: usize,
 
     /// Neural network model
-    nn_model: NNModel,
+    pub nnue_model: NnueModel,
 
     /// Number of nodes searched
     pub nodes: usize,
@@ -46,11 +46,11 @@ pub struct Search {
 }
 
 impl Search {
-    pub fn new(nn_model: NNModel) -> Self {
+    pub fn new(nnue_model: NnueModel) -> Self {
         Search {
             pos: Position::start_pos(),
             ply: 0,
-            nn_model,
+            nnue_model,
             nodes: 0,
             evals: 0,
             pv: PVTable::new(),
@@ -120,7 +120,7 @@ impl Search {
         self.nodes += 1;
 
         // evaluate the position
-        let score = self.nn_model.evaluate(&self.pos);
+        let score = self.nnue_model.forward(self.pos.turn());
         // increase number of evals computed
         self.evals += 1;
 
