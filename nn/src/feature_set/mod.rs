@@ -31,10 +31,10 @@ impl dyn FeatureSet {
         self.num_features().div_ceil(64) * 8
     }
 
-    pub fn encode(&self, board: &Board, write: &mut dyn Write) {
+    pub fn encode(&self, board: &Board, perspective: Color, write: &mut dyn Write) {
         // extract features from position
         let mut features = vec![];
-        self.active_features(board, Color::White, &mut features);
+        self.active_features(board, perspective, &mut features);
 
         // write into bits of a u64 buffer
         let mut buffer = vec![0u64; self.num_features().div_ceil(64)];

@@ -12,6 +12,7 @@ pub struct Position {
     stack: Vec<Chess>,
 
     /// NNUE
+    features_buffer: Vec<u16>,
     nnue_model: Rc<RefCell<NnueModel>>,
 }
 
@@ -21,7 +22,11 @@ impl Position {
         let mut stack = Vec::with_capacity(MAX_PLY);
         stack.push(chess);
 
-        Position { stack, nnue_model }
+        Position {
+            stack,
+            features_buffer: Vec::with_capacity(768),
+            nnue_model,
+        }
     }
 
     fn current(&self) -> &Chess {
@@ -71,33 +76,31 @@ impl Position {
         }
     }
 
-    pub fn evaluate(&self) -> i32 {
+    pub fn evaluate(&mut self) -> i32 {
         use shakmaty::Position;
 
         let pos = self.stack.last().unwrap();
         let side_to_move = pos.turn(); // side to move
 
-        let mut features = vec![];
-        self.nnue_model.borrow().get_feature_set().active_features(
-            pos.board(),
-            Color::White,
-            &mut features,
-        );
-        self.nnue_model
-            .borrow_mut()
-            .refresh_accumulator(&features, Color::White);
+        for &perspective in [Color::White, Color::Black].iter() {
+            self.features_buffer.clear();
+            self.nnue_model.borrow().get_feature_set().active_features(
+                pos.board(),
+                perspective,
+                &mut self.features_buffer,
+            );
+            self.nnue_model
+                .borrow_mut()
+                .refresh_accumulator(&self.features_buffer, perspective);
+        }
 
-        features.clear();
-        self.nnue_model.borrow().get_feature_set().active_features(
-            pos.board(),
-            Color::Black,
-            &mut features,
-        );
-        self.nnue_model
-            .borrow_mut()
-            .refresh_accumulator(&features, Color::Black);
+        let mut value = self.nnue_model.borrow_mut().forward(side_to_move);
 
-        self.nnue_model.borrow_mut().forward(side_to_move)
+        //if side_to_move == Color::White {
+        //    value = -value;
+        //}
+
+        value
     }
 
     /// Generates all legal moves

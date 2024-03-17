@@ -163,15 +163,12 @@ impl NnueModel {
 mod tests {
     use super::*;
 
-    /*
     /// Make sure that refreshing and updating (adding/removing features) gives the same output
     #[test]
     fn test_update() {
-        let mut nnue_model = NnueModel::load(
-            768,
-            "/mnt/c/Users/mlomb/Desktop/Tesis/cs-master-thesis/notebooks/runs/20240316_151919_eval_basic_4096/models/30.nn",
-        )
-        .unwrap();
+        let mut nnue_model =
+            NnueModel::load("/mnt/c/Users/mlomb/Desktop/Tesis/cs-master-thesis/test_model.nn")
+                .unwrap();
 
         let all_features = vec![
             668, 324, 624, 690, 473, 204, 97, 336, 568, 148, 667, 212, 199, 265, 760, 356, 501,
@@ -214,7 +211,6 @@ mod tests {
 
         assert_eq!(output_with_updates, output_with_refresh);
     }
-    */
 
     #[test]
     fn test_nn3() {
