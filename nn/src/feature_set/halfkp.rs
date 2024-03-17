@@ -11,12 +11,13 @@ impl HalfKP {
     }
 }
 
+/*
 impl FeatureSet for HalfKP {
     fn num_features(&self) -> usize {
         64 * 64 * 5 * 2 // 40960
     }
 
-    fn init(&self, board: &Board, active_features: &mut Vec<u16>) {
+    fn active_features(&self, board: &Board, active_features: &mut Vec<u16>) {
         active_features.clear();
 
         let king_square = board.king_of(Color::White).unwrap();
@@ -33,3 +34,4 @@ impl FeatureSet for HalfKP {
         }
     }
 }
+ */

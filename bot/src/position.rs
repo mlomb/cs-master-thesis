@@ -1,5 +1,7 @@
 use crate::defs::MAX_PLY;
-use shakmaty::{Board, Chess, Move, MoveList};
+use nn::nnue::model::NnueModel;
+use shakmaty::{Board, Chess, Color, Move, MoveList};
+use std::{cell::RefCell, rc::Rc};
 
 pub type HashKey = shakmaty::zobrist::Zobrist64;
 
@@ -8,19 +10,18 @@ pub struct Position {
     /// We use the shakmaty library that is copy-make
     /// This could be replaced by make-unmake
     stack: Vec<Chess>,
+
+    /// NNUE
+    nnue_model: Rc<RefCell<NnueModel>>,
 }
 
 impl Position {
     /// Creates a Position from a shakmaty Chess
-    pub fn from_chess(chess: Chess) -> Self {
+    pub fn from_chess(chess: Chess, nnue_model: Rc<RefCell<NnueModel>>) -> Self {
         let mut stack = Vec::with_capacity(MAX_PLY);
         stack.push(chess);
-        Position { stack }
-    }
 
-    /// Creates a Position in the starting position
-    pub fn start_pos() -> Self {
-        Position::from_chess(Chess::default())
+        Position { stack, nnue_model }
     }
 
     fn current(&self) -> &Chess {
@@ -40,6 +41,13 @@ impl Position {
         let mut new_pos = self.current().clone();
 
         if let Some(m) = m {
+            // update the NNUE accumulator
+            let feature_set = self.nnue_model.borrow().get_feature_set();
+            //feature_set.changed_features(new_pos.board(), &m, perspective, added_features, removed_features)
+            //self.nnue_model
+            //    .borrow_mut()
+            //    .update_accumulator(new_pos.board(), &m);
+
             // make a regular move
             new_pos.play_unchecked(&m);
         } else {
@@ -52,8 +60,44 @@ impl Position {
     }
 
     /// Undoes the last move
-    pub fn undo_move(&mut self, _m: Option<Move>) {
-        self.stack.pop();
+    pub fn undo_move(&mut self, m: Option<Move>) {
+        use shakmaty::Position;
+
+        let pos = self.stack.pop().unwrap();
+
+        if let Some(m) = m {
+            // update the NNUE accumulator
+            //self.nnue_model.undo_move(pos.board(), &m);
+        }
+    }
+
+    pub fn evaluate(&self) -> i32 {
+        use shakmaty::Position;
+
+        let pos = self.stack.last().unwrap();
+        let side_to_move = pos.turn(); // side to move
+
+        let mut features = vec![];
+        self.nnue_model.borrow().get_feature_set().active_features(
+            pos.board(),
+            Color::White,
+            &mut features,
+        );
+        self.nnue_model
+            .borrow_mut()
+            .refresh_accumulator(&features, Color::White);
+
+        features.clear();
+        self.nnue_model.borrow().get_feature_set().active_features(
+            pos.board(),
+            Color::Black,
+            &mut features,
+        );
+        self.nnue_model
+            .borrow_mut()
+            .refresh_accumulator(&features, Color::Black);
+
+        self.nnue_model.borrow_mut().forward(side_to_move)
     }
 
     /// Generates all legal moves

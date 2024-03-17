@@ -2,8 +2,11 @@ import torch
 import numpy as np
 
 class NnueWriter:
-    def __init__(self, model):
+    def __init__(self, model, feature_set_name):
         self.buf = bytearray()
+
+        self.buf.extend(bytes(feature_set_name, 'utf-8'))
+        self.buf.append(0) # null-terminated string
 
         self.write_linear(
             model.ft,
@@ -50,10 +53,10 @@ if __name__ == "__main__":
 
     model = NnueModel(768)
     model.clip_weights()
-    model.load_state_dict(torch.load('/mnt/c/Users/mlomb/Desktop/Tesis/cs-master-thesis/notebooks/runs/20240314_000247_eval_basic_4096/models/0.pth'))
+    model.load_state_dict(torch.load('/mnt/c/Users/mlomb/Desktop/Tesis/cs-master-thesis/notebooks/runs/20240316_151919_eval_basic_4096/models/350.pth'))
 
-    writer = NnueWriter(model)
-    with open("../test_model.nn", "wb") as f:
+    writer = NnueWriter(model, "basic")
+    with open("../../test_model.nn", "wb") as f:
         f.write(writer.buf)
 
     np.random.seed(42)

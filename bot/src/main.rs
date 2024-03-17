@@ -4,18 +4,21 @@ mod pv;
 mod search;
 mod tt;
 
-use nn::nnue::NnueModel;
+use nn::nnue::model::NnueModel;
 use search::Search;
 use shakmaty::fen::Fen;
 use shakmaty::uci::Uci;
 use shakmaty::{CastlingMode, Chess, Color, Position};
+use std::cell::RefCell;
 use std::io::{self, BufRead};
+use std::rc::Rc;
 use std::time::Duration;
 use vampirc_uci::{parse_one, UciMessage, UciTimeControl};
 
 fn main() {
-    let model = NnueModel::load(768,"/mnt/c/Users/mlomb/Desktop/Tesis/cs-master-thesis/notebooks/runs/20240316_151919_eval_basic_4096/models/300.nn").unwrap();
-    let mut search = Search::new(model);
+    let model =
+        NnueModel::load("/mnt/c/Users/mlomb/Desktop/Tesis/cs-master-thesis/test_model.nn").unwrap();
+    let mut search = Search::new(Rc::new(RefCell::new(model)));
 
     let mut position: Chess = Chess::default();
 

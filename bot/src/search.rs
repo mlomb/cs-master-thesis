@@ -4,12 +4,13 @@ use crate::{
     pv::PVTable,
     tt::{TFlag, TTable},
 };
-use nn::nnue::NnueModel;
+use nn::nnue::model::NnueModel;
 use shakmaty::{
     zobrist::{Zobrist64, ZobristHash},
     CastlingMode, Chess, Move, MoveList,
 };
 use std::time::{Duration, Instant};
+use std::{cell::RefCell, rc::Rc};
 
 pub struct Search {
     /// Current position
@@ -18,7 +19,7 @@ pub struct Search {
     pub ply: usize,
 
     /// Neural network model
-    pub nnue_model: NnueModel,
+    pub nnue_model: Rc<RefCell<NnueModel>>,
 
     /// Number of nodes searched
     pub nodes: usize,
@@ -46,9 +47,9 @@ pub struct Search {
 }
 
 impl Search {
-    pub fn new(nnue_model: NnueModel) -> Self {
+    pub fn new(nnue_model: Rc<RefCell<NnueModel>>) -> Self {
         Search {
-            pos: Position::start_pos(),
+            pos: Position::from_chess(Chess::new(), nnue_model.clone()),
             ply: 0,
             nnue_model,
             nodes: 0,
@@ -72,7 +73,7 @@ impl Search {
         time_limit: Option<Duration>,
     ) -> Option<Move> {
         // init position
-        self.pos = Position::from_chess(position);
+        self.pos = Position::from_chess(position, self.nnue_model.clone());
         self.ply = 0;
 
         // reset stats
@@ -120,7 +121,7 @@ impl Search {
         self.nodes += 1;
 
         // evaluate the position
-        let score = self.nnue_model.forward(self.pos.turn());
+        let score = self.pos.evaluate();
         // increase number of evals computed
         self.evals += 1;
 

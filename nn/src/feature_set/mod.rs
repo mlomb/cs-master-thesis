@@ -1,7 +1,7 @@
 pub mod basic;
-pub mod halfkp;
+//pub mod halfkp;
 
-use shakmaty::{Board, Color};
+use shakmaty::{Board, Color, Move};
 use std::io::Write;
 
 /// A set of features for a neural network
@@ -9,10 +9,21 @@ pub trait FeatureSet {
     /// Number of features in the set
     fn num_features(&self) -> usize;
 
-    /// Computes the initial features for the given board and perspective (potentially expensive)
-    fn init(&self, board: &Board, features: &mut Vec<u16>);
+    /// Whether the given move requires a refresh of the features
+    fn requires_refresh(&self, _move: &Move) -> bool;
 
-    // TODO: accum
+    /// Computes the initial features for the given board and perspective (potentially expensive)
+    fn active_features(&self, board: &Board, perspective: Color, features: &mut Vec<u16>);
+
+    /// Computes the features that have changed with the given move (hopefully fast)
+    fn changed_features(
+        &self,
+        board: &Board,
+        _move: &Move,
+        perspective: Color,
+        added_features: &mut Vec<u16>,
+        removed_features: &mut Vec<u16>,
+    );
 }
 
 impl dyn FeatureSet {
@@ -23,7 +34,7 @@ impl dyn FeatureSet {
     pub fn encode(&self, board: &Board, write: &mut dyn Write) {
         // extract features from position
         let mut features = vec![];
-        self.init(board, &mut features);
+        self.active_features(board, Color::White, &mut features);
 
         // write into bits of a u64 buffer
         let mut buffer = vec![0u64; self.num_features().div_ceil(64)];
