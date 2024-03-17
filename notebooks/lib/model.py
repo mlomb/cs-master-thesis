@@ -42,6 +42,6 @@ class NnueModel(nn.Module):
         hidden_clip = self.quantized_one / self.weight_scale_hidden
         output_clip = (self.quantized_one * self.quantized_one) * self.weight_scale_output
 
-        self.linear1.weight.data.clamp(-hidden_clip, hidden_clip)
-        self.linear2.weight.data.clamp(-hidden_clip, hidden_clip)
-        self.output.weight.data.clamp(-output_clip, output_clip)
+        self.linear1.weight.data.clamp_(-hidden_clip, hidden_clip)
+        self.linear2.weight.data.clamp_(-hidden_clip, hidden_clip)
+        self.output.weight.data.clamp_(-output_clip, output_clip)

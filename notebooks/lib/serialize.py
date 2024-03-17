@@ -52,8 +52,8 @@ if __name__ == "__main__":
     from model import NnueModel
 
     model = NnueModel(768)
-    model.clip_weights()
     model.load_state_dict(torch.load('/mnt/c/Users/mlomb/Desktop/Tesis/cs-master-thesis/notebooks/runs/20240316_151919_eval_basic_4096/models/350.pth'))
+    model.clip_weights()
 
     writer = NnueWriter(model, "basic")
     with open("../../test_model.nn", "wb") as f:
