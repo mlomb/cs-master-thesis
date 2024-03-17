@@ -25,33 +25,3 @@ pub trait FeatureSet {
         removed_features: &mut Vec<u16>,
     );
 }
-
-impl dyn FeatureSet {
-    pub fn encoded_size(&self) -> usize {
-        self.num_features().div_ceil(64) * 8
-    }
-
-    pub fn encode(&self, board: &Board, perspective: Color, write: &mut dyn Write) {
-        // extract features from position
-        let mut features = vec![];
-        self.active_features(board, perspective, &mut features);
-
-        // write into bits of a u64 buffer
-        let mut buffer = vec![0u64; self.num_features().div_ceil(64)];
-
-        for feature_index in features.into_iter() {
-            assert!(feature_index < self.num_features() as u16);
-
-            let elem_index = (feature_index / 64) as usize;
-            let bit_index = (feature_index % 64) as usize;
-            buffer[elem_index] |= 1 << bit_index;
-        }
-
-        // write buffer into cursor
-        write
-            .write_all(unsafe {
-                std::slice::from_raw_parts(buffer.as_ptr() as *const u8, buffer.len() * 8)
-            })
-            .unwrap();
-    }
-}

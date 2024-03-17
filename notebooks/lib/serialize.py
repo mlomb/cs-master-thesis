@@ -101,4 +101,4 @@ if __name__ == "__main__":
 
     print("===============")
     print("indices:", indices[0].tolist())
-    print("expected model output:", model(one_hot) * model.nnue2score)
+    print("expected model output:", model(one_hot))

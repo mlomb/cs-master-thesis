@@ -1,4 +1,4 @@
-use super::{ReadSample, WriteSample};
+use super::{encoded_size, ReadSample, WriteSample};
 use nn::feature_set::FeatureSet;
 use rand::{seq::SliceRandom, Rng};
 use shakmaty::uci::Uci;
@@ -43,7 +43,7 @@ impl WriteSample for PQR {
 
 impl ReadSample for PQR {
     fn x_size(&self, feature_set: &Box<dyn FeatureSet>) -> usize {
-        feature_set.encoded_size() * 3
+        encoded_size(feature_set) * 3
     }
 
     fn y_size(&self) -> usize {

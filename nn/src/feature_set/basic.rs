@@ -45,6 +45,14 @@ impl FeatureSet for Basic {
                 }
             };
 
+            let square = if perspective == Color::Black {
+                // flip square vertically if black is to play, so its below
+                square.flip_vertical()
+            } else {
+                // keep square as is, by default white is below
+                square
+            };
+
             features.push(channel * 64 + square as u16);
         }
     }
@@ -62,45 +70,39 @@ impl FeatureSet for Basic {
 
 #[cfg(test)]
 mod tests {
-    use crate::nnue::model::NnueModel;
-
     use super::FeatureSet;
     use super::*;
     use shakmaty::{fen::Fen, Chess, Position};
 
     #[test]
-    fn test_basic_feature_set() {
+    fn sanity_checks() {
         let fen: Fen = "4nrk1/3q1pp1/2n1p1p1/8/1P2Q3/7P/PB1N1PP1/2R3K1 w - - 5 26"
             .parse()
             .unwrap();
         let pos: Chess = fen.into_position(shakmaty::CastlingMode::Standard).unwrap();
+        let board_orig = pos.board().clone();
+        let mut board_flip = board_orig.clone();
+        board_flip.flip_vertical();
+        board_flip.swap_colors();
 
         let basic: Box<dyn FeatureSet> = Box::new(Basic::new());
-        let mut features_white = Vec::new();
-        let mut features_black = Vec::new();
 
-        basic.active_features(pos.board(), Color::White, &mut features_white);
-        basic.active_features(pos.board(), Color::Black, &mut features_black);
+        let mut feat_orig_white = vec![];
+        let mut feat_orig_black = vec![];
+        let mut feat_flip_white = vec![];
+        let mut feat_flip_black = vec![];
 
-        features_white.sort();
-        features_black.sort();
+        basic.active_features(&board_orig, Color::White, &mut feat_orig_white);
+        basic.active_features(&board_orig, Color::Black, &mut feat_orig_black);
+        basic.active_features(&board_flip, Color::White, &mut feat_flip_white);
+        basic.active_features(&board_flip, Color::Black, &mut feat_flip_black);
 
-        let mut buffer = Vec::new();
-        let mut cursor = std::io::Cursor::new(&mut buffer);
-        basic.encode(pos.board(), Color::White, &mut cursor);
-        basic.encode(pos.board(), Color::Black, &mut cursor);
+        feat_orig_white.sort();
+        feat_orig_black.sort();
+        feat_flip_white.sort();
+        feat_flip_black.sort();
 
-        println!("features_white: {:?}", features_white);
-        println!("features_black: {:?}", features_black);
-        println!("buffer: {:?}", buffer);
-
-        let mut nnue_model =
-            NnueModel::load("/mnt/c/Users/mlomb/Desktop/Tesis/cs-master-thesis/test_model.nn")
-                .unwrap();
-
-        nnue_model.refresh_accumulator(features_white.as_slice(), Color::White);
-        nnue_model.refresh_accumulator(features_black.as_slice(), Color::Black);
-
-        println!("model output: {:?}", nnue_model.forward(Color::White));
+        assert_eq!(feat_orig_white, feat_flip_black);
+        assert_eq!(feat_orig_black, feat_flip_white);
     }
 }

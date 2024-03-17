@@ -33,7 +33,7 @@ class NnueModel(nn.Module):
         x = self.linear2(x)
         x = torch.clamp(x, 0.0, 1.0) # Clipped ReLU
 
-        return self.output(x)
+        return self.output(x) * self.nnue2score
 
     def clip_weights(self):
         # ft weights are NOT clamped, since they are stored with 16 bits
