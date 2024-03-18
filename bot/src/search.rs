@@ -299,7 +299,7 @@ impl Search {
         if best_move.is_none() {
             if in_check {
                 // checkmate
-                return -10_000;
+                return -10_000 + self.ply as i32;
             } else {
                 // stalemate (draw)
                 return 0;
