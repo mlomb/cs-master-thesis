@@ -1,6 +1,5 @@
 pub mod eval;
 pub mod pqr;
-pub mod stats_topk;
 
 use nn::feature_set::FeatureSet;
 use shakmaty::Board;

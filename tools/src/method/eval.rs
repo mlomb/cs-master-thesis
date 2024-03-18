@@ -3,7 +3,7 @@ use crate::uci_engine::{Score, UciEngine};
 use clap::Args;
 use nn::feature_set::FeatureSet;
 use rand::seq::SliceRandom;
-use shakmaty::{fen::Fen, CastlingMode, Chess, Color, EnPassantMode, Position};
+use shakmaty::{fen::Fen, CastlingMode, Chess, EnPassantMode, Position};
 use std::io::{self, BufRead, Write};
 
 #[derive(Args, Clone)]

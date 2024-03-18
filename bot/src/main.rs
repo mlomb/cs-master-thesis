@@ -17,7 +17,7 @@ use vampirc_uci::{parse_one, UciMessage, UciTimeControl};
 
 fn main() {
     let model =
-        NnueModel::load("/mnt/c/Users/mlomb/Desktop/Tesis/cs-master-thesis/test_model.nn").unwrap();
+        NnueModel::load("/mnt/c/Users/mlomb/Desktop/Tesis/cs-master-thesis/notebooks/runs/20240317_202841_eval_basic_4096/models/256.nn").unwrap();
     let mut search = Search::new(Rc::new(RefCell::new(model)));
 
     let mut position: Chess = Chess::default();

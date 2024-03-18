@@ -1,8 +1,7 @@
-use crate::nnue::model::NnueModel;
-
 use super::FeatureSet;
 use shakmaty::{fen::Fen, Chess, Color, Position};
 
+#[allow(dead_code)]
 pub(super) fn sanity_checks(feature_set: &dyn FeatureSet) {
     const FENS: [&str; 2] = [
         "4nrk1/3q1pp1/2n1p1p1/8/1P2Q3/7P/PB1N1PP1/2R3K1 w - - 5 26",

@@ -1,6 +1,6 @@
 use crate::defs::MAX_PLY;
 use nn::nnue::model::NnueModel;
-use shakmaty::{Board, Chess, Color, Move, MoveList};
+use shakmaty::{Chess, Color, Move, MoveList};
 use std::{cell::RefCell, rc::Rc};
 
 pub type HashKey = shakmaty::zobrist::Zobrist64;
@@ -54,11 +54,6 @@ impl Position {
 
     fn current(&self) -> &Chess {
         self.stack.last().unwrap()
-    }
-
-    pub fn board(&self) -> Board {
-        use shakmaty::Position;
-        self.current().board().clone()
     }
 
     /// Makes a move, or a null move if None.
@@ -164,10 +159,5 @@ impl Position {
     pub fn is_check(&self) -> bool {
         use shakmaty::Position;
         self.current().is_check()
-    }
-
-    pub fn turn(&self) -> shakmaty::Color {
-        use shakmaty::Position;
-        self.current().turn()
     }
 }

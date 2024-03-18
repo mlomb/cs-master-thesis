@@ -414,14 +414,3 @@ impl Search {
         self.repetition_table[..self.repetition_index].contains(&key)
     }
 }
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn test_mates() {
-        const MATE_FENS: [&str; 1] = [
-            //
-            "4k3/4N2R/8/1P1K2P1/8/8/PP5P/8 w - - 5 48",
-        ];
-    }
-}

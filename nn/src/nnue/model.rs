@@ -175,7 +175,7 @@ mod tests {
     #[test]
     fn test_update() {
         let mut nnue_model = NnueModel::from_memory(include_bytes!(
-            "/mnt/c/Users/mlomb/OneDrive/Escritorio/cs-master-thesis/256.nn"
+            "/mnt/c/Users/mlomb/Desktop/Tesis/cs-master-thesis/notebooks/runs/20240317_202841_eval_basic_4096/models/256.nn"
         ))
         .unwrap();
 

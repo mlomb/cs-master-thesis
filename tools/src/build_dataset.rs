@@ -3,7 +3,6 @@ use crate::game_visitor::VisitorConfig;
 use crate::method::eval::Eval;
 use crate::method::eval::EvalArgs;
 use crate::method::pqr::PQR;
-use crate::method::stats_topk::StatsTopK;
 use crate::method::WriteSample;
 use clap::Args;
 use clap::Subcommand;
@@ -44,8 +43,6 @@ pub enum MethodSubcommand {
     PQR,
     /// Generates a dataset with three columns: FEN string of a position, its score and the best move (both given by the engine)
     Eval(EvalArgs),
-    /// Extracts statistics to build the TopK feature set
-    StatsTopK,
 }
 
 pub fn build_dataset(cmd: BuildDatasetCommand) -> Result<(), Box<dyn Error>> {
@@ -83,7 +80,6 @@ pub fn build_dataset(cmd: BuildDatasetCommand) -> Result<(), Box<dyn Error>> {
     let mut method: Box<dyn WriteSample> = match &cmd.subcommand {
         MethodSubcommand::PQR => Box::new(PQR {}),
         MethodSubcommand::Eval(args) => Box::new(Eval::new(args.clone())),
-        MethodSubcommand::StatsTopK => Box::new(StatsTopK::new()),
     };
 
     let bar = ProgressBar::new_spinner()
