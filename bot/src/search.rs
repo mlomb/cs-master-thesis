@@ -112,6 +112,12 @@ impl Search {
                 eprint!("{} ", mv.to_uci(CastlingMode::Standard));
             }
             eprint!("\n");
+
+            if score.abs() >= 9950 {
+                // mate found
+                eprint!("info string mate found, stopping search\n");
+                break;
+            }
         }
 
         best_line.unwrap().first().cloned()
