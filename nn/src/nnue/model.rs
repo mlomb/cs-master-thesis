@@ -26,7 +26,7 @@ struct LinearLayer<W, B> {
 }
 
 impl<W, B> LinearLayer<W, B> {
-    fn new(cursor: &mut Cursor<Vec<u8>>, num_inputs: usize, num_outputs: usize) -> Self {
+    fn new(cursor: &mut Cursor<&[u8]>, num_inputs: usize, num_outputs: usize) -> Self {
         Self {
             num_inputs,
             num_outputs,
@@ -58,6 +58,11 @@ impl NnueModel {
         let mut file = File::open(model_path)?;
         let mut buffer = Vec::new();
         file.read_to_end(&mut buffer)?;
+
+        Self::from_memory(&buffer)
+    }
+
+    pub fn from_memory(buffer: &[u8]) -> std::io::Result<Self> {
         let mut cursor = Cursor::new(buffer);
 
         let mut str_buffer = Vec::new();
@@ -169,9 +174,10 @@ mod tests {
     /// Make sure that refreshing and updating (adding/removing features) gives the same output
     #[test]
     fn test_update() {
-        let mut nnue_model =
-            NnueModel::load("/mnt/c/Users/mlomb/Desktop/Tesis/cs-master-thesis/test_model.nn")
-                .unwrap();
+        let mut nnue_model = NnueModel::from_memory(include_bytes!(
+            "/mnt/c/Users/mlomb/OneDrive/Escritorio/cs-master-thesis/256.nn"
+        ))
+        .unwrap();
 
         let all_features = vec![
             668, 324, 624, 690, 473, 204, 97, 336, 568, 148, 667, 212, 199, 265, 760, 356, 501,

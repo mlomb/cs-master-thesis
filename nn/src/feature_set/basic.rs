@@ -76,24 +76,22 @@ impl FeatureSet for Basic {
     fn changed_features(
         &self,
         board: &Board,
-        _move: &Move,
+        m: &Move,
         perspective: Color,
         add_feats: &mut Vec<u16>,
         rem_feats: &mut Vec<u16>,
     ) {
-        let from = _move.from().unwrap();
-        let to = _move.to();
+        let from = m.from().unwrap();
+        let to = m.to();
         let who_plays = board.color_at(from).unwrap(); // unchecked?
 
-        match _move {
-            Move::Normal {
-                role,
-                from,
-                capture,
-                to,
-                promotion,
-            } => {}
-            Move::EnPassant { from, to } => {}
+        match m {
+            Move::Normal { from, to, .. } | Move::EnPassant { from, to } => {
+                let final_role = m.promotion().unwrap_or(m.role());
+
+                add_feats.push(Self::make_index(*to, final_role, who_plays, perspective));
+                rem_feats.push(Self::make_index(*from, m.role(), who_plays, perspective));
+            }
             Move::Castle { king, rook } => {
                 rem_feats.push(Self::make_index(*king, Role::King, who_plays, perspective));
                 rem_feats.push(Self::make_index(*rook, Role::Rook, who_plays, perspective));
@@ -120,22 +118,17 @@ impl FeatureSet for Basic {
                 ));
                 return;
             }
-            _ => unsafe { unreachable_unchecked() },
+            _ => unsafe { unreachable_unchecked() }, // crazyhouse
         }
 
-        let final_role = _move.promotion().unwrap_or(_move.role());
-
-        add_feats.push(Self::make_index(to, final_role, who_plays, perspective));
-        rem_feats.push(Self::make_index(from, _move.role(), who_plays, perspective));
-
-        if _move.is_en_passant() {
+        if m.is_en_passant() {
             rem_feats.push(Self::make_index(
                 Square::from_coords(to.file(), from.rank()),
                 Role::Pawn,
                 who_plays.other(),
                 perspective,
             ));
-        } else if let Some(captured) = _move.capture() {
+        } else if let Some(captured) = m.capture() {
             rem_feats.push(Self::make_index(
                 to,
                 captured,
@@ -148,39 +141,11 @@ impl FeatureSet for Basic {
 
 #[cfg(test)]
 mod tests {
-    use super::FeatureSet;
     use super::*;
-    use shakmaty::{fen::Fen, Chess, Position};
+    use crate::feature_set::checks::sanity_checks;
 
     #[test]
-    fn sanity_checks() {
-        let fen: Fen = "4nrk1/3q1pp1/2n1p1p1/8/1P2Q3/7P/PB1N1PP1/2R3K1 w - - 5 26"
-            .parse()
-            .unwrap();
-        let pos: Chess = fen.into_position(shakmaty::CastlingMode::Standard).unwrap();
-        let board_orig = pos.board().clone();
-        let mut board_flip = board_orig.clone();
-        board_flip.flip_vertical();
-        board_flip.swap_colors();
-
-        let basic: Box<dyn FeatureSet> = Box::new(Basic::new());
-
-        let mut feat_orig_white = vec![];
-        let mut feat_orig_black = vec![];
-        let mut feat_flip_white = vec![];
-        let mut feat_flip_black = vec![];
-
-        basic.active_features(&board_orig, Color::White, &mut feat_orig_white);
-        basic.active_features(&board_orig, Color::Black, &mut feat_orig_black);
-        basic.active_features(&board_flip, Color::White, &mut feat_flip_white);
-        basic.active_features(&board_flip, Color::Black, &mut feat_flip_black);
-
-        feat_orig_white.sort();
-        feat_orig_black.sort();
-        feat_flip_white.sort();
-        feat_flip_black.sort();
-
-        assert_eq!(feat_orig_white, feat_flip_black);
-        assert_eq!(feat_orig_black, feat_flip_white);
+    fn test_sanity_checks() {
+        sanity_checks(&Basic::new());
     }
 }

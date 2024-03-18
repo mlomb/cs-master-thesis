@@ -1,8 +1,9 @@
 pub mod basic;
 //pub mod halfkp;
 
+mod checks;
+
 use shakmaty::{Board, Color, Move};
-use std::io::Write;
 
 /// A set of features for a neural network
 pub trait FeatureSet {

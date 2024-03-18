@@ -21,7 +21,7 @@ impl<T> Tensor<T> {
         Self { layout, data }
     }
 
-    pub fn from_cursor(cursor: &mut Cursor<Vec<u8>>, len: usize) -> std::io::Result<Self> {
+    pub fn from_cursor(cursor: &mut Cursor<&[u8]>, len: usize) -> std::io::Result<Self> {
         let tensor = Self::zeros(len);
 
         cursor.read_exact(unsafe {
