@@ -74,6 +74,7 @@ impl Search {
     ) -> Option<Move> {
         // init position
         self.pos = Position::from_chess(position, self.nnue_model.clone());
+        self.pos.refresh();
         self.ply = 0;
 
         // reset stats

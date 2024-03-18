@@ -17,7 +17,7 @@ pub struct EngineResult {
     pub best_move: String,
 }
 
-/// Extremely simple UCI engine wrapper to evaluate positions
+/// Extremely basic UCI engine wrapper to evaluate positions
 /// https://www.wbec-ridderkerk.nl/html/UCIProtocol.html
 pub struct UciEngine {
     /// Target depth for the search

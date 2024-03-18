@@ -48,6 +48,7 @@ class NnueWriter:
     def write_tensor(self, tensor, order='C'):
         self.buf.extend(tensor.cpu().numpy().tobytes(order))
 
+
 if __name__ == "__main__":
     from model import NnueModel, decode_int64_bitset
 

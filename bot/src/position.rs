@@ -13,6 +13,8 @@ pub struct Position {
 
     /// NNUE
     features_buffer: Vec<u16>,
+    added_features: Vec<u16>,
+    removed_features: Vec<u16>,
     nnue_model: Rc<RefCell<NnueModel>>,
 }
 
@@ -24,8 +26,29 @@ impl Position {
 
         Position {
             stack,
+            added_features: Vec::with_capacity(768),
+            removed_features: Vec::with_capacity(768),
             features_buffer: Vec::with_capacity(768),
             nnue_model,
+        }
+    }
+
+    pub fn refresh(&mut self) {
+        use shakmaty::Position;
+
+        let pos = self.current().clone();
+
+        for &perspective in [Color::White, Color::Black].iter() {
+            self.features_buffer.clear();
+
+            self.nnue_model.borrow().get_feature_set().active_features(
+                pos.board(),
+                perspective,
+                &mut self.features_buffer,
+            );
+            self.nnue_model
+                .borrow_mut()
+                .refresh_accumulator(&self.features_buffer, perspective);
         }
     }
 
@@ -47,11 +70,26 @@ impl Position {
 
         if let Some(m) = m {
             // update the NNUE accumulator
-            let feature_set = self.nnue_model.borrow().get_feature_set();
-            //feature_set.changed_features(new_pos.board(), &m, perspective, added_features, removed_features)
-            //self.nnue_model
-            //    .borrow_mut()
-            //    .update_accumulator(new_pos.board(), &m);
+
+            //println!("Do move: {:?}", m);
+
+            for &perspective in [Color::White, Color::Black].iter() {
+                self.added_features.clear();
+                self.removed_features.clear();
+
+                self.nnue_model.borrow().get_feature_set().changed_features(
+                    new_pos.board(),
+                    &m,
+                    perspective,
+                    &mut self.added_features,
+                    &mut self.removed_features,
+                );
+                self.nnue_model.borrow_mut().update_accumulator(
+                    &self.added_features,
+                    &self.removed_features,
+                    perspective,
+                );
+            }
 
             // make a regular move
             new_pos.play_unchecked(&m);
@@ -68,39 +106,47 @@ impl Position {
     pub fn undo_move(&mut self, m: Option<Move>) {
         use shakmaty::Position;
 
-        let pos = self.stack.pop().unwrap();
+        self.stack.pop().unwrap();
+        let pos = self.current().clone();
 
         if let Some(m) = m {
             // update the NNUE accumulator
-            //self.nnue_model.undo_move(pos.board(), &m);
+            for &perspective in [Color::White, Color::Black].iter() {
+                self.added_features.clear();
+                self.removed_features.clear();
+
+                self.nnue_model.borrow().get_feature_set().changed_features(
+                    pos.board(),
+                    &m,
+                    perspective,
+                    &mut self.added_features,
+                    &mut self.removed_features,
+                );
+                self.nnue_model.borrow_mut().update_accumulator(
+                    &self.removed_features,
+                    &self.added_features,
+                    perspective,
+                );
+            }
         }
     }
 
     pub fn evaluate(&mut self) -> i32 {
         use shakmaty::Position;
 
-        let pos = self.stack.last().unwrap();
+        let pos = self.current().clone();
         let side_to_move = pos.turn(); // side to move
 
-        for &perspective in [Color::White, Color::Black].iter() {
-            self.features_buffer.clear();
-            self.nnue_model.borrow().get_feature_set().active_features(
-                pos.board(),
-                perspective,
-                &mut self.features_buffer,
-            );
-            self.nnue_model
-                .borrow_mut()
-                .refresh_accumulator(&self.features_buffer, perspective);
-        }
+        let ue_value = self.nnue_model.borrow_mut().forward(side_to_move);
 
-        let mut value = self.nnue_model.borrow_mut().forward(side_to_move);
-
-        //if side_to_move == Color::White {
-        //    value = -value;
+        //self.refresh();
+        //let refresh_value = self.nnue_model.borrow_mut().forward(side_to_move);
+        //if ue_value != refresh_value {
+        //    println!("UE: {}, REFRESH: {}", ue_value, refresh_value);
+        //    panic!();
         //}
 
-        value
+        ue_value
     }
 
     /// Generates all legal moves

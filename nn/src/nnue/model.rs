@@ -71,7 +71,10 @@ impl NnueModel {
         };
         let num_features = feature_set.num_features();
 
-        println!("Loading NNUE model with feature set: {}", feature_set_str);
+        println!(
+            "info string Loading NNUE model with feature set: {}",
+            feature_set_str
+        );
 
         Ok(Self {
             feature_set,

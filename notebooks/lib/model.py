@@ -3,7 +3,7 @@ from torch import nn
 
 def decode_int64_bitset(x: torch.Tensor):
     """
-    Convert a 64-bit integer into a 64-element float tensor
+    Convert a int64 into a 64-element float32 tensor
     """
     masks = 2 ** torch.arange(64, dtype=torch.int64, device=x.device)
     expanded = torch.bitwise_and(x.unsqueeze(-1), masks).ne(0).to(torch.float32)
