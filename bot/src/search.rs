@@ -1,6 +1,6 @@
 use crate::{
     defs::{Value, INFINITE, INVALID_MOVE, MAX_PLY},
-    position::Position,
+    position::{HashKey, Position},
     pv::PVTable,
     tt::{TFlag, TTable},
 };
@@ -36,7 +36,7 @@ pub struct Search {
     pub history_moves: [[Value; 8 * 8]; 12],
     /// Repetition table
     pub repetition_index: usize,
-    pub repetition_table: [Zobrist64; 1024],
+    pub repetition_table: [HashKey; 1024],
 
     /// Start search time
     pub start_time: Instant,
@@ -59,7 +59,7 @@ impl Search {
             killer_moves: std::array::from_fn(|_| [INVALID_MOVE, INVALID_MOVE]),
             history_moves: [[0; 8 * 8]; 12],
             repetition_index: 0,
-            repetition_table: [Zobrist64(0); 1024],
+            repetition_table: [HashKey::default(); 1024],
             start_time: Instant::now(),
             time_limit: None,
             aborted: false,
@@ -399,7 +399,7 @@ impl Search {
 
     /// Push a key in the repetition table
     /// Called when making a move
-    fn push_repetition_key(&mut self, key: Zobrist64) {
+    fn push_repetition_key(&mut self, key: HashKey) {
         self.repetition_table[self.repetition_index] = key;
         self.repetition_index += 1;
     }
@@ -410,7 +410,7 @@ impl Search {
         self.repetition_index -= 1;
     }
 
-    fn is_repetition(&self, key: Zobrist64) -> bool {
+    fn is_repetition(&self, key: HashKey) -> bool {
         self.repetition_table[..self.repetition_index].contains(&key)
     }
 }

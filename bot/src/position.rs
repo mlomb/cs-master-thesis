@@ -3,7 +3,7 @@ use nn::nnue::model::NnueModel;
 use shakmaty::{Chess, Color, Move, MoveList};
 use std::{cell::RefCell, rc::Rc};
 
-pub type HashKey = shakmaty::zobrist::Zobrist64;
+pub type HashKey = shakmaty::zobrist::Zobrist32;
 
 pub struct Position {
     /// Stack of chess positions

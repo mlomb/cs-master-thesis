@@ -1,5 +1,5 @@
 use crate::position::HashKey;
-use shakmaty::Move;
+use shakmaty::{zobrist::Zobrist32, Move};
 
 #[derive(Clone)]
 pub enum TFlag {
@@ -27,7 +27,7 @@ impl TTable {
         TTable {
             entries: vec![
                 TEntry {
-                    key: shakmaty::zobrist::Zobrist64(0),
+                    key: HashKey::default(),
                     flag: TFlag::Exact,
                     depth: -1,
                     score: 0,
