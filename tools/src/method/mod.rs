@@ -28,7 +28,7 @@ pub trait ReadSample {
 }
 
 pub fn encoded_size(feature_set: &Box<dyn FeatureSet>) -> usize {
-    feature_set.num_features().div_ceil(64) * 8
+    2 * feature_set.num_features().div_ceil(64) * 8
 }
 
 pub fn encode_side(

@@ -53,7 +53,6 @@ pub fn samples_service(cmd: SamplesServiceCommand) -> Result<(), Box<dyn Error>>
     // initialize feature set
     let feature_set: Box<dyn FeatureSet> = match cmd.feature_set {
         FeatureSetChoice::Basic => Box::new(Basic::new()),
-        //FeatureSetChoice::HalfKP => Box::new(HalfKP::new()),
         FeatureSetChoice::HalfKP => todo!(),
         FeatureSetChoice::TopK20 => todo!(),
     };

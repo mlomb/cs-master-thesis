@@ -60,7 +60,7 @@ pub struct EvalRead;
 
 impl ReadSample for EvalRead {
     fn x_size(&self, feature_set: &Box<dyn FeatureSet>) -> usize {
-        encoded_size(feature_set) * 2
+        encoded_size(feature_set)
     }
 
     fn y_size(&self) -> usize {
@@ -95,20 +95,18 @@ impl ReadSample for EvalRead {
             };
 
             if let Score::Cp(cp_score) = score {
-                let p_fen = Fen::from_ascii(fen_bytes.as_slice()).unwrap();
-                let p_position: Chess = p_fen.into_position(CastlingMode::Standard).unwrap();
+                let fen = Fen::from_ascii(fen_bytes.as_slice()).unwrap();
+                let position: Chess = fen.into_position(CastlingMode::Standard).unwrap();
 
-                encode_position(feature_set, &p_position, write_x);
+                encode_position(feature_set, &position, write_x);
 
                 // side to move score
                 write_y
                     .write_all(&f32::to_le_bytes(cp_score as f32))
                     .unwrap();
-
-                return;
+            } else {
+                // else skip mate scores
             }
-
-            // else skip mate scores
         }
     }
 }

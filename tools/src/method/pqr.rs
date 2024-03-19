@@ -1,4 +1,4 @@
-use super::{encoded_size, ReadSample, WriteSample};
+use super::{encode_position, encoded_size, ReadSample, WriteSample};
 use nn::feature_set::FeatureSet;
 use rand::{seq::SliceRandom, Rng};
 use shakmaty::uci::Uci;
@@ -54,7 +54,7 @@ impl ReadSample for PQR {
         &mut self,
         read: &mut dyn BufRead,
         write_x: &mut dyn Write,
-        write_y: &mut dyn Write,
+        _write_y: &mut dyn Write,
         feature_set: &Box<dyn FeatureSet>,
     ) {
         let mut rng = rand::thread_rng();
@@ -92,8 +92,8 @@ impl ReadSample for PQR {
             break p_position.clone().play(&r_move).unwrap();
         };
 
-        //feature_set.encode(p_position.board(), p_position.turn(), write_x);
-        //feature_set.encode(q_position.board(), q_position.turn(), write_x);
-        //feature_set.encode(r_position.board(), r_position.turn(), write_x);
+        encode_position(feature_set, &p_position, write_x);
+        encode_position(feature_set, &q_position, write_x);
+        encode_position(feature_set, &r_position, write_x);
     }
 }

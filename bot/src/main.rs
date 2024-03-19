@@ -16,8 +16,9 @@ use std::time::Duration;
 use vampirc_uci::{parse_one, UciMessage, UciTimeControl};
 
 fn main() {
-    let model =
-        NnueModel::load("/mnt/c/Users/mlomb/Desktop/Tesis/cs-master-thesis/notebooks/runs/20240317_202841_eval_basic_4096/models/256.nn").unwrap();
+    // let model_path = "/mnt/c/Users/mlomb/Desktop/Tesis/cs-master-thesis/notebooks/runs/20240317_202841_eval_basic_4096/models/256.nn"; // eval good
+    let model_path = "/mnt/c/Users/mlomb/Desktop/Tesis/cs-master-thesis/notebooks/runs/20240318_193816_pqr_basic_4096/models/210.nn";
+    let model = NnueModel::load(model_path).unwrap();
     let mut search = Search::new(Rc::new(RefCell::new(model)));
 
     let mut position: Chess = Chess::default();
