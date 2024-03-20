@@ -25,7 +25,7 @@ def solve_puzzle(board: chess.Board, solution: list[chess.Move]) -> bool:
         # play opponent move
         board.push(opp_move)
 
-        res = engine.play(board, chess.engine.Limit(time=100/1000))
+        res = engine.play(board, chess.engine.Limit(time=50/1000))
 
         if res.move != expected_move:
             # Mate in 1 puzzles in Lichess can have more than one solution
@@ -38,29 +38,31 @@ def solve_puzzle(board: chess.Board, solution: list[chess.Move]) -> bool:
 
 
 class PuzzleAccuracy:
-    def __init__(self):
+    def __init__(self, puzzles_csv: str, elo_bucket_size=200):
+        self.elo_bucket_size = elo_bucket_size
         self.puzzles = []
 
         # read and store puzzles
-        with open('/mnt/c/Users/mlomb/OneDrive/Escritorio/cs-master-thesis/puzzles.csv', 'r') as f:
+        with open(puzzles_csv, 'r') as f:
             for line in f:
                 fen, moves, rating = line.strip().split(',')
                 board = chess.Board(fen)
                 moves = [chess.Move.from_uci(m) for m in moves.split(' ')]
                 rating = int(rating)
+                if rating >= 3000: # rating too high
+                    continue
 
                 self.puzzles.append((board, moves, rating))
 
         random.Random(42).shuffle(self.puzzles)
-        self.puzzles = self.puzzles[:40]
+        self.puzzles = self.puzzles[:100]
     
     def measure(self, engine_cmd: str):
         def f(puzzle):
             board, moves, _ = puzzle
             return solve_puzzle(board, moves)
 
-        ELO_BUCKET_SIZE = 200
-        NUM_BUCKETS = 3000 // ELO_BUCKET_SIZE
+        NUM_BUCKETS = 3000 // self.elo_bucket_size
         buckets_solved = [0] * NUM_BUCKETS
         buckets_total = [0] * NUM_BUCKETS
 
@@ -68,9 +70,8 @@ class PuzzleAccuracy:
             solved = list(tqdm(executor.map(f, self.puzzles), total=len(self.puzzles)))
             
             for (_, _, rating), solved in zip(self.puzzles, solved):
-                b = rating // ELO_BUCKET_SIZE
-                if b >= NUM_BUCKETS: # too high rating
-                    continue
+                assert rating < 3000
+                b = rating // self.elo_bucket_size
 
                 buckets_total[b] += 1
                 if solved:
@@ -85,13 +86,17 @@ class PuzzleAccuracy:
         result = []
         for b in range(0, NUM_BUCKETS):
             if buckets_total[b] > 0:
-                result.append((b * ELO_BUCKET_SIZE, buckets_solved[b] / buckets_total[b]))
+                result.append((
+                    b * self.elo_bucket_size,
+                    (b+1) * self.elo_bucket_size - 1,
+                    buckets_solved[b] / buckets_total[b]
+                ))
 
         return result
 
 if __name__ == '__main__':
 
-    puzzle_acc = PuzzleAccuracy()
+    puzzle_acc = PuzzleAccuracy('/mnt/c/Users/mlomb/OneDrive/Escritorio/cs-master-thesis/puzzles.csv')
     res = puzzle_acc.measure('/mnt/c/Users/mlomb/OneDrive/Escritorio/cs-master-thesis/bot/target/release/bot')
     #res = puzzle_acc.measure('/home/mlomb/engines/stockfish-ubuntu-x86-64-avx2')
     print(res)
