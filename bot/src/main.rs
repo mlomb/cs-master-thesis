@@ -105,7 +105,14 @@ fn main() {
                 let best_move = search.go(
                     position.clone(),
                     max_depth,
-                    available_time.map(|t| t - Duration::from_millis(100)),
+                    available_time.map(|t| {
+                        // wiggle room to not time out
+                        if t < Duration::from_millis(500) {
+                            (t - Duration::from_millis(10)).max(Duration::from_millis(10))
+                        } else {
+                            t - Duration::from_millis(100)
+                        }
+                    }),
                 );
 
                 println!(

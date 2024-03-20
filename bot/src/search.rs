@@ -5,10 +5,7 @@ use crate::{
     tt::{TFlag, TTable},
 };
 use nn::nnue::model::NnueModel;
-use shakmaty::{
-    zobrist::{Zobrist64, ZobristHash},
-    CastlingMode, Chess, Move, MoveList,
-};
+use shakmaty::{zobrist::ZobristHash, CastlingMode, Chess, Move, MoveList};
 use std::time::{Duration, Instant};
 use std::{cell::RefCell, rc::Rc};
 
@@ -76,6 +73,7 @@ impl Search {
         self.pos = Position::from_chess(position, self.nnue_model.clone());
         self.pos.refresh();
         self.ply = 0;
+        assert!(!self.pos.legal_moves().is_empty(), "No moves available");
 
         // reset stats
         self.nodes = 0;
@@ -100,7 +98,7 @@ impl Search {
 
             best_line = Some(self.pv.get_mainline());
 
-            eprint!(
+            print!(
                 "info depth {} nodes {} evals {} time {} score cp {} pv ",
                 depth,
                 self.nodes,
@@ -109,18 +107,18 @@ impl Search {
                 score
             );
             for mv in best_line.as_ref().unwrap() {
-                eprint!("{} ", mv.to_uci(CastlingMode::Standard));
+                print!("{} ", mv.to_uci(CastlingMode::Standard));
             }
-            eprint!("\n");
+            print!("\n");
 
             if score.abs() >= 9950 {
                 // mate found
-                eprint!("info string mate found, stopping search\n");
+                print!("info string mate found, stopping search\n");
                 break;
             }
         }
 
-        best_line.unwrap().first().cloned()
+        best_line.expect("No PV line found").first().cloned()
     }
 
     fn quiescence(&mut self, mut alpha: Value, beta: Value) -> Value {

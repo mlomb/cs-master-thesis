@@ -1,5 +1,5 @@
 use crate::position::HashKey;
-use shakmaty::{zobrist::Zobrist32, Move};
+use shakmaty::Move;
 
 #[derive(Clone)]
 pub enum TFlag {
