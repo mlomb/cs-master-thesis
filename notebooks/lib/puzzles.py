@@ -76,7 +76,7 @@ class PuzzleAccuracy:
             
             for (_, _, rating), (pz_correct_moves, pz_total_moves) in zip(self.puzzles, results):
                 bucket = rating // self.elo_bucket_size
-                solved = (correct_moves == total_moves)
+                solved = (pz_correct_moves == pz_total_moves)
 
                 correct_moves += pz_correct_moves
                 total_moves += pz_total_moves
@@ -105,6 +105,6 @@ class PuzzleAccuracy:
 if __name__ == '__main__':
 
     puzzle_acc = PuzzleAccuracy('/mnt/c/Users/mlomb/Desktop/Tesis/cs-master-thesis/puzzles.csv')
-    res = puzzle_acc.measure('/home/mlomb/engines/stockfish-ubuntu-x86-64-avx2')
+    a, b = puzzle_acc.measure('/home/mlomb/engines/stockfish-ubuntu-x86-64-avx2')
     #res = puzzle_acc.measure('/mnt/c/Users/mlomb/OneDrive/Escritorio/cs-master-thesis/bot/target/release/bot')
-    print(res)
+    print(a, b)
