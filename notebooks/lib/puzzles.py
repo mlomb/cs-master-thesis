@@ -7,15 +7,18 @@ import random
 
 engines: dict[chess.engine.SimpleEngine] = {}
 
-def init_engine(engine_cmd: str):
+def init_engine(engine_cmd: str | list[str]):
     engine = chess.engine.SimpleEngine.popen_uci(engine_cmd)
     engines[threading.current_thread()] = engine
 
 
-def solve_puzzle(board: chess.Board, solution: list[chess.Move]) -> bool:
+def solve_puzzle(board: chess.Board, solution: list[chess.Move]) -> tuple[int, int]:
     board = board.copy()
     solution = solution.copy() # clone
     engine = engines[threading.current_thread()]
+
+    correct_moves = 0
+    total_moves = 0
 
     while len(solution) > 0:
         opp_move, *solution = solution
@@ -26,14 +29,15 @@ def solve_puzzle(board: chess.Board, solution: list[chess.Move]) -> bool:
 
         res = engine.play(board, chess.engine.Limit(time=50/1000))
 
-        if res.move != expected_move:
-            # Mate in 1 puzzles in Lichess can have more than one solution
-            return board.is_checkmate()
+        # Mate in 1 puzzles in Lichess can have more than one solution
+        if res.move == expected_move or board.is_checkmate():
+            correct_moves += 1
+        total_moves += 1
 
         # play engine move
         board.push(expected_move)
     
-    return True
+    return (correct_moves, total_moves)
 
 
 class PuzzleAccuracy:
@@ -56,7 +60,7 @@ class PuzzleAccuracy:
         random.Random(42).shuffle(self.puzzles)
         self.puzzles = self.puzzles[:1000]
     
-    def measure(self, engine_cmd: str):
+    def measure(self, engine_cmd: str | list[str]):
         def f(puzzle):
             board, moves, _ = puzzle
             return solve_puzzle(board, moves)
@@ -64,18 +68,23 @@ class PuzzleAccuracy:
         NUM_BUCKETS = 3000 // self.elo_bucket_size
         buckets_solved = [0] * NUM_BUCKETS
         buckets_total = [0] * NUM_BUCKETS
+        correct_moves = 0
+        total_moves = 0
 
         with ThreadPoolExecutor(max_workers=5, initializer=init_engine, initargs=(engine_cmd,)) as executor:
-            solved = list(tqdm(executor.map(f, self.puzzles), total=len(self.puzzles)))
+            results = list(tqdm(executor.map(f, self.puzzles), total=len(self.puzzles)))
             
-            for (_, _, rating), solved in zip(self.puzzles, solved):
-                assert rating < 3000
-                b = rating // self.elo_bucket_size
+            for (_, _, rating), (pz_correct_moves, pz_total_moves) in zip(self.puzzles, results):
+                bucket = rating // self.elo_bucket_size
+                solved = (correct_moves == total_moves)
 
-                buckets_total[b] += 1
+                correct_moves += pz_correct_moves
+                total_moves += pz_total_moves
+
+                buckets_total[bucket] += 1
                 if solved:
-                    buckets_solved[b] += 1
-        
+                    buckets_solved[bucket] += 1
+
         # exit all engines
         global engines
         for _, engine in engines.items():
@@ -91,11 +100,11 @@ class PuzzleAccuracy:
                     buckets_solved[b] / buckets_total[b]
                 ))
 
-        return result
+        return result, (correct_moves / total_moves)
 
 if __name__ == '__main__':
 
-    puzzle_acc = PuzzleAccuracy('/mnt/c/Users/mlomb/OneDrive/Escritorio/cs-master-thesis/puzzles.csv')
-    res = puzzle_acc.measure('/mnt/c/Users/mlomb/OneDrive/Escritorio/cs-master-thesis/bot/target/release/bot')
-    #res = puzzle_acc.measure('/home/mlomb/engines/stockfish-ubuntu-x86-64-avx2')
+    puzzle_acc = PuzzleAccuracy('/mnt/c/Users/mlomb/Desktop/Tesis/cs-master-thesis/puzzles.csv')
+    res = puzzle_acc.measure('/home/mlomb/engines/stockfish-ubuntu-x86-64-avx2')
+    #res = puzzle_acc.measure('/mnt/c/Users/mlomb/OneDrive/Escritorio/cs-master-thesis/bot/target/release/bot')
     print(res)
