@@ -4,21 +4,45 @@ mod pv;
 mod search;
 mod tt;
 
+use clap::Parser;
 use nn::nnue::model::NnueModel;
 use search::Search;
 use shakmaty::fen::Fen;
 use shakmaty::uci::Uci;
 use shakmaty::{CastlingMode, Chess, Color, Position};
 use std::cell::RefCell;
-use std::io::{self, BufRead};
+use std::fs::File;
+use std::io::{self, BufRead, Read};
 use std::rc::Rc;
 use std::time::Duration;
 use vampirc_uci::{parse_one, UciMessage, UciTimeControl};
 
+#[derive(Parser)]
+struct Cli {
+    /// The neural network file to use
+    #[arg(long, value_name = "shmem")]
+    nn: Option<String>,
+}
+
 fn main() {
-    // let model_path = "/mnt/c/Users/mlomb/Desktop/Tesis/cs-master-thesis/notebooks/runs/20240317_202841_eval_basic_4096/models/256.nn"; // eval good
-    let model_path = "/mnt/c/Users/mlomb/Desktop/Tesis/cs-master-thesis/notebooks/runs/20240318_193816_pqr_basic_4096/models/210.nn";
-    let model = NnueModel::load(model_path).unwrap();
+    let args = Cli::parse();
+
+    let nn_file = if let Some(path) = args.nn {
+        println!("info string Loading NNUE from {}", path);
+
+        let mut file = File::open(path).unwrap();
+        let mut buffer = Vec::new();
+        file.read_to_end(&mut buffer).unwrap();
+        buffer
+    } else {
+        println!("info string Using embedded NNUE");
+
+        //"/mnt/c/Users/mlomb/Desktop/Tesis/cs-master-thesis/notebooks/runs/20240317_202841_eval_basic_4096/models/256.nn".to_string()
+        // "/mnt/c/Users/mlomb/Desktop/Tesis/cs-master-thesis/notebooks/runs/20240318_193816_pqr_basic_4096/models/256.nn".to_string()
+        include_bytes!("/mnt/c/Users/mlomb/Desktop/Tesis/cs-master-thesis/notebooks/runs/20240317_202841_eval_basic_4096/models/256.nn").to_vec()
+    };
+
+    let model = NnueModel::from_memory(&nn_file).unwrap();
     let mut search = Search::new(Rc::new(RefCell::new(model)));
 
     let mut position: Chess = Chess::default();

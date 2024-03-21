@@ -1,5 +1,4 @@
 from concurrent.futures import ThreadPoolExecutor
-from contextlib import ExitStack
 import threading
 import chess
 import chess.engine
@@ -55,7 +54,7 @@ class PuzzleAccuracy:
                 self.puzzles.append((board, moves, rating))
 
         random.Random(42).shuffle(self.puzzles)
-        self.puzzles = self.puzzles[:100]
+        self.puzzles = self.puzzles[:1000]
     
     def measure(self, engine_cmd: str):
         def f(puzzle):
