@@ -83,6 +83,11 @@ impl ReadSample for EvalRead {
             read.read_until(b',', &mut score_bytes).unwrap();
             read.read_until(b'\n', &mut bestmove_bytes).unwrap();
 
+            if fen_bytes.is_empty() {
+                // Note: this can happen if the file has a mate score in the last line
+                break;
+            }
+
             // remove trailing comma
             fen_bytes.pop();
             score_bytes.pop();
@@ -104,6 +109,8 @@ impl ReadSample for EvalRead {
                 write_y
                     .write_all(&f32::to_le_bytes(cp_score as f32))
                     .unwrap();
+
+                break;
             } else {
                 // else skip mate scores
             }
