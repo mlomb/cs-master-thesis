@@ -24,7 +24,7 @@ jobs:
 
       - name: Fill in Lichess token
         run: sed "s/LICHESS_TOKEN/${{ secrets.LICHESS_TOKEN }}/g" config.yml.template > config.yml
-        working-directory: bot/.github/workflows
+        working-directory: .github/workflows
 
       - name: Copy files via SSH
         uses: appleboy/scp-action@v0.1.7
