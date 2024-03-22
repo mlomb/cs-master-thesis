@@ -32,5 +32,5 @@ jobs:
           host: ${{ secrets.HOST_IP }}
           username: ${{ secrets.HOST_USERNAME }}
           password: ${{ secrets.HOST_PASSWORD }}
-          source: "bot/bot/target/release/bot,bot/.github/workflows/config.yml"
+          source: "bot/target/release/bot,.github/workflows/config.yml"
           target: "/root/lichess-bot"
