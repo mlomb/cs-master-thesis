@@ -209,7 +209,6 @@ impl Search {
         }
 
         let in_check = self.pos.is_check();
-        let mut tt_alpha_flag = TFlag::Alpha;
 
         // Null Move Pruning
         // https://www.chessprogramming.org/Null_Move_Pruning
@@ -250,6 +249,7 @@ impl Search {
 
         let mut best_move = None;
         let mut best_score = -INFINITE;
+        let mut tt_alpha_flag = TFlag::Alpha;
 
         for move_ in moves {
             let is_quiet = !move_.is_capture();
@@ -287,7 +287,9 @@ impl Search {
             if score > alpha {
                 if is_quiet {
                     // store history moves
-                    self.history_moves[move_.role() as usize][move_.to() as usize] += depth * depth;
+                    self.history_moves
+                        [(self.pos.turn() as usize) * 6 + (move_.role() as usize - 1)]
+                        [move_.to() as usize] += depth * depth;
                 }
 
                 tt_alpha_flag = TFlag::Exact;
@@ -329,27 +331,19 @@ impl Search {
             }
 
             if move_.is_capture() {
-                // MVV LVA [attacker][victim]
-                const MVV_LVA: [[i32; 12]; 12] = [
-                    [105, 205, 305, 405, 505, 605, 105, 205, 305, 405, 505, 605],
-                    [104, 204, 304, 404, 504, 604, 104, 204, 304, 404, 504, 604],
-                    [103, 203, 303, 403, 503, 603, 103, 203, 303, 403, 503, 603],
-                    [102, 202, 302, 402, 502, 602, 102, 202, 302, 402, 502, 602],
-                    [101, 201, 301, 401, 501, 601, 101, 201, 301, 401, 501, 601],
-                    [100, 200, 300, 400, 500, 600, 100, 200, 300, 400, 500, 600],
-                    // --
-                    [105, 205, 305, 405, 505, 605, 105, 205, 305, 405, 505, 605],
-                    [104, 204, 304, 404, 504, 604, 104, 204, 304, 404, 504, 604],
-                    [103, 203, 303, 403, 503, 603, 103, 203, 303, 403, 503, 603],
-                    [102, 202, 302, 402, 502, 602, 102, 202, 302, 402, 502, 602],
-                    [101, 201, 301, 401, 501, 601, 101, 201, 301, 401, 501, 601],
-                    [100, 200, 300, 400, 500, 600, 100, 200, 300, 400, 500, 600],
+                pub const MVV_LVA: [i32; 36] = [
+                    15, 25, 35, 45, 55, 65, // Pawn
+                    14, 24, 34, 44, 54, 64, // Knight
+                    13, 23, 33, 43, 53, 63, // Bishop
+                    12, 22, 32, 42, 52, 62, // Rook
+                    11, 21, 31, 41, 51, 61, // Queen
+                    10, 20, 30, 40, 50, 60, // King
                 ];
 
-                let attacker = move_.role();
-                let victim = move_.capture().unwrap();
+                let attacker = move_.role() as usize - 1;
+                let victim = move_.capture().unwrap() as usize - 1;
 
-                score += MVV_LVA[attacker as usize][victim as usize] + 10_000;
+                score += MVV_LVA[attacker * 6 + victim] + 10_000;
             } else {
                 // move is quiet
                 score += if self.killer_moves[self.ply][0] == *move_ {
@@ -357,7 +351,8 @@ impl Search {
                 } else if self.killer_moves[self.ply][1] == *move_ {
                     8000
                 } else {
-                    self.history_moves[move_.role() as usize][move_.to() as usize]
+                    self.history_moves[(self.pos.turn() as usize) * 6 + (move_.role() as usize - 1)]
+                        [move_.to() as usize]
                 }
             }
 

@@ -160,4 +160,9 @@ impl Position {
         use shakmaty::Position;
         self.current().is_check()
     }
+
+    pub fn turn(&self) -> Color {
+        use shakmaty::Position;
+        self.current().turn()
+    }
 }
