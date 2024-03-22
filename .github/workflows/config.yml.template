@@ -1,2 +1,21 @@
-token: "LICHESS_TOKEN"    # Lichess OAuth2 Token.
+token: "LICHESS_TOKEN"
+url: "https://lichess.org/"
 
+engine:
+  dir: "."
+  name: "bot"
+  protocol: "uci"
+  ponder: false
+
+challenge:
+  concurrency: 1
+  variants:
+    - standard
+  time_controls:
+      - bullet
+      - blitz
+      - rapid
+      - classical
+  modes:
+    - casual
+#    - rated
