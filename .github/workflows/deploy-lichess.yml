@@ -19,7 +19,7 @@ jobs:
         run: cargo build --release
         working-directory: bot
         env:
-          RUSTFLAGS: "-C target-feature=+sse,+sse2,+ssse3,+sse4_1,+sse4_2,+avx,+avx2"
+          RUSTFLAGS: "-C target-feature=+sse,+sse2,+ssse3,+sse4.1,+sse4.2,+avx,+avx2"
 
       - name: Fill in Lichess token
         run: sed "s/LICHESS_TOKEN/${{ secrets.LICHESS_TOKEN }}/g" .github/workflows/config.yml.template > bot/target/release/config.yml
