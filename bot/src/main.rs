@@ -37,9 +37,7 @@ fn main() {
     } else {
         println!("info string Using embedded NNUE");
 
-        //"/mnt/c/Users/mlomb/Desktop/Tesis/cs-master-thesis/notebooks/runs/20240317_202841_eval_basic_4096/models/256.nn".to_string()
-        // "/mnt/c/Users/mlomb/Desktop/Tesis/cs-master-thesis/notebooks/runs/20240318_193816_pqr_basic_4096/models/256.nn".to_string()
-        include_bytes!("/mnt/c/Users/mlomb/Desktop/Tesis/cs-master-thesis/notebooks/runs/20240317_202841_eval_basic_4096/models/256.nn").to_vec()
+        include_bytes!("../../models/best.nn").to_vec()
     };
 
     let model = NnueModel::from_memory(&nn_file).unwrap();
