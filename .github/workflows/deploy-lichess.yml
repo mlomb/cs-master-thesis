@@ -23,8 +23,7 @@ jobs:
           RUSTFLAGS: "-C target-feature=+sse3,+avx,+avx2"
 
       - name: Fill in Lichess token
-        run: sed "s/LICHESS_TOKEN/${{ secrets.LICHESS_TOKEN }}/g" config.yml.template > config.yml
-        working-directory: .github/workflows
+        run: sed "s/LICHESS_TOKEN/${{ secrets.LICHESS_TOKEN }}/g" .github/workflows/config.yml.template > bot/target/release/config.yml
 
       - name: Copy files via SSH
         uses: appleboy/scp-action@v0.1.7
@@ -32,8 +31,8 @@ jobs:
           host: ${{ secrets.HOST_IP }}
           username: ${{ secrets.HOST_USERNAME }}
           password: ${{ secrets.HOST_PASSWORD }}
-          source: "bot/target/release/bot,.github/workflows/config.yml"
+          source: "bot/target/release/bot,bot/target/release/config.yml"
           target: "/root/lichess-bot"
-          strip_components: 99
+          strip_components: 3
           overwrite: true
 
