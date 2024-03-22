@@ -34,3 +34,6 @@ jobs:
           password: ${{ secrets.HOST_PASSWORD }}
           source: "bot/target/release/bot,.github/workflows/config.yml"
           target: "/root/lichess-bot"
+          strip_components: 99
+          overwrite: true
+
