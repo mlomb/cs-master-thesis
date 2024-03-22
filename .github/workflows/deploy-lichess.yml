@@ -1,0 +1,22 @@
+name: Deploy to Lichess
+
+on:
+  push:
+    branches:
+      - master
+      - lichess-bot
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  style:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Build bot
+        run: cd bot && cargo build --release
+        env:
+          RUSTFLAGS: "-C target-feature=+sse3,+avx,+avx2"
