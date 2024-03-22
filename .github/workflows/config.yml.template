@@ -14,8 +14,25 @@ challenge:
   time_controls:
       - bullet
       - blitz
-      - rapid
-      - classical
+#      - rapid
+#      - classical
   modes:
     - casual
-#    - rated
+    - rated
+  accept_bot: true
+  max_increment: 5
+  min_increment: 0
+  min_base: 60
+  max_base: 600
+
+matchmaking:
+  allow_matchmaking: true
+  allow_during_games: false
+  challenge_timeout: 5
+  challenge_initial_time:
+    - 60
+    - 180
+  challenge_increment:
+    - 1
+    - 2
+  challenge_mode: "rated"
