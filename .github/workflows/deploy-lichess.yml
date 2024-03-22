@@ -36,10 +36,10 @@ jobs:
           strip_components: 3
           overwrite: true
 
-    - name: Restart bot service
-      uses: appleboy/ssh-action@v1.0.3
-      with:
-        host: ${{ secrets.HOST_IP }}
-        username: ${{ secrets.HOST_USERNAME }}
-        password: ${{ secrets.HOST_PASSWORD }}
-        script: sudo systemctl restart lichessbot.service
+      - name: Restart bot service
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.HOST_IP }}
+          username: ${{ secrets.HOST_USERNAME }}
+          password: ${{ secrets.HOST_PASSWORD }}
+          script: sudo systemctl restart lichessbot.service
