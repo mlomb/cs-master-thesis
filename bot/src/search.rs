@@ -250,14 +250,52 @@ impl Search {
         let mut best_move = None;
         let mut best_score = -INFINITE;
         let mut tt_alpha_flag = TFlag::Alpha;
+        let mut moves_searched = 0;
 
         for move_ in moves {
             let is_quiet = !move_.is_capture();
+            let mut score;
 
+            // make move
             self.ply += 1;
             self.push_repetition_key(hash_key);
             self.pos.do_move(Some(move_.clone()));
-            let score = -self.negamax(-beta, -alpha, depth - 1, true);
+
+            if moves_searched == 0 {
+                // full depth, this is the first move
+                // probably the PV line
+                score = -self.negamax(-beta, -alpha, depth - 1, true);
+            } else {
+                // Late move reductions (LMR)
+                const LMR_REDUCTION: i32 = 3;
+                if moves_searched >= 1 &&
+                    depth >= LMR_REDUCTION &&
+                    !in_check &&
+                    // no capture
+                    !move_.is_capture() &&
+                    // no promotion
+                    !move_.is_promotion()
+                {
+                    // search with reduced depth
+                    score = -self.negamax(-(alpha + 1), -alpha, depth - LMR_REDUCTION, allow_null);
+                } else {
+                    // make sure a full search is done
+                    score = alpha + 1;
+                }
+
+                // PVS search
+                if score > alpha {
+                    score = -self.negamax(-(alpha + 1), -alpha, depth - 1, true);
+
+                    if (score > alpha) && (score < beta) {
+                        // failed check :(
+                        // re-search with full depth
+                        score = -self.negamax(-beta, -alpha, depth - 1, true);
+                    }
+                }
+            }
+
+            // undo move
             self.pos.undo_move(Some(move_.clone()));
             self.pop_repetition_key();
             self.ply -= 1;
@@ -300,6 +338,8 @@ impl Search {
                 // write the move into the PV table
                 self.pv.write(self.ply, move_);
             }
+
+            moves_searched += 1;
         }
 
         if best_move.is_none() {
