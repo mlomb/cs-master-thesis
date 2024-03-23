@@ -5,7 +5,7 @@ COPY nn /nn
 COPY models /models
 WORKDIR /engine
 
-ENV RUSTFLAGS="-C target-feature=+sse,+sse2,+ssse3,+sse4.1,+sse4.2,+avx,+avx2,+vnmi,+avx_vnni"
+ENV RUSTFLAGS="-C target-cpu=goldmont -C target-feature=+sse,+sse2,+ssse3,+sse4.1,+sse4.2,+avx,+avx2,+avxvnni,+avxvnniint16,+avxvnniint8"
 RUN cargo build --release
 
 
