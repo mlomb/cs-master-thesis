@@ -8,7 +8,7 @@ engine:
   ponder: false
 
 challenge:
-  concurrency: 1
+  concurrency: 4
   variants:
     - standard
   time_controls:
@@ -27,7 +27,7 @@ challenge:
 
 matchmaking:
   allow_matchmaking: true
-  allow_during_games: false
+  allow_during_games: true
   challenge_timeout: 1
   challenge_initial_time:
     - 60
