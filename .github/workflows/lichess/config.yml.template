@@ -3,7 +3,7 @@ url: "https://lichess.org/"
 
 engine:
   dir: "."
-  name: "bot"
+  name: "engine"
   protocol: "uci"
   ponder: false
 
