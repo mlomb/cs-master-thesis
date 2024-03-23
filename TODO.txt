@@ -1,9 +1,0 @@
-pasar por parametro los samples
-hacer metricas adicionales (movimientos, blunders)
-
-hacer multithreading para samples service
-hacer método Eval
-
-
-Preguntas:
-	¿Excluír las posiciones capturas ayuda? (quiescent)

@@ -93,17 +93,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "bot"
-version = "0.1.0"
-dependencies = [
- "clap",
- "nn",
- "rand",
- "shakmaty",
- "vampirc-uci",
-]
-
-[[package]]
 name = "btoi"
 version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -226,6 +215,17 @@ checksum = "9ed9a281f7bc9b7576e61468ba615a66a5c8cfdff42420a70aa82701a3b1e292"
 dependencies = [
  "block-buffer",
  "crypto-common",
+]
+
+[[package]]
+name = "engine"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "nn",
+ "rand",
+ "shakmaty",
+ "vampirc-uci",
 ]
 
 [[package]]
