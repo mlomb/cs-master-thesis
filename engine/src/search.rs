@@ -268,7 +268,7 @@ impl Search {
             } else {
                 // Late move reductions (LMR)
                 const LMR_REDUCTION: i32 = 3;
-                if moves_searched >= 1 &&
+                if moves_searched >= 2 &&
                     depth >= LMR_REDUCTION &&
                     !in_check &&
                     // no capture
