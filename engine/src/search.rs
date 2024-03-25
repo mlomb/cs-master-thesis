@@ -142,11 +142,14 @@ impl Search {
             alpha = score;
         }
 
-        for move_ in self.pos.legal_moves() {
-            if !move_.is_capture() {
-                // only look at captures
-                continue;
-            }
+        // generate legal moves
+        let mut moves = self.pos.capture_moves();
+
+        // sort moves
+        self.sort_moves(&mut moves, None);
+
+        for move_ in moves {
+            debug_assert!(move_.is_capture());
 
             self.pos.do_move(Some(move_.clone()));
             self.ply += 1;

@@ -151,6 +151,11 @@ impl Position {
         self.current().legal_moves()
     }
 
+    pub fn capture_moves(&self) -> MoveList {
+        use shakmaty::Position;
+        self.current().capture_moves()
+    }
+
     pub fn compute_hash(&self) -> HashKey {
         use shakmaty::zobrist::ZobristHash;
         self.current().zobrist_hash(shakmaty::EnPassantMode::Legal)
