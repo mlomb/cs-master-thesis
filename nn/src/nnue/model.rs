@@ -165,14 +165,10 @@ impl NnueModel {
 mod tests {
     use super::*;
 
-    /*
     /// Make sure that refreshing and updating (adding/removing features) gives the same output
     #[test]
     fn test_update() {
-        let mut nnue_model = NnueModel::from_memory(include_bytes!(
-            "/mnt/c/Users/mlomb/Desktop/Tesis/cs-master-thesis/notebooks/runs/20240317_202841_eval_basic_4096/models/256.nn"
-        ))
-        .unwrap();
+        let nnue_model = NnueModel::from_memory(include_bytes!("../../../models/best.nn")).unwrap();
 
         let all_features = vec![
             668, 324, 624, 690, 473, 204, 97, 336, 568, 148, 667, 212, 199, 265, 760, 356, 501,
@@ -192,61 +188,23 @@ mod tests {
             605, 27, 30, 31, 659, 716, 300, 65, 528, 149, 501, 662, 226, 260, 192, 651, 356, 624,
             548, 266, 67, 290, 78, 72, 23, 79, 338, 81, 86, 328, 631, 702, 419, 616,
         ];
-        nnue_model.refresh_accumulator(initial_features.as_slice(), Color::White);
-        nnue_model.update_accumulator(&[213, 512, 97, 120], &[631, 702, 419, 616], Color::White);
-        nnue_model.update_accumulator(&[275, 428, 265, 466], &[6, 728, 683, 723], Color::White);
-        nnue_model.update_accumulator(&[363, 640, 431, 350], &[0, 577, 491, 660], Color::White);
-        nnue_model.update_accumulator(&[494, 734, 553, 544], &[547, 226, 79, 651], Color::White);
-        nnue_model.update_accumulator(&[54, 569, 582, 281], &[73, 701, 466, 260], Color::White);
-        nnue_model.update_accumulator(&[764, 148, 174, 84], &[279, 225, 569, 149], Color::White);
-        nnue_model.update_accumulator(&[396, 473, 314, 250], &[133, 507, 492, 266], Color::White);
-        nnue_model.update_accumulator(&[244, 211, 620, 39], &[484, 523, 640, 27], Color::White);
-        nnue_model.update_accumulator(&[181, 487, 168, 470], &[553, 755, 652, 537], Color::White);
-        nnue_model.update_accumulator(&[361, 324, 728, 10], &[47, 726, 333, 3], Color::White);
-        // copy accumulator from white to black
-        nnue_model.accumulator[Color::Black as usize]
-            .as_mut_slice()
-            .copy_from_slice(nnue_model.accumulator[Color::White as usize].as_slice());
-        let output_with_updates = nnue_model.forward(Color::White);
 
-        nnue_model.refresh_accumulator(all_features.as_slice(), Color::White);
-        nnue_model.refresh_accumulator(all_features.as_slice(), Color::Black);
-        let output_with_refresh = nnue_model.forward(Color::White);
+        let accum_updates = Tensor::zeros(FT);
+        nnue_model.refresh_accumulator(&accum_updates, initial_features.as_slice());
+        nnue_model.update_accumulator(&accum_updates, &[213, 512, 97, 120], &[631, 702, 419, 616]);
+        nnue_model.update_accumulator(&accum_updates, &[275, 428, 265, 466], &[6, 728, 683, 723]);
+        nnue_model.update_accumulator(&accum_updates, &[363, 640, 431, 350], &[0, 577, 491, 660]);
+        nnue_model.update_accumulator(&accum_updates, &[494, 734, 553, 544], &[547, 226, 79, 651]);
+        nnue_model.update_accumulator(&accum_updates, &[54, 569, 582, 281], &[73, 701, 466, 260]);
+        nnue_model.update_accumulator(&accum_updates, &[764, 148, 174, 84], &[279, 225, 569, 149]);
+        nnue_model.update_accumulator(&accum_updates, &[396, 473, 314, 250], &[133, 507, 492, 266]);
+        nnue_model.update_accumulator(&accum_updates, &[244, 211, 620, 39], &[484, 523, 640, 27]);
+        nnue_model.update_accumulator(&accum_updates, &[181, 487, 168, 470], &[553, 755, 652, 537]);
+        nnue_model.update_accumulator(&accum_updates, &[361, 324, 728, 10], &[47, 726, 333, 3]);
 
-        assert_eq!(output_with_updates, output_with_refresh);
+        let accum_refresh = Tensor::zeros(FT);
+        nnue_model.refresh_accumulator(&accum_refresh, &all_features.as_slice());
+
+        assert_eq!(accum_updates.as_slice(), accum_refresh.as_slice()); // thus forward gives the same output
     }
-
-    #[test]
-    fn test_nn3() {
-        let mut nnue_model =
-            NnueModel::load("/mnt/c/Users/mlomb/Desktop/Tesis/cs-master-thesis/test_model.nn")
-                .unwrap();
-
-        let all_features = vec![
-            668, 324, 624, 690, 473, 204, 97, 336, 568, 148, 667, 212, 199, 265, 760, 356, 501,
-            457, 604, 213, 636, 544, 86, 208, 281, 209, 581, 639, 328, 431, 120, 363, 425, 300, 67,
-            338, 579, 66, 582, 78, 482, 456, 30, 635, 33, 31, 39, 77, 299, 487, 629, 516, 375, 451,
-            511, 234, 361, 494, 692, 404, 754, 764, 519, 254, 483, 211, 210, 84, 239, 409, 54, 720,
-            512, 109, 587, 362, 734, 396, 528, 10, 192, 448, 174, 428, 181, 748, 155, 309, 65, 331,
-            137, 350, 81, 468, 405, 470, 250, 490, 220, 76, 548, 290, 72, 244, 394, 620, 63, 716,
-            659, 314, 118, 728, 49, 662, 411, 605, 227, 168, 513, 7, 196, 275, 23,
-        ];
-        nnue_model.refresh_accumulator(all_features.as_slice(), Color::White);
-        nnue_model.refresh_accumulator(all_features.as_slice(), Color::Black);
-
-        let mut ms = 0;
-
-        for _ in 0..1000 {
-            let start = std::time::Instant::now();
-            for _ in 0..1000 {
-                nnue_model.forward(Color::White);
-                break;
-            }
-            ms += start.elapsed().as_millis();
-        }
-
-        println!("model output = {}", nnue_model.forward(Color::White));
-        println!("time for 1000 = {}", ms as f32 / 1000.0);
-    }
-    */
 }
