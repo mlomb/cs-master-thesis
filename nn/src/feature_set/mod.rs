@@ -1,7 +1,8 @@
-pub mod basic;
-//pub mod halfkp;
+pub mod half_compact;
+pub mod half_piece;
 
 mod checks;
+mod index_indep;
 
 use shakmaty::{Board, Color, Move};
 

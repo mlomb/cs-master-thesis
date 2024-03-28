@@ -1,6 +1,6 @@
 use crate::defs::MAX_PLY;
 use nn::nnue::model::NnueModel;
-use shakmaty::{Chess, Color, Move, MoveList};
+use shakmaty::{fen::Fen, Chess, Color, EnPassantMode, Move, MoveList};
 use std::{cell::RefCell, rc::Rc};
 
 pub type HashKey = shakmaty::zobrist::Zobrist32;
@@ -131,6 +131,18 @@ impl Position {
 
         let pos = self.current().clone();
         let side_to_move = pos.turn(); // side to move
+
+        // make sure it is a quiet move
+        //let fen = Fen(pos.clone().into_setup(EnPassantMode::Always)).to_string();
+        //println!("FEN: {}", fen);
+        //assert!(
+        //    pos.legal_moves()
+        //        .to_vec()
+        //        .into_iter()
+        //        .filter(|m| m.is_capture())
+        //        .count()
+        //        == 0
+        //);
 
         let ue_value = self.nnue_model.borrow_mut().forward(side_to_move);
 

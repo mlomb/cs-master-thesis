@@ -71,7 +71,8 @@ impl NnueModel {
         let feature_set_str = std::str::from_utf8(&str_buffer).unwrap();
 
         let feature_set: Box<dyn FeatureSet> = match feature_set_str {
-            "basic" => Box::new(crate::feature_set::basic::Basic::new()),
+            "half-compact" => Box::new(crate::feature_set::half_compact::HalfCompact {}),
+            "basic" => Box::new(crate::feature_set::half_piece::HalfPiece {}),
             _ => panic!("Unknown NNUE model feature set: {}", feature_set_str),
         };
         let num_features = feature_set.num_features();

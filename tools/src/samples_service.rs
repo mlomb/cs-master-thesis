@@ -1,7 +1,9 @@
 use crate::method::pqr::PQR;
 use crate::method::{eval::EvalRead, ReadSample};
 use clap::{Args, Subcommand, ValueEnum};
-use nn::feature_set::{basic::Basic, FeatureSet};
+use nn::feature_set::half_compact::HalfCompact;
+use nn::feature_set::half_piece::HalfPiece;
+use nn::feature_set::FeatureSet;
 use shared_memory::ShmemConf;
 use std::{
     error::Error,
@@ -11,7 +13,8 @@ use std::{
 
 #[derive(ValueEnum, Clone)]
 enum FeatureSetChoice {
-    Basic,
+    HalfCompact,
+    HalfPiece,
     HalfKP,
     TopK20,
 }
@@ -52,7 +55,8 @@ pub enum MethodSubcommand {
 pub fn samples_service(cmd: SamplesServiceCommand) -> Result<(), Box<dyn Error>> {
     // initialize feature set
     let feature_set: Box<dyn FeatureSet> = match cmd.feature_set {
-        FeatureSetChoice::Basic => Box::new(Basic::new()),
+        FeatureSetChoice::HalfPiece => Box::new(HalfPiece {}),
+        FeatureSetChoice::HalfCompact => Box::new(HalfCompact {}),
         FeatureSetChoice::HalfKP => todo!(),
         FeatureSetChoice::TopK20 => todo!(),
     };
