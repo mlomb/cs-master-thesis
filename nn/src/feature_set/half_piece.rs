@@ -7,7 +7,7 @@ pub struct HalfPiece;
 
 impl PieceIndependentFeatureSet for HalfPiece {
     fn num_features() -> usize {
-        (8 * 6 * 2) * 2 // 192
+        64 * 6 * 2 // 768
     }
 
     #[inline(always)]
