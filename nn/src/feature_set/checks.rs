@@ -61,6 +61,10 @@ fn check_flipped(pos: &Chess, feature_set: &dyn FeatureSet) {
 
     assert_eq!(feat_orig_white, feat_flip_black);
     assert_eq!(feat_orig_black, feat_flip_white);
+
+    for &x in &feat_orig_white {
+        assert!((x as usize) < feature_set.num_features());
+    }
 }
 
 /// Check changed_features assuming that active_features is right

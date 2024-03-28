@@ -69,7 +69,6 @@ impl NnueModel {
         let feature_set: Box<dyn FeatureSet> = match feature_set_str {
             "half-compact" => Box::new(crate::feature_set::half_compact::HalfCompact {}),
             "half-piece" => Box::new(crate::feature_set::half_piece::HalfPiece {}),
-            "basic" => Box::new(crate::feature_set::half_piece::HalfPiece {}),
             _ => panic!("Unknown NNUE model feature set: {}", feature_set_str),
         };
         let num_features = feature_set.num_features();

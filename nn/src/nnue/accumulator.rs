@@ -17,7 +17,7 @@ impl NnueAccumulator {
     pub fn new(nnue_model: Rc<RefCell<NnueModel>>) -> Self {
         NnueAccumulator {
             nnue_model,
-            accumulation: [Tensor::zeros(256), Tensor::zeros(256)],
+            accumulation: [Tensor::zeros(256), Tensor::zeros(256)], // TODO: variable?
             buffer1: Vec::with_capacity(1000),
             buffer2: Vec::with_capacity(1000),
         }
