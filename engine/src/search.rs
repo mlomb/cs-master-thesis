@@ -1,17 +1,19 @@
 use crate::{
     defs::{Value, INFINITE, INVALID_MOVE, MAX_PLY},
-    position::{HashKey, Position},
+    position_stack::{HashKey, PositionStack},
     pv::PVTable,
     tt::{TFlag, TTable},
 };
 use nn::nnue::model::NnueModel;
-use shakmaty::{zobrist::ZobristHash, CastlingMode, Chess, Move, MoveList};
+use shakmaty::{
+    zobrist::ZobristHash, CastlingMode, Chess, EnPassantMode, Move, MoveList, Position,
+};
 use std::time::{Duration, Instant};
 use std::{cell::RefCell, rc::Rc};
 
 pub struct Search {
     /// Current position
-    pub pos: Position,
+    pub pos: PositionStack,
     /// Current ply
     pub ply: usize,
 
@@ -46,7 +48,7 @@ pub struct Search {
 impl Search {
     pub fn new(nnue_model: Rc<RefCell<NnueModel>>) -> Self {
         Search {
-            pos: Position::from_chess(Chess::new(), nnue_model.clone()),
+            pos: PositionStack::new(nnue_model.clone()),
             ply: 0,
             nnue_model,
             nodes: 0,
@@ -70,10 +72,12 @@ impl Search {
         time_limit: Option<Duration>,
     ) -> Option<Move> {
         // init position
-        self.pos = Position::from_chess(position, self.nnue_model.clone());
-        self.pos.refresh();
+        self.pos.reset(&position);
         self.ply = 0;
-        assert!(!self.pos.legal_moves().is_empty(), "No moves available");
+        assert!(
+            !self.pos.get().legal_moves().is_empty(),
+            "No moves available"
+        );
 
         // reset stats
         self.nodes = 0;
@@ -143,7 +147,7 @@ impl Search {
         }
 
         // generate legal moves
-        let mut moves = self.pos.capture_moves();
+        let mut moves = self.pos.get().capture_moves();
 
         // sort moves
         self.sort_moves(&mut moves, None);
@@ -155,7 +159,7 @@ impl Search {
             self.ply += 1;
             let score = -self.quiescence(-beta, -alpha);
             self.ply -= 1;
-            self.pos.undo_move(Some(move_));
+            self.pos.undo_move();
 
             // fail-hard beta cutoff
             if score >= beta {
@@ -189,7 +193,7 @@ impl Search {
         self.pv.reset(self.ply);
 
         let is_pv = beta - alpha > 1;
-        let hash_key = self.pos.compute_hash();
+        let hash_key = self.pos.get().zobrist_hash(EnPassantMode::Legal);
         let mut pv_move = None;
 
         if !is_pv {
@@ -211,7 +215,7 @@ impl Search {
             return self.quiescence(alpha, beta);
         }
 
-        let in_check = self.pos.is_check();
+        let in_check = self.pos.get().is_check();
 
         // Null Move Pruning
         // https://www.chessprogramming.org/Null_Move_Pruning
@@ -234,7 +238,7 @@ impl Search {
             self.ply += 1;
             let score = -self.negamax(-beta, -beta + 1, depth - R - 1, false);
             self.ply -= 1;
-            self.pos.undo_move(None);
+            self.pos.undo_move();
 
             if score >= beta {
                 return beta;
@@ -245,7 +249,7 @@ impl Search {
         self.nodes += 1;
 
         // generate legal moves
-        let mut moves = self.pos.legal_moves();
+        let mut moves = self.pos.get().legal_moves();
 
         // sort moves
         self.sort_moves(&mut moves, pv_move);
@@ -299,7 +303,7 @@ impl Search {
             }
 
             // undo move
-            self.pos.undo_move(Some(move_.clone()));
+            self.pos.undo_move();
             self.pop_repetition_key();
             self.ply -= 1;
 
@@ -329,7 +333,7 @@ impl Search {
                 if is_quiet {
                     // store history moves
                     self.history_moves
-                        [(self.pos.turn() as usize) * 6 + (move_.role() as usize - 1)]
+                        [(self.pos.get().turn() as usize) * 6 + (move_.role() as usize - 1)]
                         [move_.to() as usize] += depth * depth;
                 }
 
@@ -394,7 +398,8 @@ impl Search {
                 } else if self.killer_moves[self.ply][1] == *move_ {
                     8000
                 } else {
-                    self.history_moves[(self.pos.turn() as usize) * 6 + (move_.role() as usize - 1)]
+                    self.history_moves
+                        [(self.pos.get().turn() as usize) * 6 + (move_.role() as usize - 1)]
                         [move_.to() as usize]
                 }
             }

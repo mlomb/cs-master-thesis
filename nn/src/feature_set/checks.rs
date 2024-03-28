@@ -72,9 +72,9 @@ fn check_changed(pos: &Chess, perspective: Color, feature_set: &dyn FeatureSet) 
         let mut pos_moved = pos.clone();
         pos_moved.play_unchecked(&m);
 
-        //if feature_set.requires_refresh(&m) {
-        //    continue;
-        //}
+        if feature_set.requires_refresh(&pos.board(), &m, perspective) {
+            continue;
+        }
 
         let mut pos_moved_features = vec![];
         feature_set.active_features(pos_moved.board(), perspective, &mut pos_moved_features);

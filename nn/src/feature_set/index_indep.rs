@@ -1,9 +1,13 @@
 use super::FeatureSet;
 use shakmaty::{Board, Color, File, Move, Role, Square};
 
+/// Specialization of a feature set where each piece has its own set of indexes and are
+/// not affected by the presence of other pieces.
 pub trait PieceIndependentFeatureSet {
+    /// Number of features in the set
     fn num_features() -> usize;
 
+    /// Computes the indexes of the features for the given piece
     fn compute_indexes(
         board: &Board,
         piece_square: Square,
@@ -14,12 +18,12 @@ pub trait PieceIndependentFeatureSet {
     );
 }
 
-impl<T: PieceIndependentFeatureSet> FeatureSet for T {
+impl<FS: PieceIndependentFeatureSet> FeatureSet for FS {
     fn num_features(&self) -> usize {
         Self::num_features()
     }
 
-    fn requires_refresh(&self, _move: &Move) -> bool {
+    fn requires_refresh(&self, _: &Board, _: &Move, _: Color) -> bool {
         // :)
         false
     }
@@ -42,21 +46,21 @@ impl<T: PieceIndependentFeatureSet> FeatureSet for T {
     fn changed_features(
         &self,
         board: &Board,
-        m: &Move,
+        mov: &Move,
         perspective: Color,
         add_feats: &mut Vec<u16>,
         rem_feats: &mut Vec<u16>,
     ) {
-        let from = m.from().unwrap();
-        let to = m.to();
+        let from = mov.from().unwrap();
+        let to = mov.to();
         let who_plays = board.color_at(from).unwrap(); // unchecked?
 
-        match m {
+        match mov {
             Move::Normal { from, to, .. } | Move::EnPassant { from, to } => {
-                let final_role = m.promotion().unwrap_or(m.role());
+                let final_role = mov.promotion().unwrap_or(mov.role());
 
                 Self::compute_indexes(&board, *to, final_role, who_plays, perspective, add_feats);
-                Self::compute_indexes(&board, *from, m.role(), who_plays, perspective, rem_feats);
+                Self::compute_indexes(&board, *from, mov.role(), who_plays, perspective, rem_feats);
             }
             Move::Castle { king, rook } => {
                 Self::compute_indexes(&board, *king, Role::King, who_plays, perspective, rem_feats);
@@ -91,7 +95,7 @@ impl<T: PieceIndependentFeatureSet> FeatureSet for T {
             _ => unreachable!(),
         }
 
-        if m.is_en_passant() {
+        if mov.is_en_passant() {
             Self::compute_indexes(
                 &board,
                 Square::from_coords(to.file(), from.rank()),
@@ -100,7 +104,7 @@ impl<T: PieceIndependentFeatureSet> FeatureSet for T {
                 perspective,
                 rem_feats,
             );
-        } else if let Some(captured) = m.capture() {
+        } else if let Some(captured) = mov.capture() {
             Self::compute_indexes(
                 &board,
                 to,

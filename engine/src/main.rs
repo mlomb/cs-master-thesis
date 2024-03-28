@@ -1,5 +1,5 @@
 mod defs;
-mod position;
+mod position_stack;
 mod pv;
 mod search;
 mod tt;

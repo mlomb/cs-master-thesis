@@ -2,7 +2,7 @@ use super::index_indep::PieceIndependentFeatureSet;
 use shakmaty::{Board, Color, Role, Square};
 
 /// The Half-Piece feature set
-/// Tuple: <piece_square, piece_role>
+/// Tuple: <piece_square, piece_role, piece_color>
 pub struct HalfPiece;
 
 impl PieceIndependentFeatureSet for HalfPiece {
@@ -28,10 +28,10 @@ impl PieceIndependentFeatureSet for HalfPiece {
         };
 
         let piece_square = piece_square as u16;
-        let piece_type = piece_role as u16 - 1;
+        let piece_role = piece_role as u16 - 1;
         let piece_color = (piece_color != perspective) as u16;
 
-        features.push(piece_square * 12 + piece_type * 2 + piece_color);
+        features.push(piece_square * 12 + piece_role * 2 + piece_color);
     }
 }
 

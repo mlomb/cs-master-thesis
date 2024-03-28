@@ -12,7 +12,7 @@ pub trait FeatureSet {
     fn num_features(&self) -> usize;
 
     /// Whether the given move requires a refresh of the features
-    fn requires_refresh(&self, _move: &Move) -> bool;
+    fn requires_refresh(&self, board: &Board, mov: &Move, perspective: Color) -> bool;
 
     /// Computes the initial features for the given board and perspective (potentially expensive)
     fn active_features(&self, board: &Board, perspective: Color, features: &mut Vec<u16>);
@@ -21,7 +21,7 @@ pub trait FeatureSet {
     fn changed_features(
         &self,
         board: &Board,
-        _move: &Move,
+        mov: &Move,
         perspective: Color,
         added_features: &mut Vec<u16>,
         removed_features: &mut Vec<u16>,

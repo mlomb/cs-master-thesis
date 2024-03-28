@@ -1,4 +1,4 @@
-use crate::position::HashKey;
+use crate::position_stack::HashKey;
 use shakmaty::Move;
 
 #[derive(Clone)]
