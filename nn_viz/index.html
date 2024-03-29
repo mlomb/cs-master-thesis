@@ -26,31 +26,29 @@ import { drawWeights, drawNeurons, drawBoard, drawHalfPiece } from "./render.ts"
 const canvas = document.querySelector('canvas');
 const ctx = canvas.getContext('2d');
 
-let model = null;
-let step = 0;
-let max_step = 0;
+let models = new Array(150 + 1).fill(null);
+let loading = -1; // currently loading model
+
+let max_step = 150;
+let step = max_step;
 let neuron = 0;
 let max_neuron = 0;
 
-NN.load("best.nn").then((nn) => {
-    console.log(model);
-
-    model = nn;
+async function tryLoadModel(index) {
+    if (models[index] || loading != -1) return;
+    loading = index;
+    models[index] = await NN.load(`models/half-piece/${index}.nn`);
+    max_neuron = models[index].ft.num_outputs - 1;
     dirty = 2; // do two passes, to fill position caches
-
-    step = 0;
-    max_step = 0;
-
-    neuron = 0;
-    max_neuron = model.ft.num_outputs - 1;
-});
+    loading = -1; // allow next model to load
+}
 
 function drawUntransformed() {
     ctx.textAlign = "left";
     ctx.textBaseline = "top";
     ctx.font = "30px monospace";
     ctx.fillStyle = "white";
-    ctx.fillText(`↑↓ Step: ${step}`, 10, 10);
+    ctx.fillText(`↑↓ Step: ${step}` + (loading != -1 ? ` (loading #${loading})` : ""), 10, 10);
     ctx.fillText(`←→ L1 neuron: ${neuron}`, 10, 45);
     ctx.fillText(`(shift x10)`, 10, 80);
 }
@@ -58,9 +56,12 @@ function drawUntransformed() {
 async function draw(){
     ctx.imageSmoothingEnabled = false;
     
-    if (model) {
-        // find min and max of model.layers[0].weight
-
+    if (models[step]) {
+        // try to load next model in the background
+        const lastDownloaded = models.lastIndexOf(null);
+        if (lastDownloaded != -1)
+            tryLoadModel(lastDownloaded);
+        
         //for (let i = 0; i < model.layers.length; i++) {
         //    let layer = model.layers[i];
         //    ctx.save();
@@ -70,12 +71,17 @@ async function draw(){
         //    await drawWeights(ctx, layer.bias, 1, layer.num_outputs);
         //    ctx.restore();
         //}
+
+        const model = models[step];
         
         const FEATURES_HEIGHT = 12 * 150;
         const L1_HEIGHT = (256 / 4) * 15;
 
         drawNeurons(ctx, 400, FEATURES_HEIGHT / 2 - L1_HEIGHT / 2, model.ft, neuron);
         drawHalfPiece(ctx, model.ft, neuron);
+    } else {
+        // try to load selected model
+        tryLoadModel(step);
     }
 }
 
@@ -84,12 +90,13 @@ function onClick(x, y, button) {
 }
 
 window.addEventListener("keydown", (event) => {
-    if (!model) return;
-
     let m = 1 * (event.shiftKey ? 10 : 1);
 
     if (event.key === "ArrowUp") step = Math.min(step + m, max_step);
     if (event.key === "ArrowDown") step = Math.max(step - m, 0);
+    if (event.key === "Home") step = 0;
+    if (event.key === "End") step = max_step;
+
     if (event.key === "ArrowLeft") neuron = Math.max(neuron - m, 0);
     if (event.key === "ArrowRight") neuron = Math.min(neuron + m, max_neuron);
     
