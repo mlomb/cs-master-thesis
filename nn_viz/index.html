@@ -53,8 +53,10 @@ async function draw(){
         //}
         
         const NEURON = 3;
+        const FEATURES_HEIGHT = 12 * 150;
+        const L1_HEIGHT = (256 / 4) * 15;
 
-        drawNeurons(ctx, 400, 0, model.ft, NEURON);
+        drawNeurons(ctx, 400, FEATURES_HEIGHT / 2 - L1_HEIGHT / 2, model.ft, NEURON);
         drawHalfPiece(ctx, model.ft, NEURON);
     }
 }

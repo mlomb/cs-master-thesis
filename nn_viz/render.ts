@@ -49,38 +49,49 @@ export function drawNeurons(
     let spacing = 15;
     let radius = 5;
 
+    let x_n = offset_x + (neuron % size) * spacing,
+        y_n = offset_y + Math.floor(neuron / size) * spacing;
+
+    // connect from 0,0 to x,y 768 inputs
+    for (let feature = 0; feature < 768; feature++) {
+        if (!FEATURES_COORDS.has(feature + "")) continue;
+        let [x1, y1] = FEATURES_COORDS.get(feature + "")!;
+
+        let value = layer.getWeightFT(feature, neuron);
+        let opacity = Math.abs(value / 300);
+        let color = "rgba(" + (value > 0 ? "0, 255, 0" : "255, 0, 0") + ", " + opacity + ")";
+
+        if (opacity <= 0.03) continue;
+
+        ctx.strokeStyle = color;
+        ctx.beginPath();
+        ctx.moveTo(x1, y1);
+        ctx.lineTo(x_n, y_n);
+        //ctx.closePath(); // if this is enabled, zooming too much causes extreme lag
+        ctx.stroke();
+    }
+
     for (let i = 0; i < layer.num_outputs; i++) {
         let x = offset_x + (i % size) * spacing;
         let y = offset_y + Math.floor(i / size) * spacing;
 
         if (i == neuron) {
-            ctx.lineWidth = 1;
-
-            // connect from 0,0 to x,y 768 inputs
-            for (let feature = 0; feature < 768; feature++) {
-                if (!FEATURES_COORDS.has(feature + "")) continue;
-                let [x1, y1] = FEATURES_COORDS.get(feature + "")!;
-
-                let value = layer.getWeightFT(feature, neuron);
-                let color = "rgba(" + (value > 0 ? "0, 255, 0" : "255, 0, 0") + ", " + Math.abs(value / 300) + ")";
-
-                ctx.strokeStyle = color;
-                ctx.beginPath();
-                ctx.moveTo(x1, y1);
-                ctx.lineTo(x, y);
-                ctx.stroke();
-            }
+            ctx.fillStyle = "gray";
+            ctx.strokeStyle = "white";
+        } else {
+            ctx.fillStyle = "#454545";
+            ctx.strokeStyle = "#6A6A6A";
         }
-
-        ctx.fillStyle = "rgba(255, 255, 255, 0.2)";
-        ctx.strokeStyle = "white";
         ctx.lineWidth = 1;
 
         ctx.beginPath();
         ctx.arc(x, y, radius, 0, 2 * Math.PI);
+        ctx.closePath();
         ctx.stroke();
         ctx.fill();
     }
+
+    ctx.lineWidth = 1;
 }
 
 type Cell = {
@@ -126,9 +137,12 @@ export function drawBoard(ctx: CanvasRenderingContext2D, offset_x: number, offse
             let key = color + role;
             let img = PIECES.get(key);
             if (img) {
-                ctx.globalAlpha = opacity === undefined ? 1 : opacity;
-                ctx.drawImage(img, x, y, BOARD_CELL_SIZE, BOARD_CELL_SIZE);
-                ctx.globalAlpha = 1;
+                let op = opacity === undefined ? 1 : opacity;
+                if (op > 0.03) {
+                    ctx.globalAlpha = op;
+                    ctx.drawImage(img, x, y, BOARD_CELL_SIZE, BOARD_CELL_SIZE);
+                    ctx.globalAlpha = 1;
+                }
             }
         }
 
