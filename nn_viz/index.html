@@ -27,17 +27,36 @@ const canvas = document.querySelector('canvas');
 const ctx = canvas.getContext('2d');
 
 let model = null;
+let step = 0;
+let max_step = 0;
+let neuron = 0;
+let max_neuron = 0;
 
 NN.load("best.nn").then((nn) => {
-    model = nn;
-    dirty = 2;
     console.log(model);
+
+    model = nn;
+    dirty = 2; // do two passes, to fill position caches
+
+    step = 0;
+    max_step = 0;
+
+    neuron = 0;
+    max_neuron = model.ft.num_outputs - 1;
 });
 
+function drawUntransformed() {
+    ctx.textAlign = "left";
+    ctx.textBaseline = "top";
+    ctx.font = "30px monospace";
+    ctx.fillStyle = "white";
+    ctx.fillText(`↑↓ Step: ${step}`, 10, 10);
+    ctx.fillText(`←→ L1 neuron: ${neuron}`, 10, 45);
+    ctx.fillText(`(shift x10)`, 10, 80);
+}
 
 async function draw(){
     ctx.imageSmoothingEnabled = false;
-
     
     if (model) {
         // find min and max of model.layers[0].weight
@@ -52,18 +71,30 @@ async function draw(){
         //    ctx.restore();
         //}
         
-        const NEURON = 3;
         const FEATURES_HEIGHT = 12 * 150;
         const L1_HEIGHT = (256 / 4) * 15;
 
-        drawNeurons(ctx, 400, FEATURES_HEIGHT / 2 - L1_HEIGHT / 2, model.ft, NEURON);
-        drawHalfPiece(ctx, model.ft, NEURON);
+        drawNeurons(ctx, 400, FEATURES_HEIGHT / 2 - L1_HEIGHT / 2, model.ft, neuron);
+        drawHalfPiece(ctx, model.ft, neuron);
     }
 }
 
 function onClick(x, y, button) {
     console.log("onClick", x, y, button);
 }
+
+window.addEventListener("keydown", (event) => {
+    if (!model) return;
+
+    let m = 1 * (event.shiftKey ? 10 : 1);
+
+    if (event.key === "ArrowUp") step = Math.min(step + m, max_step);
+    if (event.key === "ArrowDown") step = Math.max(step - m, 0);
+    if (event.key === "ArrowLeft") neuron = Math.max(neuron - m, 0);
+    if (event.key === "ArrowRight") neuron = Math.min(neuron + m, max_neuron);
+    
+    dirty = Math.max(dirty, 1);
+});
 
 ////////////////////////////////////////////////
 ////////////////////////////////////////////////
@@ -91,19 +122,22 @@ function scaleAt(at, amount) {
 }
 
 async function drawCanvas() {
+
     if (dirty > 0) {
         dirty--;
         canvas.width = window.innerWidth;
         canvas.height = window.innerHeight;
-        ctx.setTransform(1, 0, 0, 1, 0, 0); 
         ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
         ctx.setTransform(
             scale, 0,
             0, scale,
             pos.x, pos.y
         );
-
         await draw();
+        
+        ctx.setTransform(1, 0, 0, 1, 0, 0); 
+        drawUntransformed();
     }
     requestAnimationFrame(drawCanvas);
 }
