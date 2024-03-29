@@ -1,0 +1,150 @@
+<html>
+<head>
+    <title>Chess Neural Network visualizer</title>
+</head>
+<body>
+<style>
+body {
+    background-color: #303030;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+}
+canvas {
+    image-rendering: pixelated;
+}
+</style>
+
+<canvas></canvas>
+
+<script type="module" src="nn.ts"></script>
+<script type="module" src="render.ts"></script>
+<script type="module">
+import { NN } from "./nn.ts";
+import { drawWeights, drawNeurons, drawBoard, drawHalfPiece } from "./render.ts";
+
+const canvas = document.querySelector('canvas');
+const ctx = canvas.getContext('2d');
+
+let model = null;
+
+NN.load("best.nn").then((nn) => {
+    model = nn;
+    dirty = 2;
+    console.log(model);
+});
+
+
+async function draw(){
+    ctx.imageSmoothingEnabled = false;
+
+    
+    if (model) {
+        // find min and max of model.layers[0].weight
+
+        //for (let i = 0; i < model.layers.length; i++) {
+        //    let layer = model.layers[i];
+        //    ctx.save();
+        //    ctx.translate(0, 300 * i);
+        //    await drawWeights(ctx, layer.weight, layer.num_inputs, layer.num_outputs);
+        //    ctx.translate(-10, 0);
+        //    await drawWeights(ctx, layer.bias, 1, layer.num_outputs);
+        //    ctx.restore();
+        //}
+        
+        const NEURON = 3;
+
+        drawNeurons(ctx, 400, 0, model.ft, NEURON);
+        drawHalfPiece(ctx, model.ft, NEURON);
+    }
+}
+
+function onClick(x, y, button) {
+    console.log("onClick", x, y, button);
+}
+
+////////////////////////////////////////////////
+////////////////////////////////////////////////
+////////////////////////////////////////////////
+
+let dirty = 1;
+let scale = 1;
+let pos = { x: 0, y: 0 };
+let panning = false;
+
+function pan(amount) {
+    if(amount.x !== 0 || amount.y !== 0) {
+        panning = true;
+        dirty = Math.max(dirty, 1);
+        pos.x += amount.x;
+        pos.y += amount.y;
+    }
+}
+
+function scaleAt(at, amount) {
+    scale *= amount;
+    pos.x = at.x - (at.x - pos.x) * amount;
+    pos.y = at.y - (at.y - pos.y) * amount;
+    dirty = Math.max(dirty, 1);
+}
+
+async function drawCanvas() {
+    if (dirty > 0) {
+        dirty--;
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        ctx.setTransform(1, 0, 0, 1, 0, 0); 
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.setTransform(
+            scale, 0,
+            0, scale,
+            pos.x, pos.y
+        );
+
+        await draw();
+    }
+    requestAnimationFrame(drawCanvas);
+}
+
+window.onresize = () => Math.max(dirty, 1);
+canvas.oncontextmenu = e => e.preventDefault();
+canvas.addEventListener("mousemove", mouseEvent);
+canvas.addEventListener("mousedown", mouseEvent);
+canvas.addEventListener("mouseup", mouseEvent);
+canvas.addEventListener("mouseout", mouseEvent);
+canvas.addEventListener("wheel", mouseWheelEvent, { passive: false });
+const mouse = { x: 0, y: 0, oldX: 0, oldY: 0, button: false };
+function mouseEvent(event) {
+    if (event.type === "mousedown") {
+        mouse.button = true;
+        panning = false;
+    }
+    if (event.type === "mouseup" || event.type === "mouseout") {
+        if(mouse.button && panning == false) {
+            const invScale = (1/scale);
+            onClick(
+                Math.ceil((mouse.x - pos.x) * invScale),
+                Math.ceil((mouse.y - pos.y) * invScale),
+                event.button
+            );
+        }
+        mouse.button = false;
+    }
+    mouse.oldX = mouse.x;
+    mouse.oldY = mouse.y;
+    mouse.x = event.offsetX;
+    mouse.y = event.offsetY;
+    if(mouse.button) pan({ x: mouse.x - mouse.oldX, y: mouse.y - mouse.oldY });
+}
+function mouseWheelEvent(event) {
+    var x = event.offsetX;
+    var y = event.offsetY;
+    if (event.deltaY < 0) { scaleAt({x, y}, 1.1) }
+    else { scaleAt({x, y}, 1 / 1.1) }
+    event.preventDefault();
+}
+
+requestAnimationFrame(drawCanvas);
+</script>
+</body>
+</html>

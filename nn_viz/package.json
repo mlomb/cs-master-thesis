@@ -1,0 +1,10 @@
+{
+  "name": "nn_viz",
+  "version": "1.0.0",
+  "dependencies": {
+    "@panzoom/panzoom": "^4.5.1",
+    "@types/node": "^20.11.30",
+    "chessground": "^9.0.4",
+    "typescript": "^5.4.3"
+  }
+}
