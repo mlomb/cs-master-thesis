@@ -12,10 +12,10 @@ jobs:
       - uses: actions/checkout@v3
       - uses: actions/setup-node@v3
       - run: npm ci
-        working-directory: ./nn-viz
+        working-directory: nn-viz
       - run: npm run build
-        working-directory: ./nn-viz
+        working-directory: nn-viz
       - uses: peaceiris/actions-gh-pages@v3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./nn-viz/dist
+          publish_dir: nn-viz/dist
