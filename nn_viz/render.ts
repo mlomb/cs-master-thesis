@@ -147,10 +147,14 @@ export function drawBoard(ctx: CanvasRenderingContext2D, offset_x: number, offse
 
 export function drawHalfPiece(ctx: CanvasRenderingContext2D, layer: Layer, neuron: number) {
     for (let channel = 0; channel < 12; channel++) {
+        let color = COLORS[Number(channel >= 6)];
+        let role = ROLES[channel % 6];
+        let y_base = channel * 150;
+
         drawBoard(
             ctx,
             0,
-            channel * 150,
+            y_base,
             Array.from({ length: 64 }, (_, i) => {
                 let feature = 64 * channel + i;
                 let value = layer.getWeightFT(feature, neuron);
@@ -161,12 +165,17 @@ export function drawHalfPiece(ctx: CanvasRenderingContext2D, layer: Layer, neuro
                     accent: "rgba(" + (value > 0 ? "0, 255, 0" : "255, 0, 0") + ", " + opacity + ")",
                     coords_key: `${feature}`,
 
-                    color: channel < 6 ? "w" : "b",
+                    color,
                     role: ROLES[channel % 6],
                     opacity,
                 };
             })
         );
+
+        let piece_img = PIECES.get(color + role);
+        if (piece_img) {
+            ctx.drawImage(piece_img, -64, y_base + (8 * BOARD_CELL_SIZE) / 2 - 32 / 2, 32, 32);
+        }
     }
 
     ctx.font = "20px monospace";
