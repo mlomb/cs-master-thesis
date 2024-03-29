@@ -7,6 +7,12 @@ pub trait PieceIndependentFeatureSet {
     /// Number of features in the set
     fn num_features() -> usize;
 
+    /// Whether the given move requires a refresh of the features
+    fn requires_refresh(_board: &Board, _mov: &Move, _perspective: Color) -> bool {
+        // by default, no refresh is needed
+        false
+    }
+
     /// Computes the indexes of the features for the given piece
     fn compute_indexes(
         board: &Board,
@@ -23,9 +29,8 @@ impl<FS: PieceIndependentFeatureSet> FeatureSet for FS {
         Self::num_features()
     }
 
-    fn requires_refresh(&self, _: &Board, _: &Move, _: Color) -> bool {
-        // :)
-        false
+    fn requires_refresh(&self, board: &Board, mov: &Move, perspective: Color) -> bool {
+        Self::requires_refresh(board, mov, perspective)
     }
 
     fn active_features(&self, board: &Board, perspective: Color, features: &mut Vec<u16>) {

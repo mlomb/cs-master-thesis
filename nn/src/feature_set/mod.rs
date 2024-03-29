@@ -1,4 +1,5 @@
 pub mod half_compact;
+pub mod half_king;
 pub mod half_piece;
 
 mod checks;

@@ -2,6 +2,7 @@ use crate::method::pqr::PQR;
 use crate::method::{eval::EvalRead, ReadSample};
 use clap::{Args, Subcommand, ValueEnum};
 use nn::feature_set::half_compact::HalfCompact;
+use nn::feature_set::half_king::HalfKingPiece;
 use nn::feature_set::half_piece::HalfPiece;
 use nn::feature_set::FeatureSet;
 use shared_memory::ShmemConf;
@@ -15,7 +16,7 @@ use std::{
 enum FeatureSetChoice {
     HalfCompact,
     HalfPiece,
-    HalfKP,
+    HalfKingPiece,
     TopK20,
 }
 
@@ -55,9 +56,9 @@ pub enum MethodSubcommand {
 pub fn samples_service(cmd: SamplesServiceCommand) -> Result<(), Box<dyn Error>> {
     // initialize feature set
     let feature_set: Box<dyn FeatureSet> = match cmd.feature_set {
-        FeatureSetChoice::HalfPiece => Box::new(HalfPiece {}),
         FeatureSetChoice::HalfCompact => Box::new(HalfCompact {}),
-        FeatureSetChoice::HalfKP => todo!(),
+        FeatureSetChoice::HalfPiece => Box::new(HalfPiece {}),
+        FeatureSetChoice::HalfKingPiece => Box::new(HalfKingPiece {}),
         FeatureSetChoice::TopK20 => todo!(),
     };
 
