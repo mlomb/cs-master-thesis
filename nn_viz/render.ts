@@ -180,7 +180,7 @@ async function loadPieces() {
     for (let color of COLORS) {
         for (let role of ROLES) {
             let img = new Image();
-            img.src = `/pieces/${color}${role}.svg`;
+            img.src = `pieces/${color}${role}.svg`;
             PIECES.set(color + role, img);
         }
     }
