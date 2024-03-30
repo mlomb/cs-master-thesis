@@ -4,3 +4,4 @@ checkpoints/
 logs/
 runs/
 __pycache__/
+wandb/

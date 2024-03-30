@@ -31,9 +31,7 @@ impl PieceIndependentFeatureSet for HalfPiece {
         let piece_role = piece_role as u16 - 1;
         let piece_color = (piece_color != perspective) as u16;
 
-        // TODO: move to new format, keeping old one to preserve current net
-        //features.push(piece_square * 12 + piece_role * 2 + piece_color);
-        features.push((piece_role + 6 * piece_color) * 64 + piece_square);
+        features.push(piece_square * 12 + piece_role * 2 + piece_color);
     }
 }
 
