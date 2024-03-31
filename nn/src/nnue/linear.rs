@@ -113,31 +113,44 @@ pub unsafe fn linear_partial_refresh(
     const REGISTER_WIDTH: usize = 256 / 16;
     const NUM_CHUNKS: usize = 16;
 
+    let num_passes = num_outputs / (REGISTER_WIDTH * NUM_CHUNKS);
+
+    debug_assert!(num_outputs % (REGISTER_WIDTH * NUM_CHUNKS) == 0); // must be multiple of 256
     debug_assert!(num_inputs % REGISTER_WIDTH == 0); // processing 16 elements at a time
-    debug_assert!(NUM_CHUNKS == num_outputs / REGISTER_WIDTH); // we expect only 16 chunks
+    debug_assert!(num_passes * NUM_CHUNKS * REGISTER_WIDTH == num_outputs);
 
     let mut regs: [__m256i; NUM_CHUNKS] = unsafe { std::mem::zeroed() };
 
-    // init registers with bias
-    for i in 0..NUM_CHUNKS {
-        regs[i] = _mm256_load_si256(bias.add(i * REGISTER_WIDTH) as *const __m256i);
-    }
+    // we have 16 registers, each with 16 i16 elements (256 bits each)
+    for p in 0..num_passes {
+        // offset for the current pass
+        let p_off = p * NUM_CHUNKS * REGISTER_WIDTH;
 
-    // accumulate active rows
-    for &a in active_rows {
+        // init registers with bias
         for i in 0..NUM_CHUNKS {
-            regs[i] = _mm256_add_epi16(
+            regs[i] = _mm256_load_si256(bias.add(p_off + i * REGISTER_WIDTH) as *const __m256i);
+        }
+
+        // accumulate active rows
+        for &a in active_rows {
+            for i in 0..NUM_CHUNKS {
+                regs[i] = _mm256_add_epi16(
+                    regs[i],
+                    _mm256_load_si256(
+                        weight.add((a as usize) * num_outputs + p_off + i * REGISTER_WIDTH)
+                            as *const __m256i,
+                    ),
+                );
+            }
+        }
+
+        // copy to output
+        for i in 0..NUM_CHUNKS {
+            _mm256_store_si256(
+                output.add(p_off + i * REGISTER_WIDTH) as *mut __m256i,
                 regs[i],
-                _mm256_load_si256(
-                    weight.add((a as usize) * num_outputs + i * REGISTER_WIDTH) as *const __m256i
-                ),
             );
         }
-    }
-
-    // copy to output
-    for i in 0..NUM_CHUNKS {
-        _mm256_store_si256(output.add(i * REGISTER_WIDTH) as *mut __m256i, regs[i]);
     }
 }
 
@@ -154,42 +167,56 @@ pub unsafe fn linear_partial_update(
     const REGISTER_WIDTH: usize = 256 / 16;
     const NUM_CHUNKS: usize = 16;
 
+    let num_passes = num_outputs / (REGISTER_WIDTH * NUM_CHUNKS);
+
+    debug_assert!(num_outputs % (REGISTER_WIDTH * NUM_CHUNKS) == 0); // must be multiple of 256
     debug_assert!(num_inputs % REGISTER_WIDTH == 0); // processing 16 elements at a time
-    debug_assert!(NUM_CHUNKS == num_outputs / REGISTER_WIDTH); // we expect only 16 chunks
+    debug_assert!(num_passes * NUM_CHUNKS * REGISTER_WIDTH == num_outputs);
 
     let mut regs: [__m256i; NUM_CHUNKS] = unsafe { std::mem::zeroed() };
 
-    // copy all existing values into the registers
-    for i in 0..NUM_CHUNKS {
-        regs[i] = _mm256_load_si256(inout.add(i * REGISTER_WIDTH) as *const __m256i);
-    }
+    // we have 16 registers, each with 16 i16 elements (256 bits each)
+    for p in 0..num_passes {
+        // offset for the current pass
+        let p_off = p * NUM_CHUNKS * REGISTER_WIDTH;
 
-    // subtract removed rows
-    for &r in removed_rows {
+        // copy all existing values into the registers
         for i in 0..NUM_CHUNKS {
-            regs[i] = _mm256_sub_epi16(
+            regs[i] = _mm256_load_si256(inout.add(p_off + i * REGISTER_WIDTH) as *const __m256i);
+        }
+
+        // subtract removed rows
+        for &r in removed_rows {
+            for i in 0..NUM_CHUNKS {
+                regs[i] = _mm256_sub_epi16(
+                    regs[i],
+                    _mm256_load_si256(
+                        weight.add((r as usize) * num_outputs + p_off + i * REGISTER_WIDTH)
+                            as *const __m256i,
+                    ),
+                );
+            }
+        }
+
+        // add added rows
+        for &a in added_rows {
+            for i in 0..NUM_CHUNKS {
+                regs[i] = _mm256_add_epi16(
+                    regs[i],
+                    _mm256_load_si256(
+                        weight.add((a as usize) * num_outputs + p_off + i * REGISTER_WIDTH)
+                            as *const __m256i,
+                    ),
+                );
+            }
+        }
+
+        // copy the result back
+        for i in 0..NUM_CHUNKS {
+            _mm256_store_si256(
+                inout.add(p_off + i * REGISTER_WIDTH) as *mut __m256i,
                 regs[i],
-                _mm256_load_si256(
-                    weight.add((r as usize) * num_outputs + i * REGISTER_WIDTH) as *const __m256i
-                ),
             );
         }
-    }
-
-    // add added rows
-    for &a in added_rows {
-        for i in 0..NUM_CHUNKS {
-            regs[i] = _mm256_add_epi16(
-                regs[i],
-                _mm256_load_si256(
-                    weight.add((a as usize) * num_outputs + i * REGISTER_WIDTH) as *const __m256i
-                ),
-            );
-        }
-    }
-
-    // copy the result back
-    for i in 0..NUM_CHUNKS {
-        _mm256_store_si256(inout.add(i * REGISTER_WIDTH) as *mut __m256i, regs[i]);
     }
 }

@@ -15,9 +15,10 @@ pub struct NnueAccumulator {
 
 impl NnueAccumulator {
     pub fn new(nnue_model: Rc<RefCell<NnueModel>>) -> Self {
+        let num_ft = nnue_model.borrow().get_num_ft();
         NnueAccumulator {
             nnue_model,
-            accumulation: [Tensor::zeros(256), Tensor::zeros(256)], // TODO: variable?
+            accumulation: [Tensor::zeros(num_ft), Tensor::zeros(num_ft)],
             buffer1: Vec::with_capacity(1000),
             buffer2: Vec::with_capacity(1000),
         }

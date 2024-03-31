@@ -162,6 +162,10 @@ impl NnueModel {
     pub fn get_feature_set(&self) -> &dyn FeatureSet {
         self.feature_set.as_ref()
     }
+
+    pub fn get_num_ft(&self) -> usize {
+        self.feature_transform.num_outputs
+    }
 }
 
 #[cfg(test)]
@@ -192,7 +196,7 @@ mod tests {
             548, 266, 67, 290, 78, 72, 23, 79, 338, 81, 86, 328, 631, 702, 419, 616,
         ];
 
-        let accum_updates = Tensor::zeros(256);
+        let accum_updates = Tensor::zeros(nnue_model.get_num_ft());
         nnue_model.refresh_accumulator(&accum_updates, initial_features.as_slice());
         nnue_model.update_accumulator(&accum_updates, &[213, 512, 97, 120], &[631, 702, 419, 616]);
         nnue_model.update_accumulator(&accum_updates, &[275, 428, 265, 466], &[6, 728, 683, 723]);
@@ -205,7 +209,7 @@ mod tests {
         nnue_model.update_accumulator(&accum_updates, &[181, 487, 168, 470], &[553, 755, 652, 537]);
         nnue_model.update_accumulator(&accum_updates, &[361, 324, 728, 10], &[47, 726, 333, 3]);
 
-        let accum_refresh = Tensor::zeros(256);
+        let accum_refresh = Tensor::zeros(nnue_model.get_num_ft());
         nnue_model.refresh_accumulator(&accum_refresh, &all_features.as_slice());
 
         assert_eq!(accum_updates.as_slice(), accum_refresh.as_slice()); // thus forward gives the same output
