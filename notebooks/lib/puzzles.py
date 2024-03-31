@@ -12,7 +12,7 @@ def init_engine(engine_cmd: str | list[str]):
     engines[threading.current_thread()] = engine
 
 
-def solve_puzzle(board: chess.Board, solution: list[chess.Move]) -> tuple[int, int]:
+def solve_puzzle(board: chess.Board, solution: list[chess.Move], themes) -> tuple[int, int]:
     board = board.copy()
     solution = solution.copy() # clone
     engine = engines[threading.current_thread()]
@@ -29,14 +29,14 @@ def solve_puzzle(board: chess.Board, solution: list[chess.Move]) -> tuple[int, i
 
         res = engine.play(board, chess.engine.Limit(time=50/1000))
 
-        # Mate in 1 puzzles in Lichess can have more than one solution
+        # play engine move
+        board.push(expected_move)
+
+        # Mate in 1 puzzles can have more than one solution (Lichess)
         if res.move == expected_move or board.is_checkmate():
             correct_moves += 1
         total_moves += 1
 
-        # play engine move
-        board.push(expected_move)
-    
     return (correct_moves, total_moves)
 
 
@@ -66,8 +66,8 @@ class PuzzleAccuracy:
     
     def measure(self, engine_cmd: str | list[str]):
         def f(puzzle):
-            board, moves, _ = puzzle
-            return solve_puzzle(board, moves)
+            board, moves, themes = puzzle
+            return solve_puzzle(board, moves, themes)
 
         correct_moves = 0
         total_moves = 0
@@ -75,7 +75,7 @@ class PuzzleAccuracy:
         themes_solved = {}
         themes_total = {}
 
-        with ThreadPoolExecutor(max_workers=5, initializer=init_engine, initargs=(engine_cmd,)) as executor:
+        with ThreadPoolExecutor(max_workers=1, initializer=init_engine, initargs=(engine_cmd,)) as executor:
             results = list(tqdm(executor.map(f, self.puzzles), total=len(self.puzzles)))
             
             for (_, _, themes), (pz_correct_moves, pz_total_moves) in zip(self.puzzles, results):

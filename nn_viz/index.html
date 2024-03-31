@@ -56,6 +56,8 @@ function drawUntransformed() {
 async function draw(){
     ctx.imageSmoothingEnabled = false;
     
+    // TODO: separar el draw de las líneas de drawNeurons para hacer lineas de feature → neuron
+
     if (models[step]) {
         // try to load next model in the background
         const lastDownloaded = models.lastIndexOf(null);
