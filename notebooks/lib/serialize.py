@@ -8,6 +8,15 @@ class NnueWriter:
         self.buf.extend(bytes(feature_set_name, 'utf-8'))
         self.buf.append(0) # null-terminated string
 
+        for k in [
+            model.num_features,
+            model.num_ft,
+            model.num_l1,
+            model.num_l2
+        ]:
+            # number of neurons
+            self.buf.extend(k.to_bytes(4, byteorder='little', signed=False))
+
         self.write_linear(
             model.ft,
             weightType=torch.int16,

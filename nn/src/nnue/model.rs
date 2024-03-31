@@ -2,12 +2,9 @@ use super::crelu::{crelu_16, crelu_32};
 use super::linear::{linear, linear_partial_refresh, linear_partial_update};
 use super::tensor::Tensor;
 use crate::feature_set::FeatureSet;
+use byteorder::{LittleEndian, ReadBytesExt};
 use std::fs::File;
 use std::io::{BufRead, Cursor, Read};
-
-const FT: usize = 256;
-const L1: usize = 32;
-const L2: usize = 32;
 
 struct LinearLayer<W, B> {
     num_inputs: usize,
@@ -66,22 +63,27 @@ impl NnueModel {
         str_buffer.pop(); // remove null byte
         let feature_set_str = std::str::from_utf8(&str_buffer).unwrap();
 
+        let num_features = cursor.read_u32::<LittleEndian>().unwrap() as usize;
+        let num_ft = cursor.read_u32::<LittleEndian>().unwrap() as usize;
+        let num_l1 = cursor.read_u32::<LittleEndian>().unwrap() as usize;
+        let num_l2 = cursor.read_u32::<LittleEndian>().unwrap() as usize;
+
         let feature_set: Box<dyn FeatureSet> = match feature_set_str {
             "half-compact" => Box::new(crate::feature_set::half_compact::HalfCompact {}),
             "half-piece" => Box::new(crate::feature_set::half_piece::HalfPiece {}),
             "half-king-piece" => Box::new(crate::feature_set::half_king::HalfKingPiece {}),
             _ => panic!("Unknown NNUE model feature set: {}", feature_set_str),
         };
-        let num_features = feature_set.num_features();
+        assert_eq!(num_features as usize, feature_set.num_features());
 
         println!("info string NNUE feature set: {}", feature_set_str);
 
         Ok(Self {
             feature_set,
-            feature_transform: LinearLayer::new(&mut cursor, num_features, FT),
-            linear1: LinearLayer::new(&mut cursor, 2 * FT, L1),
-            linear2: LinearLayer::new(&mut cursor, L1, L2),
-            linear_out: LinearLayer::new(&mut cursor, L2, 1),
+            feature_transform: LinearLayer::new(&mut cursor, num_features, num_ft),
+            linear1: LinearLayer::new(&mut cursor, 2 * num_ft, num_l1),
+            linear2: LinearLayer::new(&mut cursor, num_l1, num_l2),
+            linear_out: LinearLayer::new(&mut cursor, num_l2, 1),
         })
     }
 
@@ -121,20 +123,21 @@ impl NnueModel {
             let to_move_accum = to_move_accum.as_ptr();
             let not_to_move_accum = not_to_move_accum.as_ptr();
 
-            let (to_move, not_to_move) = self.linear1.input_buffer.as_mut_slice().split_at_mut(FT);
-            crelu_16(FT, to_move_accum, to_move.as_mut_ptr());
-            crelu_16(FT, not_to_move_accum, not_to_move.as_mut_ptr());
+            let ft = self.feature_transform.num_outputs;
+            let (to_move, not_to_move) = self.linear1.input_buffer.as_mut_slice().split_at_mut(ft);
+            crelu_16(ft, to_move_accum, to_move.as_mut_ptr());
+            crelu_16(ft, not_to_move_accum, not_to_move.as_mut_ptr());
 
             Self::forward_hidden(&self.linear1);
             crelu_32(
-                L1,
+                self.linear1.num_outputs,
                 self.linear1.intermediate_buffer.as_ptr(),
                 self.linear2.input_buffer.as_mut_ptr(),
             );
 
             Self::forward_hidden(&self.linear2);
             crelu_32(
-                L2,
+                self.linear2.num_outputs,
                 self.linear2.intermediate_buffer.as_ptr(),
                 self.linear_out.input_buffer.as_mut_ptr(),
             );
@@ -189,7 +192,7 @@ mod tests {
             548, 266, 67, 290, 78, 72, 23, 79, 338, 81, 86, 328, 631, 702, 419, 616,
         ];
 
-        let accum_updates = Tensor::zeros(FT);
+        let accum_updates = Tensor::zeros(256);
         nnue_model.refresh_accumulator(&accum_updates, initial_features.as_slice());
         nnue_model.update_accumulator(&accum_updates, &[213, 512, 97, 120], &[631, 702, 419, 616]);
         nnue_model.update_accumulator(&accum_updates, &[275, 428, 265, 466], &[6, 728, 683, 723]);
@@ -202,7 +205,7 @@ mod tests {
         nnue_model.update_accumulator(&accum_updates, &[181, 487, 168, 470], &[553, 755, 652, 537]);
         nnue_model.update_accumulator(&accum_updates, &[361, 324, 728, 10], &[47, 726, 333, 3]);
 
-        let accum_refresh = Tensor::zeros(FT);
+        let accum_refresh = Tensor::zeros(256);
         nnue_model.refresh_accumulator(&accum_refresh, &all_features.as_slice());
 
         assert_eq!(accum_updates.as_slice(), accum_refresh.as_slice()); // thus forward gives the same output
