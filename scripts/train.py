@@ -134,21 +134,21 @@ def main():
     parser = argparse.ArgumentParser(description="Train the network")
 
     # model
-    parser.add_argument("--feature_set", default="half-piece", type=str)
-    parser.add_argument("--ft_size", default=256, type=int)
-    parser.add_argument("--l1_size", default=32, type=int)
-    parser.add_argument("--l2_size", default=32, type=int)
+    parser.add_argument("--feature-set", default="half-piece", type=str)
+    parser.add_argument("--ft-size", default=256, type=int)
+    parser.add_argument("--l1-size", default=32, type=int)
+    parser.add_argument("--l2-size", default=32, type=int)
 
     # training
-    parser.add_argument("--batch_size", default=4096, type=int)
-    parser.add_argument("--batches_per_epoch", default=1000, type=int)
+    parser.add_argument("--batch-size", default=4096, type=int)
+    parser.add_argument("--batches-per-epoch", default=1000, type=int)
     parser.add_argument("--epochs", default=300, type=int, help="Number of epochs to train for")
     parser.add_argument("--lr", default=0.0015, type=float, help="Initial learning rate")
     parser.add_argument("--method", default="eval", type=str)
 
     # misc
-    parser.add_argument("--checkpoint_interval", default=10, type=int)
-    parser.add_argument("--puzzle_interval", default=30, type=int)
+    parser.add_argument("--checkpoint-interval", default=10, type=int)
+    parser.add_argument("--puzzle-interval", default=30, type=int)
 
     config = parser.parse_args()
 
