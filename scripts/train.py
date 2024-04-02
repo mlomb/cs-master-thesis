@@ -42,7 +42,7 @@ def train(config):
     )
     chessmodel.cuda()
 
-    optimizer = torch.optim.Adam(chessmodel.parameters(), lr=config.lr)
+    optimizer = torch.optim.Adam(chessmodel.parameters(), lr=config.learning_rate)
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', threshold=0.0001, factor=0.7, patience=15)
 
     # @torch.compile # 30% speedup
@@ -143,7 +143,7 @@ def main():
     parser.add_argument("--batch-size", default=4096, type=int)
     parser.add_argument("--batches-per-epoch", default=1000, type=int)
     parser.add_argument("--epochs", default=300, type=int, help="Number of epochs to train for")
-    parser.add_argument("--lr", default=0.0015, type=float, help="Initial learning rate")
+    parser.add_argument("--learning-rate", default=0.0015, type=float, help="Initial learning rate")
     parser.add_argument("--method", default="eval", type=str)
 
     # misc
