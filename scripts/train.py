@@ -67,7 +67,7 @@ def train(config):
     # Make sure gradient tracking is on
     chessmodel.train()
 
-    for epoch in range(1, config.epochs):
+    for epoch in range(1, config.epochs+1):
         avg_loss = 0.0
 
         for _ in tqdm(range(config.batches_per_epoch), desc=f'Epoch {epoch}'):

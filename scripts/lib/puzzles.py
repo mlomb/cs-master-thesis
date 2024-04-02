@@ -6,16 +6,23 @@ from tqdm import tqdm
 import random
 
 engines: dict[chess.engine.SimpleEngine] = {}
+cmds: dict[str] = {}
 
 def init_engine(engine_cmd: str | list[str]):
     engine = chess.engine.SimpleEngine.popen_uci(engine_cmd)
     engines[threading.current_thread()] = engine
+    cmds[threading.current_thread()] = engine_cmd
+    return engine
 
+def restart_engine_current():
+    engine = engines[threading.current_thread()]
+    engine.close() # force quit
+    return init_engine(cmds[threading.current_thread()])
 
 def solve_puzzle(board: chess.Board, solution: list[chess.Move], themes) -> tuple[int, int]:
     board = board.copy()
     solution = solution.copy() # clone
-    engine = engines[threading.current_thread()]
+    engine: chess.engine.SimpleEngine = engines[threading.current_thread()]
 
     correct_moves = 0
     total_moves = 0
@@ -27,7 +34,14 @@ def solve_puzzle(board: chess.Board, solution: list[chess.Move], themes) -> tupl
         # play opponent move
         board.push(opp_move)
 
-        res = engine.play(board, chess.engine.Limit(time=50/1000))
+        while True:
+            try:
+                res = engine.play(board, chess.engine.Limit(time=50/1000))
+            except Exception as e:
+                print('Engine play errored:', e)
+                engine = restart_engine_current()
+                continue
+            break
 
         # play engine move
         board.push(expected_move)
