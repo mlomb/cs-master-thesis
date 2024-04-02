@@ -10,9 +10,9 @@ class NnueWriter:
 
         for k in [
             model.num_features,
-            model.num_ft,
-            model.num_l1,
-            model.num_l2
+            model.ft_size,
+            model.l1_size,
+            model.l2_size,
         ]:
             # number of neurons
             self.buf.extend(k.to_bytes(4, byteorder='little', signed=False))

@@ -62,7 +62,7 @@ class PuzzleAccuracy:
                 self.puzzles.append((board, moves, themes))
 
         random.Random(42).shuffle(self.puzzles) # puzzles should be already sorted but just in case...
-        #self.puzzles = self.puzzles[:100]
+        self.puzzles = self.puzzles[:100]
     
     def measure(self, engine_cmd: str | list[str]):
         def f(puzzle):

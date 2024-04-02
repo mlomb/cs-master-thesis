@@ -10,7 +10,7 @@ def decode_int64_bitset(x: torch.Tensor):
     return expanded
 
 class NnueModel(nn.Module):
-    def __init__(self, num_features: int = 768, num_ft: int = 256, num_l1: int = 32, num_l2: int = 32):
+    def __init__(self, num_features: int = 768, ft_size: int = 256, l1_size: int = 32, l2_size: int = 32):
         super(NnueModel, self).__init__()
 
         self.quantized_one = 127
@@ -19,18 +19,18 @@ class NnueModel(nn.Module):
         self.nnue2score = 600
 
         self.num_features = num_features
-        self.num_ft = num_ft
-        self.num_l1 = num_l1
-        self.num_l2 = num_l2
+        self.ft_size = ft_size
+        self.l1_size = l1_size
+        self.l2_size = l2_size
 
-        self.ft = nn.Linear(num_features, num_ft)
-        self.linear1 = nn.Linear(num_ft * 2, num_l1)
-        self.linear2 = nn.Linear(num_l1, num_l2)
-        self.output = nn.Linear(num_l2, 1)
+        self.ft = nn.Linear(num_features, ft_size)
+        self.linear1 = nn.Linear(ft_size * 2, l1_size)
+        self.linear2 = nn.Linear(l1_size, l2_size)
+        self.output = nn.Linear(l2_size, 1)
 
     def forward(self, x):
         x = self.ft(x)
-        x = x.view(-1, self.num_ft * 2)
+        x = x.view(-1, self.ft_size * 2)
         x = torch.clamp(x, 0.0, 1.0) # Clipped ReLU
 
         x = self.linear1(x)
