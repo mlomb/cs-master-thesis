@@ -14,16 +14,16 @@ from lib.puzzles import PuzzleAccuracy
 from lib.losses import EvalLoss, PQRLoss
 
 
-def train(config):
+def train(config, use_wandb: bool):
     if config.method == "pqr":
         X_SHAPE = (config.batch_size, 3, 2, config.num_features // 64)
         Y_SHAPE = (config.batch_size, 0)
-        INPUTS = glob("/mnt/d/datasets/pqr-1700/*.csv")
+        INPUTS = glob("/mnt/c/datasets/pqr-1700/*.csv")
         loss_fn = PQRLoss()
     elif config.method == "eval":
         X_SHAPE = (config.batch_size, 2, config.num_features // 64)
         Y_SHAPE = (config.batch_size, 1)
-        INPUTS = glob("/mnt/d/datasets/eval/*.csv")
+        INPUTS = glob("/mnt/c/datasets/eval/*.csv")
         loss_fn = EvalLoss()
 
     puzzles = PuzzleAccuracy('./data/puzzles.csv')
@@ -89,7 +89,7 @@ def train(config):
         scheduler.step(avg_loss)
 
         # log metrics to W&B
-        wandb.log(step=epoch, data={
+        metrics = {
             "Train/loss": avg_loss,
             "Train/lr": scheduler._last_lr[0], # get_last_lr()
             "Train/samples": config.batch_size * config.batches_per_epoch * (epoch + 1),
@@ -98,24 +98,36 @@ def train(config):
             "Weight/mean-l1": torch.mean(chessmodel.linear1.weight),
             "Weight/mean-l2": torch.mean(chessmodel.linear2.weight),
             "Weight/mean-out": torch.mean(chessmodel.output.weight),
-        })
+        }
+        if use_wandb:
+            wandb.log(step=epoch, data=metrics)
+        else:
+            print(f"Epoch {epoch} - Loss: {avg_loss}, LR: {scheduler._last_lr[0]}")
 
         with tempfile.NamedTemporaryFile() as tmp:
             tmp.write(NnueWriter(chessmodel, config.feature_set).buf)
 
             if epoch % config.checkpoint_interval == 0 or epoch == 1:
-                # store artifact in W&B
-                artifact = wandb.Artifact(wandb.run.id, type="model")
-                artifact.add_file(tmp.name, name=f"{epoch}.nn")
-                wandb.log_artifact(artifact, aliases=["latest", f"epoch_{epoch}"])
+
+                if use_wandb:
+                    # store artifact in W&B
+                    artifact = wandb.Artifact(wandb.run.id, type="model")
+                    artifact.add_file(tmp.name, name=f"{epoch}.nn")
+                    wandb.log_artifact(artifact, aliases=["latest", f"epoch_{epoch}"])
+                else:
+                    # TODO: make local checkpoint
+                    pass
 
             if epoch % config.puzzle_interval == 0 or epoch == 1:
                 # run puzzles
                 puzzles_results, puzzles_accuracy = puzzles.measure(["../engine/target/release/engine", f"--nn={tmp.name}"])
 
                 # log puzzle metrics
-                wandb.log(step=epoch, data={"Puzzles/accuracy": puzzles_accuracy})
-                wandb.log(step=epoch, data={f"Puzzles/{category}": accuracy for category, accuracy in puzzles_results})
+                if use_wandb:
+                    wandb.log(step=epoch, data={"Puzzles/accuracy": puzzles_accuracy})
+                    wandb.log(step=epoch, data={f"Puzzles/{category}": accuracy for category, accuracy in puzzles_results})
+                else:
+                    print(f"Epoch {epoch} - Puzzles accuracy: {puzzles_accuracy}")
 
                 # build ratings bar chart
                 #wandb.log(step=epoch, data={
@@ -149,6 +161,7 @@ def main():
     # misc
     parser.add_argument("--checkpoint-interval", default=10, type=int)
     parser.add_argument("--puzzle-interval", default=30, type=int)
+    parser.add_argument("--wandb-project", default=None, type=str)
 
     config = parser.parse_args()
 
@@ -161,18 +174,22 @@ def main():
 
     print(config)
 
-    wandb.init(
-        project="sweep-testing",
-        job_type="train",
-        name=f"{config.method}_{config.batch_size}_{config.feature_set}[{config.num_features}]->{config.ft_size}x2->{config.l1_size}->{config.l2_size}",
-        config=config
-    )
-    wandb.define_metric("Train/loss", summary="min")
-    wandb.define_metric("Puzzles/accuracy", summary="max")
+    use_wandb = config.wandb_project is not None
 
-    train(config)
+    if use_wandb:
+        wandb.init(
+            project=config.wandb_project,
+            job_type="train",
+            name=f"{config.method}_{config.batch_size}_{config.feature_set}[{config.num_features}]->{config.ft_size}x2->{config.l1_size}->{config.l2_size}",
+            config=config
+        )
+        wandb.define_metric("Train/loss", summary="min")
+        wandb.define_metric("Puzzles/accuracy", summary="max")
 
-    wandb.finish()
+    train(config, use_wandb)
+
+    if use_wandb:
+        wandb.finish()
 
 
 if __name__ == '__main__':
