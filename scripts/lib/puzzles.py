@@ -89,7 +89,7 @@ class PuzzleAccuracy:
         themes_solved = {}
         themes_total = {}
 
-        with ThreadPoolExecutor(max_workers=5, initializer=init_engine, initargs=(engine_cmd,)) as executor:
+        with ThreadPoolExecutor(max_workers=16, initializer=init_engine, initargs=(engine_cmd,)) as executor:
             results = list(tqdm(executor.map(f, self.puzzles), total=len(self.puzzles)))
             
             for (_, _, themes), (pz_correct_moves, pz_total_moves) in zip(self.puzzles, results):
