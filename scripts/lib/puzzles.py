@@ -36,14 +36,14 @@ def solve_puzzle(board: chess.Board, solution: list[chess.Move], themes) -> tupl
 
         while True:
             try:
-                res = engine.play(board, chess.engine.Limit(time=50/1000))
+                res = engine.play(board, chess.engine.Limit(depth=5))
             except Exception as e:
                 print('Engine play errored:', e)
                 engine = restart_engine_current()
                 continue
             break
 
-        # play engine move
+        # play expected move
         board.push(expected_move)
 
         # Mate in 1 puzzles can have more than one solution (Lichess)
@@ -67,11 +67,12 @@ class PuzzleAccuracy:
                 moves = [chess.Move.from_uci(m) for m in moves.split(' ')]
                 rating = int(rating)
                 themes = themes.split(' ')
-                if rating >= 3000: # rating too high
-                    continue
-                
+
                 bucket = rating // self.elo_bucket_size
                 themes.append('rating' + str(bucket * self.elo_bucket_size) + 'to' + str((bucket + 1) * self.elo_bucket_size - 1))
+
+                if self.should_skip(board, moves, themes, rating):
+                    continue
 
                 self.puzzles.append((board, moves, themes))
 
@@ -89,7 +90,7 @@ class PuzzleAccuracy:
         themes_solved = {}
         themes_total = {}
 
-        with ThreadPoolExecutor(max_workers=16, initializer=init_engine, initargs=(engine_cmd,)) as executor:
+        with ThreadPoolExecutor(max_workers=None, initializer=init_engine, initargs=(engine_cmd,)) as executor:
             results = list(tqdm(executor.map(f, self.puzzles), total=len(self.puzzles)))
             
             for (_, _, themes), (pz_correct_moves, pz_total_moves) in zip(self.puzzles, results):
@@ -113,6 +114,38 @@ class PuzzleAccuracy:
             result.append((theme, themes_solved[theme] / themes_total[theme]))
 
         return result, (correct_moves / total_moves)
+    
+    def should_skip(self, board: chess.Board, solution: list[chess.Move], themes: list[str], rating: int) -> bool:
+        if rating >= 3000: # rating too high
+            return True
+        if rating < 1000: # rating too low
+            return True
+
+        board = board.copy()
+        solution = solution.copy()
+        while len(solution) > 0:
+            opp_move, *solution = solution
+            expected_move, *solution = solution
+            
+            board.push(opp_move)
+
+            if len(list(board.legal_moves)) <= 2:
+                # if there is only one legal move in a step of the puzzle
+                # we skip it
+                return True
+
+            board.push(expected_move)
+        
+        if board.is_checkmate():
+            # skip puzzles that end in checkmate
+            return True
+
+        # skip easy themes
+        SKIP_THEMES = [
+            "mate",
+            "oneMove",
+        ]
+        return any(theme in SKIP_THEMES for theme in themes)
 
 if __name__ == '__main__':
 

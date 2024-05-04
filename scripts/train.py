@@ -120,14 +120,14 @@ def train(config, use_wandb: bool):
 
             if epoch % config.puzzle_interval == 0 or epoch == 1:
                 # run puzzles
-                puzzles_results, puzzles_accuracy = puzzles.measure(["../engine/target/release/engine", f"--nn={tmp.name}"])
+                puzzles_results, puzzles_move_accuracy = puzzles.measure(["../engine/target/release/engine", f"--nn={tmp.name}"])
 
                 # log puzzle metrics
                 if use_wandb:
-                    wandb.log(step=epoch, data={"Puzzles/accuracy": puzzles_accuracy})
+                    wandb.log(step=epoch, data={"Puzzles/moveAccuracy": puzzles_move_accuracy})
                     wandb.log(step=epoch, data={f"Puzzles/{category}": accuracy for category, accuracy in puzzles_results})
                 else:
-                    print(f"Epoch {epoch} - Puzzles accuracy: {puzzles_accuracy}")
+                    print(f"Epoch {epoch} - Puzzles move accuracy: {puzzles_move_accuracy}")
 
                 # build ratings bar chart
                 #wandb.log(step=epoch, data={
