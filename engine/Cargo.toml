@@ -6,9 +6,12 @@ edition = "2021"
 [dependencies]
 clap = { version = "4.5.0", features = ["derive"] }
 rand = "0.8.5"
-shakmaty = { git = "https://github.com/niklasf/shakmaty" }
+shakmaty = "0.27.0"
 vampirc-uci = {version = "0.11" }
 nn = { path = "../nn" }
+
+[patch.crates-io]
+shakmaty = { git = "https://github.com/niklasf/shakmaty" }
 
 [profile.release]
 debug = true

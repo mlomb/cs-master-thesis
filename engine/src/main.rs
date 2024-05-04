@@ -8,7 +8,7 @@ use clap::Parser;
 use nn::nnue::model::NnueModel;
 use search::Search;
 use shakmaty::fen::Fen;
-use shakmaty::uci::Uci;
+use shakmaty::uci::UciMove;
 use shakmaty::{CastlingMode, Chess, Color, Position};
 use std::cell::RefCell;
 use std::fs::File;
@@ -20,7 +20,7 @@ use vampirc_uci::{parse_one, UciMessage, UciTimeControl};
 #[derive(Parser)]
 struct Cli {
     /// The neural network file to use
-    #[arg(long, value_name = "shmem")]
+    #[arg(long, value_name = "model.nn file")]
     nn: Option<String>,
 }
 
@@ -77,7 +77,7 @@ fn main() {
                 search.record_repetition(&position);
 
                 for m in moves {
-                    let uci: Uci = m.to_string().parse().unwrap();
+                    let uci: UciMove = m.to_string().parse().unwrap();
                     let m = uci.to_move(&position).unwrap();
                     position = position.play(&m).unwrap();
 

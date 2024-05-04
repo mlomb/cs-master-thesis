@@ -17,9 +17,6 @@ pub struct Search {
     /// Current ply
     pub ply: usize,
 
-    /// Neural network model
-    pub nnue_model: Rc<RefCell<NnueModel>>,
-
     /// Number of nodes searched
     pub nodes: usize,
     /// Number of evals computed
@@ -50,7 +47,6 @@ impl Search {
         Search {
             pos: PositionStack::new(nnue_model.clone()),
             ply: 0,
-            nnue_model,
             nodes: 0,
             evals: 0,
             pv: PVTable::new(),
