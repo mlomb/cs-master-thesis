@@ -230,7 +230,7 @@ dependencies = [
  "clap",
  "nn",
  "rand",
- "shakmaty",
+ "shakmaty 0.26.0",
  "vampirc-uci",
 ]
 
@@ -316,7 +316,7 @@ name = "nn"
 version = "0.1.0"
 dependencies = [
  "byteorder",
- "shakmaty",
+ "shakmaty 0.27.0",
 ]
 
 [[package]]
@@ -448,6 +448,17 @@ dependencies = [
 name = "shakmaty"
 version = "0.26.0"
 source = "git+https://github.com/niklasf/shakmaty#ceaf0d6c08c308ff292d88325c745366dd351221"
+dependencies = [
+ "arrayvec",
+ "bitflags",
+ "btoi",
+]
+
+[[package]]
+name = "shakmaty"
+version = "0.27.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9a2320d3932d5b410b2bdee568152b51f2373f018d3425dc7b424ab9b23a5d13"
 dependencies = [
  "arrayvec",
  "bitflags",

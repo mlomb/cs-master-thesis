@@ -1,6 +1,7 @@
 use crate::method::pqr::PQR;
 use crate::method::{eval::EvalRead, ReadSample};
 use clap::{Args, Subcommand, ValueEnum};
+use crossbeam::channel::{bounded, Receiver, Sender};
 use nn::feature_set::half_compact::HalfCompact;
 use nn::feature_set::half_king::HalfKingPiece;
 use nn::feature_set::half_piece::HalfPiece;
@@ -20,7 +21,7 @@ enum FeatureSetChoice {
     TopK20,
 }
 
-#[derive(Args)]
+#[derive(Args, Clone)]
 pub struct SamplesServiceCommand {
     /// List of .csv or .csv.zst files to read samples.
     /// CSVs must be generated using the `build-dataset` command
@@ -43,9 +44,13 @@ pub struct SamplesServiceCommand {
     /// Method to use
     #[command(subcommand)]
     subcommand: MethodSubcommand,
+
+    /// Number of batch threads to use
+    #[arg(long, default_value = "4")]
+    batch_threads: usize,
 }
 
-#[derive(Subcommand)]
+#[derive(Subcommand, Clone)]
 pub enum MethodSubcommand {
     /// Given a transition P → Q in a game, R is selected from a legal move from P while R != Q.
     PQR,
@@ -54,40 +59,67 @@ pub enum MethodSubcommand {
 }
 
 pub fn samples_service(cmd: SamplesServiceCommand) -> Result<(), Box<dyn Error>> {
-    // initialize feature set
-    let feature_set: Box<dyn FeatureSet> = match cmd.feature_set {
-        FeatureSetChoice::HalfCompact => Box::new(HalfCompact {}),
-        FeatureSetChoice::HalfPiece => Box::new(HalfPiece {}),
-        FeatureSetChoice::HalfKingPiece => Box::new(HalfKingPiece {}),
-        FeatureSetChoice::TopK20 => todo!(),
-    };
+    let (line_sender, line_receiver) = bounded(1_000_000); // keep up to X sample lines in memory
+    let (batch_sender, batch_receiver) = bounded(128); // keep up to X batches ready in memory
 
-    let mut method: Box<dyn ReadSample> = match cmd.subcommand {
-        MethodSubcommand::PQR => Box::new(PQR {}),
-        MethodSubcommand::Eval => Box::new(EvalRead {}),
-    };
+    // start line thread
+    let inputs = cmd.inputs.clone();
+    std::thread::spawn(move || read_lines_thread(inputs, line_sender).unwrap());
+
+    // start batch threads
+    for _ in 0..cmd.batch_threads {
+        let line_receiver = line_receiver.clone();
+        let batch_sender = batch_sender.clone();
+        let cmd = cmd.clone();
+        std::thread::spawn(move || build_samples_thread(cmd, line_receiver, batch_sender));
+    }
+
+    let feature_set = build_feature_set(&cmd);
+    let method = build_method(&cmd);
 
     // open shared memory file
     let mut shmem = ShmemConf::new().os_id(cmd.shmem).open()?;
     let shmem_slice = unsafe { shmem.as_slice_mut() };
 
-    let x_size = method.x_size(&feature_set) * cmd.batch_size;
-    let y_size = method.y_size() * cmd.batch_size;
+    let x_batch_size = cmd.batch_size * method.x_size(&feature_set);
+    let y_batch_size = cmd.batch_size * method.y_size();
+    assert!(
+        shmem_slice.len() == x_batch_size + y_batch_size,
+        "Unexpected shared memory size"
+    );
 
-    // initialize backbuffer
-    let x_buffer = vec![0u8; x_size];
-    let y_buffer = vec![0u8; y_size];
-    // make sure sizes match
-    assert_eq!(shmem_slice.len(), x_buffer.len() + y_buffer.len());
+    // loop to write batches
+    loop {
+        let batch: BatchReady = batch_receiver.recv().unwrap();
+        assert!(batch.x.len() == x_batch_size);
+        assert!(batch.y.len() == y_batch_size);
 
-    let mut x_cursor = Cursor::new(x_buffer);
-    let mut y_cursor = Cursor::new(y_buffer);
-    let mut in_batch = 0;
+        // wait for the reader to signal that it has finished copying the data of the last batch (1 byte)
+        io::stdin().read_exact(&mut [0])?;
 
+        // copy new batch to shared memory
+        shmem_slice[..x_batch_size].copy_from_slice(&batch.x);
+        shmem_slice[x_batch_size..].copy_from_slice(&batch.y);
+
+        // send a signal to the consumer (1 byte)
+        io::stdout().write_all(&[64])?;
+        io::stdout().flush()?;
+    }
+}
+
+struct BatchReady {
+    x: Vec<u8>,
+    y: Vec<u8>,
+}
+
+fn read_lines_thread(
+    inputs: Vec<String>,
+    line_sender: Sender<Vec<u8>>,
+) -> Result<(), Box<dyn Error>> {
     // loop over the dataset indefinitely
     loop {
         // loop over every input file
-        for filename in &cmd.inputs {
+        for filename in &inputs {
             let file = File::open(filename)?;
 
             // decompress if necessary
@@ -97,35 +129,70 @@ pub fn samples_service(cmd: SamplesServiceCommand) -> Result<(), Box<dyn Error>>
                 Box::new(file)
             };
 
-            let mut reader = BufReader::with_capacity(32 * 8192, reader);
+            let reader = BufReader::with_capacity(50_000_000, reader);
 
-            // loop for every sample in file
-            while reader.has_data_left()? {
-                // write sample
-                method.read_sample(&mut reader, &mut x_cursor, &mut y_cursor, &feature_set);
-                in_batch += 1;
-
-                if in_batch == cmd.batch_size {
-                    // now we wait for the consumer to signal that it has finished copying the data (1 byte)
-                    io::stdin().read_exact(&mut [0])?;
-
-                    // copy buffer into shared memory and reset
-                    x_cursor.rewind()?;
-                    y_cursor.rewind()?;
-
-                    x_cursor.read_exact(&mut shmem_slice[..x_size])?;
-                    y_cursor.read_exact(&mut shmem_slice[x_size..])?;
-
-                    x_cursor.rewind()?;
-                    y_cursor.rewind()?;
-                    in_batch = 0;
-
-                    // we have filled the current batch with samples
-                    // send a signal to the consumer (1 byte)
-                    io::stdout().write_all(&[64])?;
-                    io::stdout().flush()?;
-                }
-            }
+            // send every line
+            reader
+                .split('\n' as u8)
+                .for_each(|line| line_sender.send(line.unwrap()).unwrap());
         }
+    }
+}
+
+fn build_samples_thread(
+    cmd: SamplesServiceCommand,
+    line_receiver: Receiver<Vec<u8>>,
+    batch_sender: Sender<BatchReady>,
+) {
+    let feature_set = build_feature_set(&cmd);
+    let mut method = build_method(&cmd);
+
+    let x_batch_size = cmd.batch_size * method.x_size(&feature_set);
+    let y_batch_size = cmd.batch_size * method.y_size();
+
+    let mut x_cursor = Cursor::new(vec![0u8; x_batch_size]);
+    let mut y_cursor = Cursor::new(vec![0u8; y_batch_size]);
+
+    loop {
+        while x_cursor.position() < x_batch_size as u64 {
+            let line = line_receiver.recv().unwrap();
+
+            method.read_sample(
+                &mut line.as_slice(),
+                &mut x_cursor,
+                &mut y_cursor,
+                &feature_set,
+            );
+        }
+
+        assert!(x_cursor.position() == x_batch_size as u64);
+        assert!(y_cursor.position() == y_batch_size as u64);
+
+        batch_sender
+            .send(BatchReady {
+                x: x_cursor.clone().into_inner(),
+                y: y_cursor.clone().into_inner(),
+            })
+            .unwrap();
+
+        // reset buffers
+        x_cursor.rewind().unwrap();
+        y_cursor.rewind().unwrap();
+    }
+}
+
+fn build_feature_set(cmd: &SamplesServiceCommand) -> Box<dyn FeatureSet> {
+    match cmd.feature_set {
+        FeatureSetChoice::HalfCompact => Box::new(HalfCompact {}),
+        FeatureSetChoice::HalfPiece => Box::new(HalfPiece {}),
+        FeatureSetChoice::HalfKingPiece => Box::new(HalfKingPiece {}),
+        FeatureSetChoice::TopK20 => todo!(),
+    }
+}
+
+fn build_method(cmd: &SamplesServiceCommand) -> Box<dyn ReadSample> {
+    match cmd.subcommand {
+        MethodSubcommand::PQR => Box::new(PQR {}),
+        MethodSubcommand::Eval => Box::new(EvalRead {}),
     }
 }

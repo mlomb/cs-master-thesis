@@ -1,7 +1,7 @@
 use super::{encode_position, encoded_size, ReadSample, WriteSample};
 use nn::feature_set::FeatureSet;
 use rand::{seq::SliceRandom, Rng};
-use shakmaty::uci::Uci;
+use shakmaty::uci::UciMove;
 use shakmaty::CastlingMode;
 use shakmaty::{fen::Fen, Chess, EnPassantMode, Position};
 use std::io::BufRead;
@@ -75,7 +75,7 @@ impl ReadSample for PQR {
         let p_position: Chess = p_fen.into_position(CastlingMode::Standard).unwrap();
         let moves = p_position.legal_moves();
 
-        let q_move = Uci::from_ascii(q_move_bytes.as_slice())
+        let q_move = UciMove::from_ascii(q_move_bytes.as_slice())
             .unwrap()
             .to_move(&p_position)
             .unwrap();
