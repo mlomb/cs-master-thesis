@@ -13,7 +13,7 @@ pub struct EvalArgs {
     engine: String,
 
     /// Target depth for search
-    #[arg(long, value_name = "depth", default_value = "13")]
+    #[arg(long, value_name = "depth", default_value = "10")]
     depth: usize,
 }
 
