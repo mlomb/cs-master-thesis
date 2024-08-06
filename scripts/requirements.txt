@@ -1,5 +1,5 @@
 tqdm
-wandb==0.16.6
+wandb==0.17.5
 chess==1.10.0
 torch==2.3.0
 torchvision==0.18.0

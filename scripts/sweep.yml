@@ -1,20 +1,29 @@
 program: train.py
-name: sweep-testing
-method: random
+name: sweep-initial-half-piece
+method: grid
 metric:
   goal: minimize
-  name: Train/loss
+  name: Train/loss.min
 parameters:
   learning-rate:
-    min: 0.00001
-    max: 0.01
+    values: [0.0015]
+#    min: 0.00001
+#    max: 0.01
   batch-size:
-    values: [1024, 4096, 8192]
+    values: [512, 1024, 4096, 8192]
   feature-set:
     values: ["half-piece"]
   ft-size:
-    values: [256, 512, 1024]
+    values: [256, 512, 1024, 2048]
   l1-size:
-    values: [32, 64, 128]
+    values: [32]
   l2-size:
-    values: [32, 64, 128]
+    values: [32]
+  wandb-project:
+    values: ["cs-master-thesis"]
+
+command:
+  - ${env}
+  - python3
+  - ${program}
+  - ${args}

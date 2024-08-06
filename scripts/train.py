@@ -23,7 +23,7 @@ def train(config, use_wandb: bool):
     elif config.method == "eval":
         X_SHAPE = (config.batch_size, 2, config.num_features // 64)
         Y_SHAPE = (config.batch_size, 1)
-        INPUTS = glob("/mnt/c/datasets/eval/*.csv")
+        INPUTS = glob("/mnt/c/datasets/eval-1700/*.csv")
         loss_fn = EvalLoss()
 
     puzzles = PuzzleAccuracy('./data/puzzles.csv')
@@ -44,8 +44,9 @@ def train(config, use_wandb: bool):
 
     optimizer = torch.optim.Adam(chessmodel.parameters(), lr=config.learning_rate)
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', threshold=0.0001, factor=0.7, patience=15)
+    # scheduler = torch.optim.lr_scheduler.CyclicLR(optimizer, base_lr=0.000001, max_lr=0.0002, step_size_up=128)
 
-    # @torch.compile # 30% speedup
+    @torch.compile
     def train_step(X, y):
         # Clear the gradients
         optimizer.zero_grad()
@@ -67,12 +68,15 @@ def train(config, use_wandb: bool):
     # Make sure gradient tracking is on
     chessmodel.train()
 
-    for epoch in range(1, config.epochs+1):
+    # max_samples = batch_size * batches_per_step * steps
+    batches_per_step = config.max_samples // (config.batch_size * config.steps)
+    
+    for step in range(1, config.steps+1):
         avg_loss = 0.0
 
-        for _ in tqdm(range(config.batches_per_epoch), desc=f'Epoch {epoch}'):
+        for _ in tqdm(range(batches_per_step), desc=f'Step {step}/{config.steps}'):
             X, y = samples_service.next_batch()
-        
+
             # expand bitset
             X = decode_int64_bitset(X)
             X = X.reshape(-1, 2, config.num_features)
@@ -83,7 +87,7 @@ def train(config, use_wandb: bool):
             if math.isnan(avg_loss):
                 raise Exception("Loss is NaN, exiting")
 
-        avg_loss /= config.batches_per_epoch
+        avg_loss /= batches_per_step
 
         # Step the scheduler
         scheduler.step(avg_loss)
@@ -92,7 +96,7 @@ def train(config, use_wandb: bool):
         metrics = {
             "Train/loss": avg_loss,
             "Train/lr": scheduler._last_lr[0], # get_last_lr()
-            "Train/samples": config.batch_size * config.batches_per_epoch * (epoch + 1),
+            "Train/samples": config.batch_size * batches_per_step * (step + 1),
 
             "Weight/mean-f1": torch.mean(chessmodel.ft.weight),
             "Weight/mean-l1": torch.mean(chessmodel.linear1.weight),
@@ -100,37 +104,37 @@ def train(config, use_wandb: bool):
             "Weight/mean-out": torch.mean(chessmodel.output.weight),
         }
         if use_wandb:
-            wandb.log(step=epoch, data=metrics)
+            wandb.log(step=step, data=metrics)
         else:
-            print(f"Epoch {epoch} - Loss: {avg_loss}, LR: {scheduler._last_lr[0]}")
+            print(f"Step {step} - Loss: {avg_loss}, LR: {scheduler._last_lr[0]}")
 
         with tempfile.NamedTemporaryFile() as tmp:
             tmp.write(NnueWriter(chessmodel, config.feature_set).buf)
 
-            if epoch % config.checkpoint_interval == 0 or epoch == 1:
+            if step % config.checkpoint_interval == 0 or step == 1:
 
                 if use_wandb:
                     # store artifact in W&B
                     artifact = wandb.Artifact(wandb.run.id, type="model")
-                    artifact.add_file(tmp.name, name=f"{epoch}.nn")
-                    wandb.log_artifact(artifact, aliases=["latest", f"epoch_{epoch}"])
+                    artifact.add_file(tmp.name, name=f"{step}.nn")
+                    wandb.log_artifact(artifact, aliases=["latest", f"step_{step}"])
                 else:
                     # TODO: make local checkpoint
                     pass
 
-            if epoch % config.puzzle_interval == 0 or epoch == 1:
+            if step % config.puzzle_interval == 0 or step == 1:
                 # run puzzles
                 puzzles_results, puzzles_move_accuracy = puzzles.measure(["../engine/target/release/engine", f"--nn={tmp.name}"])
 
                 # log puzzle metrics
                 if use_wandb:
-                    wandb.log(step=epoch, data={"Puzzles/moveAccuracy": puzzles_move_accuracy})
-                    wandb.log(step=epoch, data={f"Puzzles/{category}": accuracy for category, accuracy in puzzles_results})
+                    wandb.log(step=step, data={"Puzzles/moveAccuracy": puzzles_move_accuracy})
+                    wandb.log(step=step, data={f"Puzzles/{category}": accuracy for category, accuracy in puzzles_results})
                 else:
-                    print(f"Epoch {epoch} - Puzzles move accuracy: {puzzles_move_accuracy}")
+                    print(f"step {step} - Puzzles move accuracy: {puzzles_move_accuracy}")
 
                 # build ratings bar chart
-                #wandb.log(step=epoch, data={
+                #wandb.log(step=step, data={
                 #    "Puzzles/ratings": wandb.plot.bar(
                 #        wandb.Table(
                 #            data=sorted([[cat, acc] for cat, acc in puzzles_results if cat.startswith("rating")], 
@@ -152,15 +156,15 @@ def main():
     parser.add_argument("--l2-size", default=32, type=int)
 
     # training
-    parser.add_argument("--batch-size", default=4096, type=int)
-    parser.add_argument("--batches-per-epoch", default=1000, type=int)
-    parser.add_argument("--epochs", default=300, type=int, help="Number of epochs to train for")
+    parser.add_argument("--batch-size", default=4096, type=int, help="Number of samples per minibatch") # 4K
+    parser.add_argument("--max-samples", default=2 ** 30, type=int, help="Number of samples to train for") # 1B
+    parser.add_argument("--steps", default=1024, type=int, help="Number of steps to train")
     parser.add_argument("--learning-rate", default=0.0015, type=float, help="Initial learning rate")
     parser.add_argument("--method", default="eval", type=str)
 
     # misc
-    parser.add_argument("--checkpoint-interval", default=10, type=int)
-    parser.add_argument("--puzzle-interval", default=30, type=int)
+    parser.add_argument("--checkpoint-interval", default=16, type=int)
+    parser.add_argument("--puzzle-interval", default=32, type=int)
     parser.add_argument("--wandb-project", default=None, type=str)
 
     config = parser.parse_args()
@@ -173,6 +177,8 @@ def main():
     }[config.feature_set]
 
     print(config)
+
+    # torch.set_float32_matmul_precision("high")
 
     use_wandb = config.wandb_project is not None
 

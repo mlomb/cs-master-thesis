@@ -63,7 +63,10 @@ impl UciEngine {
             let mut parts = line.split_whitespace();
 
             if line.starts_with("info depth") {
-                parts.position(|p| p == "score").unwrap();
+                if parts.position(|p| p == "score").is_none() {
+                    println!("fen: {}", fen);
+                    panic!("No score in line: {}", line);
+                }
 
                 let score_type = parts.nth(0).unwrap();
                 let score_value = parts.nth(0).unwrap().parse::<i32>().unwrap();
