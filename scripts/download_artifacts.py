@@ -27,6 +27,9 @@ def main():
 
     print(f"Found {len(runs)} runs")
 
+    if not os.path.exists(config.output_dir):
+        os.makedirs(config.output_dir)
+
     for run in tqdm(runs):
         latest_artifact = None
 
