@@ -1,0 +1,50 @@
+import argparse
+import os
+import shutil
+from tqdm import tqdm
+import wandb
+
+def main():
+    parser = argparse.ArgumentParser(description="Downloads the latest model from a wandb sweep")
+
+    parser.add_argument("--wandb-project", default="mlomb/cs-master-thesis", type=str)
+    parser.add_argument("--wandb-sweep", default=None, type=str)
+
+    parser.add_argument("--output-dir", default="models", type=str)
+
+    config = parser.parse_args()
+
+    if config.wandb_sweep is None:
+        print("No sweep ID specified")
+        return
+
+    api = wandb.Api()
+
+    runs = api.runs(
+        config.wandb_project,
+        filters={"Sweep": config.wandb_sweep}
+    )
+
+    print(f"Found {len(runs)} runs")
+
+    for run in tqdm(runs):
+        latest_artifact = None
+
+        for artifact in run.logged_artifacts():
+            if artifact.type == "model" and "latest" in artifact.aliases:
+                latest_artifact = artifact
+                break
+
+        path = latest_artifact.download()
+
+        # list single file and copy to output directory
+        files = os.listdir(path)
+        assert len(files) == 1
+
+        model_file = os.listdir(path)[0]
+        shutil.copyfile(os.path.join(path, model_file), os.path.join(config.output_dir, run.name + ".nn"))
+
+    print("Done")
+
+if __name__ == '__main__':
+    main()

@@ -1,5 +1,5 @@
 program: train.py
-name: sweep-initial-half-piece
+name: sweep-initial-1
 method: grid
 metric:
   goal: minimize
@@ -10,9 +10,9 @@ parameters:
 #    min: 0.00001
 #    max: 0.01
   batch-size:
-    values: [512, 1024, 4096, 8192]
+    values: [512, 1024, 4096, 8192, 16384]
   feature-set:
-    values: ["half-piece"]
+    values: ["half-piece", "half-king-piece"]
   ft-size:
     values: [256, 512, 1024, 2048]
   l1-size:
