@@ -117,10 +117,18 @@ fn main() {
                 };
 
                 let mut max_depth = None;
-                if let Some(search_control) = search_control {
+                if let Some(ref search_control) = search_control {
                     if let Some(opt_depth) = search_control.depth {
                         assert!(opt_depth >= 1);
                         max_depth = Some(opt_depth as i32);
+                    }
+                }
+
+                let mut max_nodes = None;
+                if let Some(ref search_control) = search_control {
+                    if let Some(opt_nodes) = search_control.nodes {
+                        assert!(opt_nodes >= 1);
+                        max_nodes = Some(opt_nodes as usize);
                     }
                 }
 
@@ -135,6 +143,7 @@ fn main() {
                             t - Duration::from_millis(100)
                         }
                     }),
+                    max_nodes,
                 );
 
                 println!(

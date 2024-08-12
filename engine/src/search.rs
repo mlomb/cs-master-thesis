@@ -38,6 +38,8 @@ pub struct Search {
     pub start_time: Instant,
     /// Time limit, do not exceed this time
     pub time_limit: Option<Duration>,
+    /// Nodes limit, do not visit more nodes than this
+    pub node_limit: Option<usize>,
     /// Whether the search was aborted
     pub aborted: bool,
 }
@@ -57,6 +59,7 @@ impl Search {
             repetition_table: [HashKey::default(); 1024],
             start_time: Instant::now(),
             time_limit: None,
+            node_limit: None,
             aborted: false,
         }
     }
@@ -66,6 +69,7 @@ impl Search {
         position: Chess,
         max_depth: Option<i32>,
         time_limit: Option<Duration>,
+        node_limit: Option<usize>,
     ) -> Option<Move> {
         // init position
         self.pos.reset(&position);
@@ -82,6 +86,7 @@ impl Search {
         // time control
         self.start_time = Instant::now();
         self.time_limit = time_limit;
+        self.node_limit = node_limit;
         self.aborted = false;
 
         // best line found so far
@@ -407,9 +412,15 @@ impl Search {
 
     fn checkup(&mut self) {
         if self.nodes & 2047 == 0 {
-            // make sure we are not exceeding the time limit
+            // make sure we are not exceeding the limits
             if let Some(time_limit) = self.time_limit {
                 if self.start_time.elapsed() >= time_limit {
+                    self.aborted = true;
+                }
+            }
+
+            if let Some(node_limit) = self.node_limit {
+                if self.nodes >= node_limit {
                     self.aborted = true;
                 }
             }
