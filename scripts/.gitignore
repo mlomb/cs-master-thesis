@@ -1,2 +1,5 @@
 artifacts/
 models/
+c-chess-cli
+ordo
+*.epd

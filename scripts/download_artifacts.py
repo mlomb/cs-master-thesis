@@ -44,8 +44,15 @@ def main():
         files = os.listdir(path)
         assert len(files) == 1
 
+        def fix_name(name):
+            # replace:
+            # [ with (
+            # ] with )
+            # > with _
+            return name.replace("[", "(").replace("]", ")").replace(">", "_")
+
         model_file = os.listdir(path)[0]
-        shutil.copyfile(os.path.join(path, model_file), os.path.join(config.output_dir, run.name + ".nn"))
+        shutil.copyfile(os.path.join(path, model_file), os.path.join(config.output_dir, run.id + "_" + fix_name(run.name) + ".nn"))
 
     print("Done")
 
