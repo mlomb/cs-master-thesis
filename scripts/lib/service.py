@@ -67,10 +67,9 @@ class SamplesService:
         x_tensor = torch.tensor(self.x, dtype=torch.int64, device='cuda')
         y_tensor = torch.tensor(self.y, dtype=torch.float32, device='cuda')
 
-        # Liberate the shared memory for the generator to use.
+        # Release the shared memory for the generator to use.
         self.notify_ready_for_next()
 
-        # Return the TensorFlow tensors.
         return x_tensor, y_tensor
 
     def __del__(self):
