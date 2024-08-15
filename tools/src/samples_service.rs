@@ -23,7 +23,6 @@ pub struct SamplesServiceCommand {
 
     /// The feature set to use
     #[arg(long, value_name = "feature-set")]
-    #[clap(value_enum)]
     feature_set: String,
 
     /// Batch size

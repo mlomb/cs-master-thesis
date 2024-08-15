@@ -85,3 +85,10 @@ class SamplesService:
         self.y = None
         self.data = None
         self.shmem.close()
+
+def get_feature_set_size(name: str):
+    return int(subprocess.check_output([
+        "../tools/target/release/tools",
+        "feature-set-size",
+        "--feature-set=" + name,
+    ]))

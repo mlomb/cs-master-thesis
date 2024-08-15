@@ -6,7 +6,7 @@ import torch
 import wandb
 import tempfile
 
-from lib.service import SamplesService
+from lib.service import SamplesService, get_feature_set_size
 from lib.model import NnueModel
 from lib.model import decode_int64_bitset
 from lib.serialize import NnueWriter
@@ -170,11 +170,7 @@ def main():
     config = parser.parse_args()
 
     # compute feature size from feature set
-    config.num_features = {
-        "half-compact": 192,
-        "half-piece": 768,
-        "half-king-piece": 40960
-    }[config.feature_set]
+    config.num_features = get_feature_set_size(config.feature_set)
 
     print(config)
 
