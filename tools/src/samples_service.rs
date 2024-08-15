@@ -1,25 +1,14 @@
 use crate::method::pqr::PQR;
 use crate::method::{eval::EvalRead, ReadSample};
-use clap::{Args, Subcommand, ValueEnum};
+use clap::{Args, Subcommand};
 use crossbeam::channel::{bounded, Receiver, Sender};
-use nn::feature_set::half_compact::HalfCompact;
-use nn::feature_set::half_king::HalfKingPiece;
-use nn::feature_set::half_piece::HalfPiece;
-use nn::feature_set::FeatureSet;
+use nn::feature_set::build::build_feature_set;
 use shared_memory::ShmemConf;
 use std::{
     error::Error,
     fs::File,
     io::{self, BufRead, BufReader, Cursor, Read, Seek, Write},
 };
-
-#[derive(ValueEnum, Clone)]
-enum FeatureSetChoice {
-    HalfCompact,
-    HalfPiece,
-    HalfKingPiece,
-    TopK20,
-}
 
 #[derive(Args, Clone)]
 pub struct SamplesServiceCommand {
@@ -35,7 +24,7 @@ pub struct SamplesServiceCommand {
     /// The feature set to use
     #[arg(long, value_name = "feature-set")]
     #[clap(value_enum)]
-    feature_set: FeatureSetChoice,
+    feature_set: String,
 
     /// Batch size
     #[arg(long, default_value = "32")]
@@ -74,7 +63,7 @@ pub fn samples_service(cmd: SamplesServiceCommand) -> Result<(), Box<dyn Error>>
         std::thread::spawn(move || build_samples_thread(cmd, line_receiver, batch_sender));
     }
 
-    let feature_set = build_feature_set(&cmd);
+    let feature_set = build_feature_set(&cmd.feature_set);
     let method = build_method(&cmd);
 
     // open shared memory file
@@ -144,7 +133,7 @@ fn build_samples_thread(
     line_receiver: Receiver<Vec<u8>>,
     batch_sender: Sender<BatchReady>,
 ) {
-    let feature_set = build_feature_set(&cmd);
+    let feature_set = build_feature_set(&cmd.feature_set);
     let mut method = build_method(&cmd);
 
     let x_batch_size = cmd.batch_size * method.x_size(&feature_set);
@@ -178,15 +167,6 @@ fn build_samples_thread(
         // reset buffers
         x_cursor.rewind().unwrap();
         y_cursor.rewind().unwrap();
-    }
-}
-
-fn build_feature_set(cmd: &SamplesServiceCommand) -> Box<dyn FeatureSet> {
-    match cmd.feature_set {
-        FeatureSetChoice::HalfCompact => Box::new(HalfCompact {}),
-        FeatureSetChoice::HalfPiece => Box::new(HalfPiece {}),
-        FeatureSetChoice::HalfKingPiece => Box::new(HalfKingPiece {}),
-        FeatureSetChoice::TopK20 => todo!(),
     }
 }
 

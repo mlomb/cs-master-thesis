@@ -1,6 +1,7 @@
 use super::crelu::{crelu_16, crelu_32};
 use super::linear::{linear, linear_partial_refresh, linear_partial_update};
 use super::tensor::Tensor;
+use crate::feature_set::build::build_feature_set;
 use crate::feature_set::FeatureSet;
 use byteorder::{LittleEndian, ReadBytesExt};
 use std::fs::File;
@@ -68,12 +69,7 @@ impl NnueModel {
         let num_l1 = cursor.read_u32::<LittleEndian>().unwrap() as usize;
         let num_l2 = cursor.read_u32::<LittleEndian>().unwrap() as usize;
 
-        let feature_set: Box<dyn FeatureSet> = match feature_set_str {
-            "half-compact" => Box::new(crate::feature_set::half_compact::HalfCompact {}),
-            "half-piece" => Box::new(crate::feature_set::half_piece::HalfPiece {}),
-            "half-king-piece" => Box::new(crate::feature_set::half_king::HalfKingPiece {}),
-            _ => panic!("Unknown NNUE model feature set: {}", feature_set_str),
-        };
+        let feature_set = build_feature_set(feature_set_str);
         assert_eq!(num_features as usize, feature_set.num_features());
 
         println!("info string NNUE feature set: {}", feature_set_str);

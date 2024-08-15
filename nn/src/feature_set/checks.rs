@@ -31,8 +31,11 @@ pub(super) fn sanity_checks(feature_set: &dyn FeatureSet) {
         let pos: Chess = fen.into_position(shakmaty::CastlingMode::Standard).unwrap();
 
         check_flipped(&pos, feature_set);
-        check_changed(&pos, Color::White, feature_set);
-        check_changed(&pos, Color::Black, feature_set);
+
+        // disabled since changed features was removed
+        // who knows I'll leave the code
+        // check_changed(&pos, Color::White, feature_set);
+        // check_changed(&pos, Color::Black, feature_set);
     }
 }
 
@@ -68,6 +71,7 @@ fn check_flipped(pos: &Chess, feature_set: &dyn FeatureSet) {
 }
 
 /// Check changed_features assuming that active_features is right
+#[allow(dead_code)]
 fn check_changed(pos: &Chess, perspective: Color, feature_set: &dyn FeatureSet) {
     let mut pos_features = vec![];
     feature_set.active_features(pos.board(), perspective, &mut pos_features);
@@ -76,6 +80,7 @@ fn check_changed(pos: &Chess, perspective: Color, feature_set: &dyn FeatureSet) 
         let mut pos_moved = pos.clone();
         pos_moved.play_unchecked(&m);
 
+        /*
         if feature_set.requires_refresh(&pos.board(), &m, perspective) {
             continue;
         }
@@ -95,14 +100,17 @@ fn check_changed(pos: &Chess, perspective: Color, feature_set: &dyn FeatureSet) 
         );
         let mut applied = apply_changes(&pos_features, &added_features, &removed_features);
 
+
         pos_moved_features.sort();
         applied.sort();
 
         assert_eq!(pos_moved_features, applied);
+        */
     }
 }
 
 /// Also checks that added do not exist in actual and removed do exist
+#[allow(dead_code)]
 fn apply_changes(actual: &Vec<u16>, added: &Vec<u16>, removed: &Vec<u16>) -> Vec<u16> {
     let mut result = vec![];
 

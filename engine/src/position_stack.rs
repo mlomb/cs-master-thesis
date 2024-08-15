@@ -63,16 +63,16 @@ impl PositionStack {
         next_state.copy_from(prev_state);
 
         if let Some(mov) = mov {
-            // update the NNUE accumulator (before making the move!)
-            next_state
-                .nnue_accum
-                .update(&next_state.pos.board(), &mov, Color::White);
-            next_state
-                .nnue_accum
-                .update(&next_state.pos.board(), &mov, Color::Black);
-
             // make a regular move
             next_state.pos.play_unchecked(&mov);
+
+            // update the NNUE accumulator (AFTER making the move!)
+            next_state
+                .nnue_accum
+                .update(&next_state.pos.board(), Color::White);
+            next_state
+                .nnue_accum
+                .update(&next_state.pos.board(), Color::Black);
         } else {
             // make a null move
             // (forfeit the move and let the opponent play)
