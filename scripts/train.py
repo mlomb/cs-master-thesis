@@ -16,12 +16,12 @@ from lib.losses import EvalLoss, PQRLoss
 
 def train(config, use_wandb: bool):
     if config.method == "pqr":
-        X_SHAPE = (config.batch_size, 3, 2, config.num_features // 64)
+        X_SHAPE = (config.batch_size, 3, 2, math.ceil(config.num_features / 64))
         Y_SHAPE = (config.batch_size, 0)
         INPUTS = glob("/mnt/c/datasets/pqr-1700/*.csv")
         loss_fn = PQRLoss()
     elif config.method == "eval":
-        X_SHAPE = (config.batch_size, 2, config.num_features // 64)
+        X_SHAPE = (config.batch_size, 2, math.ceil(config.num_features / 64))
         Y_SHAPE = (config.batch_size, 1)
         INPUTS = glob("/mnt/c/datasets/eval-1700/*.csv")
         loss_fn = EvalLoss()
@@ -78,8 +78,13 @@ def train(config, use_wandb: bool):
             X, y = samples_service.next_batch()
 
             # expand bitset
-            X = decode_int64_bitset(X)
-            X = X.reshape(-1, 2, config.num_features)
+            # X.shape = [4096, 2, 43]
+            X = decode_int64_bitset(X) 
+            # X.shape = [4096, 2, 43, 64]
+            X = X.reshape(-1, 2, X.shape[-2] * 64)
+            # X.shape = [4096, 2, 2752]
+            X = X[:, :, :config.num_features] # truncate to the actual number of features
+            # X.shape = [4096, 2, 2700]
 
             loss = train_step(X, y)
             avg_loss += loss.item()
