@@ -5,21 +5,21 @@ metric:
   goal: minimize
   name: Train/loss.min
 parameters:
-  learning-rate:
+  learning_rate:
     values: [0.0015]
 #    min: 0.00001
 #    max: 0.01
-  feature-set:
+  feature_set:
     values: ["hv","h+v","hv+h+v","d1d2","d1+d2","hv+d1d2","h+v+d1+d2","hv+h+v+d1+d2","hd1+vd2","vd1+hd2"]
-  ft-size:
+  ft_size:
     values: [256, 512, 1024, 2048]
-  batch-size:
+  batch_size:
     values: [4096, 8192, 16384]
-  l1-size:
+  l1_size:
     values: [32]
-  l2-size:
+  l2_size:
     values: [32]
-  wandb-project:
+  wandb_project:
     values: ["cs-master-thesis"]
 
 command:

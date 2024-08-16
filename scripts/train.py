@@ -164,22 +164,22 @@ def main():
     parser = argparse.ArgumentParser(description="Train the network")
 
     # model
-    parser.add_argument("--feature-set", default="half-piece", type=str)
-    parser.add_argument("--ft-size", default=256, type=int)
-    parser.add_argument("--l1-size", default=32, type=int)
-    parser.add_argument("--l2-size", default=32, type=int)
+    parser.add_argument("--feature_set", default="hv", type=str)
+    parser.add_argument("--ft_size", default=256, type=int)
+    parser.add_argument("--l1_size", default=32, type=int)
+    parser.add_argument("--l2_size", default=32, type=int)
 
     # training
-    parser.add_argument("--batch-size", default=4096, type=int, help="Number of samples per minibatch") # 4K
-    parser.add_argument("--max-samples", default=2 ** 30, type=int, help="Number of samples to train for") # 1B
+    parser.add_argument("--batch_size", default=4096, type=int, help="Number of samples per minibatch") # 4K
+    parser.add_argument("--max_samples", default=2 ** 30, type=int, help="Number of samples to train for") # 1B
     parser.add_argument("--steps", default=1024, type=int, help="Number of steps to train")
-    parser.add_argument("--learning-rate", default=0.0015, type=float, help="Initial learning rate")
+    parser.add_argument("--learning_rate", default=0.0015, type=float, help="Initial learning rate")
     parser.add_argument("--method", default="eval", type=str)
 
     # misc
-    parser.add_argument("--checkpoint-interval", default=16, type=int)
-    parser.add_argument("--puzzle-interval", default=32, type=int)
-    parser.add_argument("--wandb-project", default=None, type=str)
+    parser.add_argument("--checkpoint_interval", default=16, type=int)
+    parser.add_argument("--puzzle_interval", default=32, type=int)
+    parser.add_argument("--wandb_project", default=None, type=str)
 
     config = parser.parse_args()
 
