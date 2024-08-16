@@ -72,7 +72,7 @@ def train(config, use_wandb: bool):
     batches_per_step = config.max_samples // (config.batch_size * config.steps)
     
     best_loss = float("inf")
-    last_artifact = None
+    checkpoint_is_best = True
 
     for step in range(1, config.steps+1):
         avg_loss = 0.0
@@ -100,9 +100,8 @@ def train(config, use_wandb: bool):
         # Step the scheduler
         scheduler.step(avg_loss)
         
-        is_best = avg_loss < best_loss
-        if is_best:
-            best_loss = avg_loss
+        checkpoint_is_best = checkpoint_is_best or avg_loss < best_loss
+        best_loss = min(best_loss, avg_loss)
 
         # log metrics to W&B
         metrics = {
@@ -137,15 +136,13 @@ def train(config, use_wandb: bool):
             if step % config.checkpoint_interval == 0 or step == 1:
 
                 if use_wandb:
-                    # make sure last was uploaded
-                    if last_artifact is not None:
-                        last_artifact.wait()
-
                     # store artifact in W&B
                     artifact = wandb.Artifact(f"model_{wandb.run.id}", type="model")
                     artifact.add_file(local_path=tmp.name, name=f"model.nn", policy="mutable")
-                    wandb.log_artifact(artifact, aliases=["latest", "best"] if is_best else ["latest"])
-                    last_artifact = artifact
+                    wandb.log_artifact(artifact, aliases=["latest", "best"] if checkpoint_is_best else ["latest"])
+
+                    # reset tag
+                    checkpoint_is_best = False
                 else:
                     # TODO: make local checkpoint
                     pass
