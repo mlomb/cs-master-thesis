@@ -71,6 +71,8 @@ def train(config, use_wandb: bool):
     # max_samples = batch_size * batches_per_step * steps
     batches_per_step = config.max_samples // (config.batch_size * config.steps)
     
+    best_loss = float("inf")
+
     for step in range(1, config.steps+1):
         avg_loss = 0.0
 
@@ -96,6 +98,10 @@ def train(config, use_wandb: bool):
 
         # Step the scheduler
         scheduler.step(avg_loss)
+        
+        is_best = avg_loss < best_loss
+        if is_best:
+            best_loss = avg_loss
 
         # log metrics to W&B
         metrics = {
@@ -120,9 +126,9 @@ def train(config, use_wandb: bool):
 
                 if use_wandb:
                     # store artifact in W&B
-                    artifact = wandb.Artifact(wandb.run.id, type="model")
-                    artifact.add_file(tmp.name, name=f"{step}.nn")
-                    wandb.log_artifact(artifact, aliases=["latest", f"step_{step}"])
+                    artifact = wandb.Artifact(f"model_{wandb.run.id}", type="model")
+                    artifact.add_file(local_path=tmp.name, name=f"model.nn")
+                    wandb.log_artifact(artifact, aliases=["latest", "best"] if is_best else ["latest"])
                 else:
                     # TODO: make local checkpoint
                     pass
@@ -191,7 +197,7 @@ def main():
             config=config
         )
         wandb.define_metric("Train/loss", summary="min")
-        wandb.define_metric("Puzzles/accuracy", summary="max")
+        wandb.define_metric("Puzzles/moveAccuracy", summary="max")
 
     train(config, use_wandb)
 
