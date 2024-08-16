@@ -138,7 +138,8 @@ def train(config, use_wandb: bool):
 
                 if use_wandb:
                     # make sure last was uploaded
-                    last_artifact.wait()
+                    if last_artifact is not None:
+                        last_artifact.wait()
 
                     # store artifact in W&B
                     artifact = wandb.Artifact(f"model_{wandb.run.id}", type="model")
