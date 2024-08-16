@@ -9,12 +9,12 @@ parameters:
     values: [0.0015]
 #    min: 0.00001
 #    max: 0.01
-  batch-size:
-    values: [512, 1024, 4096, 8192, 16384]
   feature-set:
-    values: ["half-piece", "half-king-piece"]
+    values: ["hv","h+v","hv+h+v","d1d2","d1+d2","hv+d1d2","h+v+d1+d2","hv+h+v+d1+d2","hd1+vd2","vd1+hd2"]
   ft-size:
     values: [256, 512, 1024, 2048]
+  batch-size:
+    values: [4096, 8192, 16384]
   l1-size:
     values: [32]
   l2-size:
