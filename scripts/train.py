@@ -72,6 +72,7 @@ def train(config, use_wandb: bool):
     batches_per_step = config.max_samples // (config.batch_size * config.steps)
     
     best_loss = float("inf")
+    last_artifact = None
 
     for step in range(1, config.steps+1):
         avg_loss = 0.0
@@ -122,17 +123,6 @@ def train(config, use_wandb: bool):
         with tempfile.NamedTemporaryFile() as tmp:
             tmp.write(NnueWriter(chessmodel, config.feature_set).buf)
 
-            if step % config.checkpoint_interval == 0 or step == 1:
-
-                if use_wandb:
-                    # store artifact in W&B
-                    artifact = wandb.Artifact(f"model_{wandb.run.id}", type="model")
-                    artifact.add_file(local_path=tmp.name, name=f"model.nn")
-                    wandb.log_artifact(artifact, aliases=["latest", "best"] if is_best else ["latest"])
-                else:
-                    # TODO: make local checkpoint
-                    pass
-
             if step % config.puzzle_interval == 0 or step == 1:
                 # run puzzles
                 puzzles_results, puzzles_move_accuracy = puzzles.measure(["../engine/target/release/engine", f"--nn={tmp.name}"])
@@ -143,6 +133,21 @@ def train(config, use_wandb: bool):
                     wandb.log(step=step, data={f"Puzzles/{category}": accuracy for category, accuracy in puzzles_results})
                 else:
                     print(f"step {step} - Puzzles move accuracy: {puzzles_move_accuracy}")
+
+            if step % config.checkpoint_interval == 0 or step == 1:
+
+                if use_wandb:
+                    # make sure last was uploaded
+                    last_artifact.wait()
+
+                    # store artifact in W&B
+                    artifact = wandb.Artifact(f"model_{wandb.run.id}", type="model")
+                    artifact.add_file(local_path=tmp.name, name=f"model.nn", policy="mutable")
+                    wandb.log_artifact(artifact, aliases=["latest", "best"] if is_best else ["latest"])
+                    last_artifact = artifact
+                else:
+                    # TODO: make local checkpoint
+                    pass
 
                 # build ratings bar chart
                 #wandb.log(step=step, data={
