@@ -1,5 +1,5 @@
 program: train.py
-name: sweep-initial-1
+name: sweep-2
 method: grid
 metric:
   goal: minimize
