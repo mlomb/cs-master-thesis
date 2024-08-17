@@ -31,14 +31,8 @@ def main():
         os.makedirs(config.output_dir)
 
     for run in tqdm(runs):
-        latest_artifact = None
-
-        for artifact in run.logged_artifacts():
-            if artifact.type == "model" and "latest" in artifact.aliases:
-                latest_artifact = artifact
-                break
-
-        path = latest_artifact.download()
+        artifact = api.artifact(f"mlomb/cs-master-thesis/model_{run.id}:best")
+        path = artifact.download()
 
         # list single file and copy to output directory
         files = os.listdir(path)
