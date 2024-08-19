@@ -42,11 +42,14 @@ impl Axes {
 
 pub struct AxesBlock {
     pub axes: Vec<Axes>,
+    pub incl_king: bool,
 }
 
 impl AxesBlock {
     pub fn size(&self) -> usize {
-        self.axes.iter().map(|ax| ax.size()).product::<usize>() * 6 * 2
+        self.axes.iter().map(|ax| ax.size()).product::<usize>()
+            * (if self.incl_king { 6 } else { 5 })
+            * 2
     }
 }
 
@@ -90,7 +93,12 @@ impl FeatureSet for AxesFeatureSet {
                     index = index * ax.size() as u16 + ax.index(board, perspective, piece_square);
                 }
 
-                features.push(offset as u16 + index * 12 + piece_role * 2 + piece_color);
+                features.push(
+                    offset as u16
+                        + index * (if block.incl_king { 12 } else { 10 })
+                        + piece_role * 2
+                        + piece_color,
+                );
                 offset += block.size();
             }
         }
