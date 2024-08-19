@@ -10,6 +10,8 @@ pub enum Axes {
     Diagonal1,
     // Backward diagonal (\)
     Diagonal2,
+    // King
+    King,
 }
 
 impl Axes {
@@ -20,10 +22,11 @@ impl Axes {
             Axes::Vertical => 8,
             Axes::Diagonal1 => 15,
             Axes::Diagonal2 => 15,
+            Axes::King => 64,
         }
     }
 
-    pub fn index(&self, piece_square: Square) -> u16 {
+    pub fn index(&self, board: &Board, perspective: Color, piece_square: Square) -> u16 {
         let file = piece_square.file() as u16;
         let rank = piece_square.rank() as u16;
 
@@ -32,18 +35,18 @@ impl Axes {
             Axes::Vertical => rank,
             Axes::Diagonal1 => file + rank,
             Axes::Diagonal2 => file + 7 - rank,
+            Axes::King => board.king_of(perspective).unwrap() as u16,
         }
     }
 }
 
 pub struct AxesBlock {
-    pub first_axis: Axes,
-    pub second_axis: Option<Axes>,
+    pub axes: Vec<Axes>,
 }
 
 impl AxesBlock {
     pub fn size(&self) -> usize {
-        self.first_axis.size() * self.second_axis.as_ref().map_or(1, |ax| ax.size()) * 6 * 2
+        self.axes.iter().map(|ax| ax.size()).product::<usize>() * 6 * 2
     }
 }
 
@@ -77,17 +80,15 @@ impl FeatureSet for AxesFeatureSet {
             let piece_role = piece.role as u16 - 1;
             let piece_color = (piece.color != perspective) as u16;
 
+            // block offset
             let mut offset: usize = 0;
 
             for block in &self.blocks {
-                let first_index = block.first_axis.index(piece_square);
+                let mut index: u16 = 0;
 
-                let index = match block.second_axis {
-                    None => first_index,
-                    Some(ref second_axis) => {
-                        first_index * second_axis.size() as u16 + second_axis.index(piece_square)
-                    }
-                };
+                for ax in &block.axes {
+                    index = index * ax.size() as u16 + ax.index(board, perspective, piece_square);
+                }
 
                 features.push(offset as u16 + index * 12 + piece_role * 2 + piece_color);
                 offset += block.size();
