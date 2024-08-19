@@ -1,5 +1,5 @@
 use super::FeatureSet;
-use shakmaty::{Board, Color, Square};
+use shakmaty::{Board, Color, Role, Square};
 
 pub enum Axes {
     // Across files (↔)
@@ -87,6 +87,11 @@ impl FeatureSet for AxesFeatureSet {
             let mut offset: usize = 0;
 
             for block in &self.blocks {
+                if !block.incl_king && piece.role == Role::King {
+                    // skip king
+                    continue;
+                }
+
                 let mut index: u16 = 0;
 
                 for ax in &block.axes {
