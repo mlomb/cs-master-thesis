@@ -3,7 +3,7 @@ use crate::uci_engine::{Score, UciEngine};
 use clap::Args;
 use nn::feature_set::FeatureSet;
 use rand::seq::SliceRandom;
-use shakmaty::{fen::Fen, CastlingMode, Chess, EnPassantMode, Position};
+use shakmaty::{fen::Fen, uci::UciMove, CastlingMode, Chess, EnPassantMode, Position};
 use std::io::{self, BufRead, Write};
 
 #[derive(Args, Clone)]
@@ -76,7 +76,7 @@ impl ReadSample for EvalRead {
     ) {
         let mut fen_bytes = Vec::with_capacity(128);
         let mut score_bytes = Vec::with_capacity(16);
-        let mut bestmove_bytes = Vec::with_capacity(16); // unused
+        let mut bestmove_bytes = Vec::with_capacity(16);
 
         read.read_until(b',', &mut fen_bytes).unwrap();
         read.read_until(b',', &mut score_bytes).unwrap();
@@ -101,6 +101,19 @@ impl ReadSample for EvalRead {
         if let Score::Cp(cp_score) = score {
             let fen = Fen::from_ascii(fen_bytes.as_slice()).unwrap();
             let position: Chess = fen.into_position(CastlingMode::Standard).unwrap();
+
+            let best_move_uci: UciMove = UciMove::from_ascii(bestmove_bytes.as_slice()).unwrap();
+            let best_move = best_move_uci.to_move(&position).unwrap();
+
+            if best_move.is_capture() || position.is_check() {
+                // skip capture and check positions
+                return;
+            }
+
+            // random fen skipping
+            if rand::random::<f64>() < 0.3 {
+                return;
+            }
 
             encode_position(feature_set, &position, write_x);
 

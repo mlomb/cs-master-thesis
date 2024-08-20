@@ -179,7 +179,13 @@ impl Search {
         alpha
     }
 
-    fn negamax(&mut self, mut alpha: Value, beta: Value, depth: i32, allow_null: bool) -> Value {
+    fn negamax(
+        &mut self,
+        mut alpha: Value,
+        beta: Value,
+        mut depth: i32,
+        allow_null: bool,
+    ) -> Value {
         assert!(-INFINITE <= alpha && alpha < beta && beta <= INFINITE);
         assert!(depth >= 0);
 
@@ -217,6 +223,12 @@ impl Search {
         }
 
         let in_check = self.pos.get().is_check();
+
+        if in_check {
+            // extend depth
+            // See https://chess.stackexchange.com/a/20086
+            depth += 1;
+        }
 
         // Null Move Pruning
         // https://www.chessprogramming.org/Null_Move_Pruning

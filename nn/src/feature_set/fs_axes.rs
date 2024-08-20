@@ -16,6 +16,7 @@ pub enum Axes {
 
 impl Axes {
     // Number of indexable steps
+    #[inline(always)]
     pub fn size(&self) -> usize {
         match self {
             Axes::Horizontal => 8,
@@ -26,6 +27,7 @@ impl Axes {
         }
     }
 
+    #[inline(always)]
     pub fn index(&self, board: &Board, perspective: Color, piece_square: Square) -> u16 {
         let file = piece_square.file() as u16;
         let rank = piece_square.rank() as u16;
@@ -46,6 +48,7 @@ pub struct AxesBlock {
 }
 
 impl AxesBlock {
+    #[inline(always)]
     pub fn size(&self) -> usize {
         self.axes.iter().map(|ax| ax.size()).product::<usize>()
             * (if self.incl_king { 6 } else { 5 })
@@ -62,6 +65,7 @@ impl FeatureSet for AxesFeatureSet {
         self.blocks.iter().map(|b| b.size()).sum::<usize>()
     }
 
+    #[inline(always)]
     fn active_features(&self, board: &Board, perspective: Color, features: &mut Vec<u16>) {
         for (piece_square, piece) in board.clone().into_iter() {
             let piece_square = if perspective == Color::Black {
