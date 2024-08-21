@@ -1,8 +1,13 @@
-# Analysis of feature sets in NNUE networks for chess engines
+# Analysis of feature sets in NNUE networks for chess
 
 [poner abstract]
 
-The bot can be challenged on Lichess: [https://lichess.org/@/LimboBot](https://lichess.org/@/LimboBot)
+
+The bot can be challenged on Lichess: [https://lichess.org/@/LimboBot](https://lichess.org/@/LimboBot)!
+
+[![lichess-bullet](https://lichess-shield.vercel.app/api?username=LimboBot&format=bullet)](https://lichess.org/@/LimboBot/perf/bullet)
+[![lichess-blitz](https://lichess-shield.vercel.app/api?username=LimboBot&format=blitz)](https://lichess.org/@/LimboBot/perf/blitz)
+[![lichess-rapid](https://lichess-shield.vercel.app/api?username=LimboBot&format=rapid)](https://lichess.org/@/LimboBot/perf/rapid)
 
 # Code
 
