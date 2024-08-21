@@ -5,10 +5,6 @@ pub fn build_feature_set(name: &str) -> Box<dyn FeatureSet> {
     use crate::feature_set::fs_axes::*;
 
     match name {
-        "half-piece" => Box::new(AxesFeatureSet {
-            #[rustfmt::skip]
-            blocks: vec![AxesBlock { axes: vec![Vertical, Horizontal], incl_king: true }],
-        }),
         "hv" => Box::new(AxesFeatureSet {
             #[rustfmt::skip]
             blocks: vec![AxesBlock { axes: vec![Horizontal, Vertical], incl_king: true }],
