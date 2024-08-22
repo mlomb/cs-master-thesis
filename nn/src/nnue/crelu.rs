@@ -3,6 +3,7 @@ use std::arch::x86_64::*;
 
 /// Clipped ReLU activation function from i16 elements
 /// https://github.com/official-stockfish/nnue-pytorch/blob/master/docs/nnue.md#int16---int8
+#[target_feature(enable = "avx2")]
 pub unsafe fn crelu_16(size: usize, input: *const i16, output: *mut i8) {
     const IN_REG_WIDTH: usize = 256 / 16;
     const OUT_REG_WIDTH: usize = 256 / 8;
@@ -27,6 +28,7 @@ pub unsafe fn crelu_16(size: usize, input: *const i16, output: *mut i8) {
 
 /// Clipped ReLU activation function from i32 elements
 /// https://github.com/official-stockfish/nnue-pytorch/blob/master/docs/nnue.md#int32---int8
+#[target_feature(enable = "avx2")]
 pub unsafe fn crelu_32(size: usize, input: *const i32, output: *mut i8) {
     const IN_REG_WIDTH: usize = 256 / 32;
     const OUT_REG_WIDTH: usize = 256 / 8;

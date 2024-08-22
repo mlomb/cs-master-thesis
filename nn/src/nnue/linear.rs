@@ -7,6 +7,7 @@ const LOG2_OUTPUT_WEIGHT_SCALE: i32 = 4;
 
 /// Quantized linear layer with 8-bit weights and 32-bits bias
 /// https://github.com/official-stockfish/nnue-pytorch/blob/master/docs/nnue.md#linear-layer-4
+#[target_feature(enable = "avx2")]
 pub unsafe fn linear(
     num_inputs: usize,
     num_outputs: usize,
@@ -102,6 +103,7 @@ unsafe fn m256_add_dpbusd_epi32(acc: &mut __m256i, a: __m256i, b: __m256i) {
 
 /// Refresh accumulator
 /// https://github.com/official-stockfish/nnue-pytorch/blob/master/docs/nnue.md#feature-transformer-2
+#[target_feature(enable = "avx2")]
 pub unsafe fn linear_partial_refresh(
     num_inputs: usize,
     num_outputs: usize,
@@ -156,6 +158,7 @@ pub unsafe fn linear_partial_refresh(
 
 /// Update accumulator
 /// https://github.com/official-stockfish/nnue-pytorch/blob/master/docs/nnue.md#feature-transformer-2
+#[target_feature(enable = "avx2")]
 pub unsafe fn linear_partial_update(
     num_inputs: usize,
     num_outputs: usize,
