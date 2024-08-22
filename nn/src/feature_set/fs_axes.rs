@@ -1,4 +1,5 @@
 use super::FeatureSet;
+use fixedbitset::FixedBitSet;
 use shakmaty::{Board, Color, Role, Square};
 
 pub enum Axes {
@@ -66,7 +67,7 @@ impl FeatureSet for AxesFeatureSet {
     }
 
     #[inline(always)]
-    fn active_features(&self, board: &Board, perspective: Color, features: &mut Vec<u16>) {
+    fn active_features(&self, board: &Board, perspective: Color, features: &mut FixedBitSet) {
         for (piece_square, piece) in board.clone().into_iter() {
             let piece_square = if perspective == Color::Black {
                 // flip square vertically if black is to play, so it is on the bottom side
@@ -102,11 +103,12 @@ impl FeatureSet for AxesFeatureSet {
                     index = index * ax.size() as u16 + ax.index(board, perspective, piece_square);
                 }
 
-                features.push(
-                    offset as u16
+                features.set(
+                    (offset as u16
                         + index * (if block.incl_king { 12 } else { 10 })
                         + piece_role * 2
-                        + piece_color,
+                        + piece_color) as usize,
+                    true,
                 );
                 offset += block.size();
             }

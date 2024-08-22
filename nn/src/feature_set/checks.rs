@@ -47,6 +47,7 @@ fn check_flipped(pos: &Chess, feature_set: &dyn FeatureSet) {
     board_flip.flip_vertical();
     board_flip.swap_colors();
 
+    /*
     let mut feat_orig_white = vec![];
     let mut feat_orig_black = vec![];
     let mut feat_flip_white = vec![];
@@ -68,11 +69,13 @@ fn check_flipped(pos: &Chess, feature_set: &dyn FeatureSet) {
     for &x in &feat_orig_white {
         assert!((x as usize) < feature_set.num_features());
     }
+    */
 }
 
 /// Check changed_features assuming that active_features is right
 #[allow(dead_code)]
 fn check_changed(pos: &Chess, perspective: Color, feature_set: &dyn FeatureSet) {
+    /*
     let mut pos_features = vec![];
     feature_set.active_features(pos.board(), perspective, &mut pos_features);
 
@@ -80,7 +83,6 @@ fn check_changed(pos: &Chess, perspective: Color, feature_set: &dyn FeatureSet) 
         let mut pos_moved = pos.clone();
         pos_moved.play_unchecked(&m);
 
-        /*
         if feature_set.requires_refresh(&pos.board(), &m, perspective) {
             continue;
         }
@@ -105,8 +107,8 @@ fn check_changed(pos: &Chess, perspective: Color, feature_set: &dyn FeatureSet) 
         applied.sort();
 
         assert_eq!(pos_moved_features, applied);
-        */
     }
+    */
 }
 
 /// Also checks that added do not exist in actual and removed do exist

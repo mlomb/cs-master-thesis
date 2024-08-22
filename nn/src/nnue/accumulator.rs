@@ -1,4 +1,5 @@
 use super::{model::NnueModel, tensor::Tensor};
+use fixedbitset::FixedBitSet;
 use shakmaty::{Board, Color};
 use std::{cell::RefCell, rc::Rc};
 
@@ -10,18 +11,22 @@ thread_local! {
 
 pub struct NnueAccumulator {
     accumulation: [Tensor<i16>; 2], // indexed by perspective (Color as usize)
-    features: [Vec<u16>; 2],        // current active features
+    features_bitset: [FixedBitSet; 2], // current active features
 
     nnue_model: Rc<RefCell<NnueModel>>,
 }
 
 impl NnueAccumulator {
     pub fn new(nnue_model: Rc<RefCell<NnueModel>>) -> Self {
-        let num_ft = nnue_model.borrow().get_num_ft();
+        let num_l1 = nnue_model.borrow().get_num_ft();
+        let num_features = nnue_model.borrow().get_feature_set().num_features();
         NnueAccumulator {
             nnue_model,
-            accumulation: [Tensor::zeros(num_ft), Tensor::zeros(num_ft)],
-            features: [Vec::with_capacity(1000), Vec::with_capacity(1000)],
+            accumulation: [Tensor::zeros(num_l1), Tensor::zeros(num_l1)],
+            features_bitset: [
+                FixedBitSet::with_capacity(num_features),
+                FixedBitSet::with_capacity(num_features),
+            ],
         }
     }
 
@@ -36,26 +41,32 @@ impl NnueAccumulator {
         let nnue_model = self.nnue_model.borrow();
         let feature_set = nnue_model.get_feature_set();
 
-        let mut buffer = &mut self.features[perspective as usize];
-
-        buffer.clear();
+        let mut bitset = &mut self.features_bitset[perspective as usize];
 
         // gather active features
-        feature_set.active_features(board, perspective, &mut buffer);
+        bitset.clear();
+        feature_set.active_features(board, perspective, &mut bitset);
 
         // refresh the accumulator
-        nnue_model.refresh_accumulator(&self.accumulation[perspective as usize], &buffer);
+        nnue_model.refresh_accumulator(
+            &self.accumulation[perspective as usize],
+            bitset
+                .ones()
+                .map(|f| f as u16)
+                .collect::<Vec<_>>()
+                .as_slice(),
+        );
     }
 
     pub fn update(&mut self, board: &Board, perspective: Color) {
         let nnue_model = self.nnue_model.borrow();
         let feature_set = nnue_model.get_feature_set();
 
-        let prev_features = self.features[perspective as usize].clone();
-        let mut next_features = &mut self.features[perspective as usize];
+        let prev_bitset = self.features_bitset[perspective as usize].clone();
+        let mut next_bitset = &mut self.features_bitset[perspective as usize];
 
-        next_features.clear();
-        feature_set.active_features(board, perspective, &mut next_features);
+        next_bitset.clear();
+        feature_set.active_features(board, perspective, &mut next_bitset);
 
         // compute diff
         let mut added_features = INDEX_BUFFER1.take();
@@ -65,17 +76,12 @@ impl NnueAccumulator {
         removed_features.clear();
 
         // make diff
-        // TODO: make efficient
-        for &f in prev_features.iter() {
-            if !next_features.contains(&f) {
-                removed_features.push(f);
-            }
-        }
-        for &f in next_features.iter() {
-            if !prev_features.contains(&f) {
-                added_features.push(f);
-            }
-        }
+        next_bitset.difference(&prev_bitset).for_each(|f| {
+            added_features.push(f as u16);
+        });
+        prev_bitset.difference(&next_bitset).for_each(|f| {
+            removed_features.push(f as u16);
+        });
 
         // do the math
         nnue_model.update_accumulator(
@@ -92,7 +98,7 @@ impl NnueAccumulator {
         self.accumulation[1]
             .as_mut_slice()
             .copy_from_slice(other.accumulation[1].as_slice());
-        self.features[0].clone_from(&other.features[0]);
-        self.features[1].clone_from(&other.features[1]);
+        self.features_bitset[0].clone_from(&other.features_bitset[0]);
+        self.features_bitset[1].clone_from(&other.features_bitset[1]);
     }
 }
