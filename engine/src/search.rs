@@ -5,9 +5,7 @@ use crate::{
     tt::{TFlag, TTable},
 };
 use nn::nnue::model::NnueModel;
-use shakmaty::{
-    zobrist::ZobristHash, CastlingMode, Chess, EnPassantMode, Move, MoveList, Position,
-};
+use shakmaty::{zobrist::ZobristHash, CastlingMode, Chess, Move, MoveList, Position};
 use std::time::{Duration, Instant};
 use std::{cell::RefCell, rc::Rc};
 
@@ -130,8 +128,14 @@ impl Search {
         // increment the number of nodes searched
         self.nodes += 1;
 
+        if self.is_draw() {
+            // draw
+            return 0;
+        }
+
         // evaluate the position
         let score = self.pos.evaluate();
+        assert!(score >= -10_000 && score <= 10_000);
         // increase number of evals computed
         self.evals += 1;
 
@@ -199,21 +203,23 @@ impl Search {
 
         self.pv.reset(self.ply);
 
+        // check three fold repetition & 50-move rule
+        if self.is_draw() {
+            // draw
+            return 0;
+        }
+
         let is_pv = beta - alpha > 1;
-        let hash_key = self.pos.get().zobrist_hash(EnPassantMode::Legal);
         let mut pv_move = None;
 
-        if !is_pv {
-            if let Some(score) = self.tt.probe(hash_key, alpha, beta, depth, &mut pv_move) {
+        if !is_pv && self.pos.rule50() < 90 {
+            if let Some(score) =
+                self.tt
+                    .probe(self.pos.hash_key(), alpha, beta, depth, &mut pv_move)
+            {
                 // hit!
                 return score;
             }
-        }
-
-        // check three fold repetition
-        if self.ply > 0 && self.is_repetition(hash_key) {
-            // draw
-            return 0;
         }
 
         if depth == 0 {
@@ -278,7 +284,7 @@ impl Search {
 
             // make move
             self.ply += 1;
-            self.push_repetition_key(hash_key);
+            self.push_repetition_key(self.pos.hash_key());
             self.pos.do_move(Some(move_.clone()));
 
             if moves_searched == 0 {
@@ -335,7 +341,8 @@ impl Search {
                 }
 
                 // store TT entry
-                self.tt.record(hash_key, move_, beta, depth, TFlag::Beta);
+                self.tt
+                    .record(self.pos.hash_key(), move_, beta, depth, TFlag::Beta);
 
                 // fails high
                 return beta;
@@ -372,8 +379,13 @@ impl Search {
             }
         }
 
-        self.tt
-            .record(hash_key, best_move.unwrap(), alpha, depth, tt_alpha_flag);
+        self.tt.record(
+            self.pos.hash_key(),
+            best_move.unwrap(),
+            alpha,
+            depth,
+            tt_alpha_flag,
+        );
 
         // node fails low
         alpha
@@ -420,6 +432,21 @@ impl Search {
             // sorts are from low to high, so flip
             -score
         });
+    }
+
+    fn is_draw(&self) -> bool {
+        // insufficient material
+        if self.pos.get().is_insufficient_material() {
+            return true;
+        }
+
+        // 50-move rule
+        if self.pos.rule50() >= 100 {
+            return true;
+        }
+
+        // threefold repetition
+        return self.ply > 0 && self.is_repetition(self.pos.hash_key());
     }
 
     fn checkup(&mut self) {
