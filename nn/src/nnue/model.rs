@@ -41,8 +41,7 @@ impl<W, B> LinearLayer<W, B> {
 pub struct NnueModel {
     feature_set: Box<dyn FeatureSet>,
 
-    feature_transform: LinearLayer<i16, i16>,
-    linear1: LinearLayer<i8, i32>,
+    linear1: LinearLayer<i16, i16>,
     linear2: LinearLayer<i8, i32>,
     linear_out: LinearLayer<i8, i32>,
 }
@@ -65,7 +64,6 @@ impl NnueModel {
         let feature_set_str = std::str::from_utf8(&str_buffer).unwrap();
 
         let num_features = cursor.read_u32::<LittleEndian>().unwrap() as usize;
-        let num_ft = cursor.read_u32::<LittleEndian>().unwrap() as usize;
         let num_l1 = cursor.read_u32::<LittleEndian>().unwrap() as usize;
         let num_l2 = cursor.read_u32::<LittleEndian>().unwrap() as usize;
 
@@ -76,9 +74,8 @@ impl NnueModel {
 
         Ok(Self {
             feature_set,
-            feature_transform: LinearLayer::new(&mut cursor, num_features, num_ft),
-            linear1: LinearLayer::new(&mut cursor, 2 * num_ft, num_l1),
-            linear2: LinearLayer::new(&mut cursor, num_l1, num_l2),
+            linear1: LinearLayer::new(&mut cursor, num_features, num_l1),
+            linear2: LinearLayer::new(&mut cursor, 2 * num_l1, num_l2),
             linear_out: LinearLayer::new(&mut cursor, num_l2, 1),
         })
     }
@@ -86,11 +83,11 @@ impl NnueModel {
     pub fn refresh_accumulator(&self, accumulator: &Tensor<i16>, active_features: &[u16]) {
         unsafe {
             linear_partial_refresh(
-                self.feature_transform.num_inputs,
-                self.feature_transform.num_outputs,
+                self.linear1.num_inputs,
+                self.linear1.num_outputs,
                 active_features,
-                self.feature_transform.weight.as_ptr(),
-                self.feature_transform.bias.as_ptr(),
+                self.linear1.weight.as_ptr(),
+                self.linear1.bias.as_ptr(),
                 accumulator.as_mut_ptr(),
             );
         }
@@ -104,11 +101,11 @@ impl NnueModel {
     ) {
         unsafe {
             linear_partial_update(
-                self.feature_transform.num_inputs,
-                self.feature_transform.num_outputs,
+                self.linear1.num_inputs,
+                self.linear1.num_outputs,
                 added_features,
                 removed_features,
-                self.feature_transform.weight.as_ptr(),
+                self.linear1.weight.as_ptr(),
                 accumulator.as_mut_ptr(),
             );
         }
@@ -119,17 +116,10 @@ impl NnueModel {
             let to_move_accum = to_move_accum.as_ptr();
             let not_to_move_accum = not_to_move_accum.as_ptr();
 
-            let ft = self.feature_transform.num_outputs;
-            let (to_move, not_to_move) = self.linear1.input_buffer.as_mut_slice().split_at_mut(ft);
-            crelu_16(ft, to_move_accum, to_move.as_mut_ptr());
-            crelu_16(ft, not_to_move_accum, not_to_move.as_mut_ptr());
-
-            Self::forward_hidden(&self.linear1);
-            crelu_32(
-                self.linear1.num_outputs,
-                self.linear1.intermediate_buffer.as_ptr(),
-                self.linear2.input_buffer.as_mut_ptr(),
-            );
+            let l2 = self.linear1.num_outputs;
+            let (to_move, not_to_move) = self.linear2.input_buffer.as_mut_slice().split_at_mut(l2);
+            crelu_16(l2, to_move_accum, to_move.as_mut_ptr());
+            crelu_16(l2, not_to_move_accum, not_to_move.as_mut_ptr());
 
             Self::forward_hidden(&self.linear2);
             crelu_32(
@@ -160,7 +150,7 @@ impl NnueModel {
     }
 
     pub fn get_num_ft(&self) -> usize {
-        self.feature_transform.num_outputs
+        self.linear1.num_outputs
     }
 }
 

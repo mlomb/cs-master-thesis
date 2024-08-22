@@ -10,7 +10,6 @@ class NnueWriter:
 
         for k in [
             model.num_features,
-            model.ft_size,
             model.l1_size,
             model.l2_size,
         ]:
@@ -18,7 +17,7 @@ class NnueWriter:
             self.buf.extend(k.to_bytes(4, byteorder='little', signed=False))
 
         self.write_linear(
-            model.ft,
+            model.l1,
             weightType=torch.int16,
             weightScale=model.quantized_one,
             weightOrder='F', # column-major
@@ -26,16 +25,15 @@ class NnueWriter:
             biasScale=model.quantized_one
         )
 
-        for layer in [model.linear1, model.linear2]:
-            self.write_linear(
-                layer,
-                weightType=torch.int8,
-                weightScale=model.weight_scale_hidden,
-                weightOrder='C', # row-major
-                biasType=torch.int32,
-                biasScale=model.weight_scale_hidden * model.quantized_one
-            )
-        
+        self.write_linear(
+            model.l2,
+            weightType=torch.int8,
+            weightScale=model.weight_scale_hidden,
+            weightOrder='C', # row-major
+            biasType=torch.int32,
+            biasScale=model.weight_scale_hidden * model.quantized_one
+        )
+    
         self.write_linear(
             model.output,
             weightType=torch.int8,
@@ -83,11 +81,11 @@ if __name__ == "__main__":
     print("model length:", len(writer.buf))
     print("features:", features.tolist())
 
-    ft = model.ft(sample_input)
+    ft = model.l1(sample_input)
     ft_crelu = torch.clamp(ft, 0, 1)
-    linear1 = model.linear1(torch.concat([ft_crelu, ft_crelu], dim=0))
+    linear1 = model.l2(torch.concat([ft_crelu, ft_crelu], dim=0))
     linear1_crelu = torch.clamp(linear1, 0, 1)
-    linear2 = model.linear2(linear1_crelu)
+    linear2 = model.l3(linear1_crelu)
     linear2_crelu = torch.clamp(linear2, 0, 1)
     linear_out = model.output(linear2_crelu)
 

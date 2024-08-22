@@ -84,7 +84,7 @@ pub unsafe fn linear(
 }
 
 /// https://github.com/official-stockfish/nnue-pytorch/blob/master/docs/nnue.md#m256_add_dpbusd_epi32
-#[inline]
+#[inline(always)]
 unsafe fn m256_add_dpbusd_epi32(acc: &mut __m256i, a: __m256i, b: __m256i) {
     #[cfg(target_feature = "avx512vnni,avx512vl")]
     {

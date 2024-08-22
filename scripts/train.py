@@ -36,14 +36,14 @@ def train(config, use_wandb: bool):
     )
     chessmodel = NnueModel(
         num_features=config.num_features,
-        ft_size=config.ft_size,
         l1_size=config.l1_size,
         l2_size=config.l2_size
     )
     chessmodel.cuda()
 
     optimizer = torch.optim.Adam(chessmodel.parameters(), lr=config.learning_rate)
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', threshold=0.0001, factor=0.7, patience=20)
+    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=1, gamma=config.gamma)
+    #scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', threshold=0.0001, factor=0.7, patience=30)
     # scheduler = torch.optim.lr_scheduler.CyclicLR(optimizer, base_lr=0.000001, max_lr=0.0002, step_size_up=128)
 
     @torch.compile
@@ -68,16 +68,15 @@ def train(config, use_wandb: bool):
     # Make sure gradient tracking is on
     chessmodel.train()
 
-    # max_samples = batch_size * batches_per_step * steps
-    batches_per_step = config.max_samples // (config.batch_size * config.steps)
-    
+    batches_per_epoch = config.epoch_size // config.batch_size
+
     best_loss = float("inf")
     checkpoint_is_best = True
 
-    for step in range(1, config.steps+1):
+    for epoch in range(1, config.epochs+1):
         avg_loss = 0.0
 
-        for _ in tqdm(range(batches_per_step), desc=f'Step {step}/{config.steps}'):
+        for _ in tqdm(range(batches_per_epoch), desc=f'Epoch {epoch}/{config.epochs}'):
             X, y = samples_service.next_batch()
 
             # expand bitset
@@ -95,10 +94,10 @@ def train(config, use_wandb: bool):
             if math.isnan(avg_loss):
                 raise Exception("Loss is NaN, exiting")
 
-        avg_loss /= batches_per_step
+        avg_loss /= batches_per_epoch
 
         # Step the scheduler
-        scheduler.step(avg_loss)
+        scheduler.step()
         
         checkpoint_is_best = checkpoint_is_best or avg_loss < best_loss
         best_loss = min(best_loss, avg_loss)
@@ -107,33 +106,33 @@ def train(config, use_wandb: bool):
         metrics = {
             "Train/loss": avg_loss,
             "Train/lr": scheduler._last_lr[0], # get_last_lr()
-            "Train/samples": config.batch_size * batches_per_step * (step + 1),
+            "Train/samples": config.batch_size * batches_per_epoch * (epoch + 1),
 
-            "Weight/mean-f1": torch.mean(chessmodel.ft.weight),
-            "Weight/mean-l1": torch.mean(chessmodel.linear1.weight),
-            "Weight/mean-l2": torch.mean(chessmodel.linear2.weight),
+            "Weight/mean-l1": torch.mean(chessmodel.l1.weight),
+            "Weight/mean-l2": torch.mean(chessmodel.l2.weight),
             "Weight/mean-out": torch.mean(chessmodel.output.weight),
         }
         if use_wandb:
-            wandb.log(step=step, data=metrics)
+            wandb.log(step=epoch, data=metrics)
         else:
-            print(f"Step {step} - Loss: {avg_loss}, LR: {scheduler._last_lr[0]}")
+            print(f"Step {epoch} - Loss: {avg_loss}, LR: {scheduler._last_lr[0]}")
 
         with tempfile.NamedTemporaryFile() as tmp:
             tmp.write(NnueWriter(chessmodel, config.feature_set).buf)
 
-            if step % config.puzzle_interval == 0 or step == 1:
+            if epoch % config.puzzle_interval == 0 or epoch == 1:
                 # run puzzles
+                print("tmp.name", tmp.name)
                 puzzles_results, puzzles_move_accuracy = puzzles.measure(["../engine/target/release/engine", f"--nn={tmp.name}"])
 
                 # log puzzle metrics
                 if use_wandb:
-                    wandb.log(step=step, data={"Puzzles/moveAccuracy": puzzles_move_accuracy})
-                    wandb.log(step=step, data={f"Puzzles/{category}": accuracy for category, accuracy in puzzles_results})
+                    wandb.log(step=epoch, data={"Puzzles/moveAccuracy": puzzles_move_accuracy})
+                    wandb.log(step=epoch, data={f"Puzzles/{category}": accuracy for category, accuracy in puzzles_results})
                 else:
-                    print(f"step {step} - Puzzles move accuracy: {puzzles_move_accuracy}")
+                    print(f"step {epoch} - Puzzles move accuracy: {puzzles_move_accuracy}")
 
-            if step % config.checkpoint_interval == 0 or step == 1:
+            if epoch % config.checkpoint_interval == 0 or epoch == 1:
 
                 if use_wandb:
                     # store artifact in W&B
@@ -165,15 +164,15 @@ def main():
 
     # model
     parser.add_argument("--feature_set", default="hv", type=str)
-    parser.add_argument("--ft_size", default=256, type=int)
-    parser.add_argument("--l1_size", default=32, type=int)
+    parser.add_argument("--l1_size", default=256, type=int)
     parser.add_argument("--l2_size", default=32, type=int)
 
     # training
-    parser.add_argument("--batch_size", default=4096, type=int, help="Number of samples per minibatch") # 4K
-    parser.add_argument("--max_samples", default=2 ** 30, type=int, help="Number of samples to train for") # 1B
-    parser.add_argument("--steps", default=1024, type=int, help="Number of steps to train")
-    parser.add_argument("--learning_rate", default=0.0015, type=float, help="Initial learning rate")
+    parser.add_argument("--batch_size", default=16384, type=int, help="Number of samples per minibatch") # 16K
+    parser.add_argument("--epoch_size", default=6104 * 16384, type=int, help="Number of samples in one epoch") # 100M
+    parser.add_argument("--epochs", default=1024, type=int, help="Number of epochs to train")
+    parser.add_argument("--gamma", default=0.992, type=float, help="Multiplier for learning rate decay")
+    parser.add_argument("--learning_rate", default=8.75e-4, type=float, help="Initial learning rate")
     parser.add_argument("--method", default="eval", type=str)
 
     # misc
@@ -196,7 +195,7 @@ def main():
         wandb.init(
             project=config.wandb_project,
             job_type="train",
-            name=f"{config.method}_{config.batch_size}_{config.feature_set}[{config.num_features}]->{config.ft_size}x2->{config.l1_size}->{config.l2_size}",
+            name=f"{config.method}_{config.batch_size}_{config.feature_set}[{config.num_features}]->{config.l1_size}x2->{config.l2_size}->1",
             config=config
         )
         wandb.define_metric("Train/loss", summary="min")
