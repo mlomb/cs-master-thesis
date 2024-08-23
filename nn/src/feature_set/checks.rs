@@ -31,15 +31,12 @@ pub(super) fn sanity_checks(feature_set: &dyn FeatureSet) {
         let pos: Chess = fen.into_position(shakmaty::CastlingMode::Standard).unwrap();
 
         check_flipped(&pos, feature_set);
-
-        // disabled since changed features was removed
-        // who knows I'll leave the code
-        // check_changed(&pos, Color::White, feature_set);
-        // check_changed(&pos, Color::Black, feature_set);
+        check_changed(&pos, Color::White, feature_set);
+        check_changed(&pos, Color::Black, feature_set);
     }
 }
 
-/// Check that features are correctly the same when board if flipped
+/// Check that features are exactly the same when board if flipped
 fn check_flipped(pos: &Chess, feature_set: &dyn FeatureSet) {
     let board_orig = pos.board().clone();
 
@@ -47,7 +44,6 @@ fn check_flipped(pos: &Chess, feature_set: &dyn FeatureSet) {
     board_flip.flip_vertical();
     board_flip.swap_colors();
 
-    /*
     let mut feat_orig_white = vec![];
     let mut feat_orig_black = vec![];
     let mut feat_flip_white = vec![];
@@ -63,19 +59,19 @@ fn check_flipped(pos: &Chess, feature_set: &dyn FeatureSet) {
     feat_flip_white.sort();
     feat_flip_black.sort();
 
-    assert_eq!(feat_orig_white, feat_flip_black);
-    assert_eq!(feat_orig_black, feat_flip_white);
-
     for &x in &feat_orig_white {
         assert!((x as usize) < feature_set.num_features());
     }
-    */
+    for &x in &feat_orig_black {
+        assert!((x as usize) < feature_set.num_features());
+    }
+
+    assert_eq!(feat_orig_white, feat_flip_black);
+    assert_eq!(feat_orig_black, feat_flip_white);
 }
 
 /// Check changed_features assuming that active_features is right
-#[allow(dead_code)]
 fn check_changed(pos: &Chess, perspective: Color, feature_set: &dyn FeatureSet) {
-    /*
     let mut pos_features = vec![];
     feature_set.active_features(pos.board(), perspective, &mut pos_features);
 
@@ -87,9 +83,6 @@ fn check_changed(pos: &Chess, perspective: Color, feature_set: &dyn FeatureSet) 
             continue;
         }
 
-        let mut pos_moved_features = vec![];
-        feature_set.active_features(pos_moved.board(), perspective, &mut pos_moved_features);
-
         let mut added_features = vec![];
         let mut removed_features = vec![];
 
@@ -100,37 +93,27 @@ fn check_changed(pos: &Chess, perspective: Color, feature_set: &dyn FeatureSet) 
             &mut added_features,
             &mut removed_features,
         );
-        let mut applied = apply_changes(&pos_features, &added_features, &removed_features);
 
-
-        pos_moved_features.sort();
-        applied.sort();
-
-        assert_eq!(pos_moved_features, applied);
-    }
-    */
-}
-
-/// Also checks that added do not exist in actual and removed do exist
-#[allow(dead_code)]
-fn apply_changes(actual: &Vec<u16>, added: &Vec<u16>, removed: &Vec<u16>) -> Vec<u16> {
-    let mut result = vec![];
-
-    for &x in actual {
-        if !removed.contains(&x) {
-            result.push(x);
+        // add features and remove features should not intersect
+        let mut actual_features = pos_features.clone();
+        for &x in &added_features {
+            actual_features.push(x);
         }
-    }
+        for &x in &removed_features {
+            // remove exactly one instance of x
+            let pos = actual_features
+                .iter()
+                .position(|&r| r == x)
+                .expect("removing non-present feature");
+            actual_features.remove(pos);
+        }
 
-    for x in added {
-        result.push(*x);
-        assert!(!actual.contains(x), "added feature {} is in actual", x);
-        assert!(!removed.contains(x), "added feature {} is in remove", x);
-    }
+        let mut truth_features = vec![];
+        feature_set.active_features(pos_moved.board(), perspective, &mut truth_features);
 
-    for x in removed {
-        assert!(actual.contains(x), "tried to remove a feature not present");
-    }
+        truth_features.sort();
+        actual_features.sort();
 
-    result
+        assert_eq!(truth_features, actual_features);
+    }
 }

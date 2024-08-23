@@ -84,3 +84,35 @@ pub fn build_feature_set(name: &str) -> Box<dyn FeatureSet> {
         _ => panic!("Unknown NNUE model feature set: {}", name),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::feature_set::checks::sanity_checks;
+
+    use super::*;
+
+    macro_rules! fs_tests {
+        ($($name:ident: $value:expr,)*) => {
+        $(
+            #[test]
+            fn $name() {
+                sanity_checks(build_feature_set($value).as_ref());
+            }
+        )*
+        }
+    }
+
+    fs_tests! {
+        hv: "hv",
+        h_v: "h+v",
+        hv_h_v: "hv+h+v",
+        d1d2: "d1d2",
+        d1_d2: "d1+d2",
+        hv_d1d2: "hv+d1d2",
+        h_v_d1_d2: "h+v+d1+d2",
+        hv_h_v_d1_d2: "hv+h+v+d1+d2",
+        hd1_vd2: "hd1+vd2",
+        vd1_hd2: "vd1+hd2",
+        khv: "khv",
+    }
+}

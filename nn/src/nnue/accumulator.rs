@@ -1,6 +1,5 @@
 use super::{model::NnueModel, tensor::Tensor};
-use fixedbitset::FixedBitSet;
-use shakmaty::{Board, Color};
+use shakmaty::{Chess, Color, Move, Position};
 use std::{cell::RefCell, rc::Rc};
 
 thread_local! {
@@ -11,7 +10,7 @@ thread_local! {
 
 pub struct NnueAccumulator {
     accumulation: [Tensor<i16>; 2], // indexed by perspective (Color as usize)
-    features_bitset: [FixedBitSet; 2], // current active features
+    features: [Vec<i8>; 2],
 
     nnue_model: Rc<RefCell<NnueModel>>,
 }
@@ -23,10 +22,7 @@ impl NnueAccumulator {
         NnueAccumulator {
             nnue_model,
             accumulation: [Tensor::zeros(num_l1), Tensor::zeros(num_l1)],
-            features_bitset: [
-                FixedBitSet::with_capacity(num_features),
-                FixedBitSet::with_capacity(num_features),
-            ],
+            features: [vec![0; num_features], vec![0; num_features]],
         }
     }
 
@@ -37,57 +33,92 @@ impl NnueAccumulator {
         )
     }
 
-    pub fn refresh(&mut self, board: &Board, perspective: Color) {
+    pub fn refresh(&mut self, pos: &Chess, perspective: Color) {
         let nnue_model = self.nnue_model.borrow();
         let feature_set = nnue_model.get_feature_set();
 
-        let mut bitset = &mut self.features_bitset[perspective as usize];
+        let mut features = INDEX_BUFFER1.take();
 
         // gather active features
-        bitset.clear();
-        feature_set.active_features(board, perspective, &mut bitset);
+        features.clear();
+        feature_set.active_features(pos.board(), perspective, &mut features);
+
+        // update the feature counts
+        let counts = &mut self.features[perspective as usize];
+        counts.iter_mut().for_each(|c| *c = 0);
+        for &f in features.iter() {
+            counts[f as usize] += 1;
+        }
 
         // refresh the accumulator
-        nnue_model.refresh_accumulator(
-            &self.accumulation[perspective as usize],
-            bitset
-                .ones()
-                .map(|f| f as u16)
-                .collect::<Vec<_>>()
-                .as_slice(),
-        );
+        features.sort_unstable();
+        features.dedup();
+        nnue_model.refresh_accumulator(&self.accumulation[perspective as usize], &features);
     }
 
-    pub fn update(&mut self, board: &Board, perspective: Color) {
+    pub fn update(&mut self, pos: &Chess, mov: &Move, perspective: Color) {
+        let board = pos.board();
+
+        if self
+            .nnue_model
+            .borrow()
+            .get_feature_set()
+            .requires_refresh(board, mov, perspective)
+        {
+            let mut next_pos = pos.clone();
+            next_pos.play_unchecked(mov);
+            self.refresh(&next_pos, perspective);
+            return;
+        }
+
         let nnue_model = self.nnue_model.borrow();
         let feature_set = nnue_model.get_feature_set();
+        let prev_counts = &self.features[perspective as usize].clone();
+        let counts = &mut self.features[perspective as usize];
 
-        let prev_bitset = self.features_bitset[perspective as usize].clone();
-        let mut next_bitset = &mut self.features_bitset[perspective as usize];
-
-        next_bitset.clear();
-        feature_set.active_features(board, perspective, &mut next_bitset);
-
-        // compute diff
         let mut added_features = INDEX_BUFFER1.take();
         let mut removed_features = INDEX_BUFFER2.take();
 
         added_features.clear();
         removed_features.clear();
 
-        // make diff
-        next_bitset.difference(&prev_bitset).for_each(|f| {
-            added_features.push(f as u16);
-        });
-        prev_bitset.difference(&next_bitset).for_each(|f| {
-            removed_features.push(f as u16);
-        });
+        feature_set.changed_features(
+            board,
+            mov,
+            perspective,
+            &mut added_features,
+            &mut removed_features,
+        );
+
+        // update the feature counts
+        for &f in added_features.iter() {
+            counts[f as usize] += 1;
+        }
+        for &f in removed_features.iter() {
+            counts[f as usize] -= 1;
+        }
+
+        // compute which rows to add and remove
+        // based on the feature counts after applying the modifications
+        let mut added_rows = vec![];
+        let mut removed_rows = vec![];
+
+        for f in added_features.iter() {
+            if prev_counts[*f as usize] == 0 && counts[*f as usize] > 0 {
+                added_rows.push(*f as u16);
+            }
+        }
+        for f in removed_features.iter() {
+            if prev_counts[*f as usize] > 0 && counts[*f as usize] == 0 {
+                removed_rows.push(*f as u16);
+            }
+        }
 
         // do the math
         nnue_model.update_accumulator(
             &self.accumulation[perspective as usize],
-            &added_features,
-            &removed_features,
+            &added_rows,
+            &removed_rows,
         );
     }
 
@@ -98,7 +129,7 @@ impl NnueAccumulator {
         self.accumulation[1]
             .as_mut_slice()
             .copy_from_slice(other.accumulation[1].as_slice());
-        self.features_bitset[0].clone_from(&other.features_bitset[0]);
-        self.features_bitset[1].clone_from(&other.features_bitset[1]);
+        self.features[0].copy_from_slice(&other.features[0]);
+        self.features[1].copy_from_slice(&other.features[1]);
     }
 }

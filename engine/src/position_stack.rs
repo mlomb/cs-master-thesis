@@ -57,8 +57,8 @@ impl PositionStack {
         self.stack[0].pos = pos.clone();
         self.stack[0].hash_key = pos.zobrist_hash(EnPassantMode::Legal);
         self.stack[0].rule50 = 0;
-        self.stack[0].nnue_accum.refresh(pos.board(), Color::White);
-        self.stack[0].nnue_accum.refresh(pos.board(), Color::Black);
+        self.stack[0].nnue_accum.refresh(pos, Color::White);
+        self.stack[0].nnue_accum.refresh(pos, Color::Black);
     }
 
     /// Get current chess position
@@ -90,6 +90,14 @@ impl PositionStack {
         next_state.rule50 += 1;
 
         if let Some(mov) = mov {
+            // update the NNUE accumulator (BEFORE making the move!)
+            next_state
+                .nnue_accum
+                .update(&next_state.pos, &mov, Color::White);
+            next_state
+                .nnue_accum
+                .update(&next_state.pos, &mov, Color::Black);
+
             // make a regular move
             next_state.pos.play_unchecked(&mov);
 
@@ -101,14 +109,6 @@ impl PositionStack {
                     next_state.rule50 = 0;
                 }
             }
-
-            // update the NNUE accumulator (AFTER making the move!)
-            next_state
-                .nnue_accum
-                .update(&next_state.pos.board(), Color::White);
-            next_state
-                .nnue_accum
-                .update(&next_state.pos.board(), Color::Black);
         } else {
             // make a null move
             // (forfeit the move and let the opponent play)
