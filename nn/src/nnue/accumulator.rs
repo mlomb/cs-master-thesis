@@ -4,10 +4,10 @@ use std::{cell::RefCell, rc::Rc};
 
 thread_local! {
     // buffers for storing temporary feature indexes
-    static INDEX_BUFFER1: RefCell<Vec<u16>> = RefCell::new(Vec::with_capacity(1000));
-    static INDEX_BUFFER2: RefCell<Vec<u16>> = RefCell::new(Vec::with_capacity(1000));
-    static INDEX_BUFFER3: RefCell<Vec<u16>> = RefCell::new(Vec::with_capacity(1000));
-    static INDEX_BUFFER4: RefCell<Vec<u16>> = RefCell::new(Vec::with_capacity(1000));
+    static INDEX_BUFFER1: RefCell<Vec<u16>> = RefCell::new(Vec::with_capacity(128));
+    static INDEX_BUFFER2: RefCell<Vec<u16>> = RefCell::new(Vec::with_capacity(128));
+    static INDEX_BUFFER3: RefCell<Vec<u16>> = RefCell::new(Vec::with_capacity(128));
+    static INDEX_BUFFER4: RefCell<Vec<u16>> = RefCell::new(Vec::with_capacity(128));
 }
 
 pub struct NnueAccumulator {
