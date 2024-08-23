@@ -6,6 +6,8 @@ thread_local! {
     // buffers for storing temporary feature indexes
     static INDEX_BUFFER1: RefCell<Vec<u16>> = RefCell::new(Vec::with_capacity(1000));
     static INDEX_BUFFER2: RefCell<Vec<u16>> = RefCell::new(Vec::with_capacity(1000));
+    static INDEX_BUFFER3: RefCell<Vec<u16>> = RefCell::new(Vec::with_capacity(1000));
+    static INDEX_BUFFER4: RefCell<Vec<u16>> = RefCell::new(Vec::with_capacity(1000));
 }
 
 pub struct NnueAccumulator {
@@ -73,7 +75,6 @@ impl NnueAccumulator {
 
         let nnue_model = self.nnue_model.borrow();
         let feature_set = nnue_model.get_feature_set();
-        let prev_counts = &self.features[perspective as usize].clone();
         let counts = &mut self.features[perspective as usize];
 
         let mut added_features = INDEX_BUFFER1.take();
@@ -90,27 +91,24 @@ impl NnueAccumulator {
             &mut removed_features,
         );
 
-        // update the feature counts
+        // compute which rows to add and remove
+        // based on the feature counts after applying the modifications
+        let mut added_rows = INDEX_BUFFER3.take();
+        let mut removed_rows = INDEX_BUFFER4.take();
+
+        added_rows.clear();
+        removed_rows.clear();
+
         for &f in added_features.iter() {
+            if counts[f as usize] == 0 {
+                added_rows.push(f);
+            }
             counts[f as usize] += 1;
         }
         for &f in removed_features.iter() {
             counts[f as usize] -= 1;
-        }
-
-        // compute which rows to add and remove
-        // based on the feature counts after applying the modifications
-        let mut added_rows = vec![];
-        let mut removed_rows = vec![];
-
-        for f in added_features.iter() {
-            if prev_counts[*f as usize] == 0 && counts[*f as usize] > 0 {
-                added_rows.push(*f as u16);
-            }
-        }
-        for f in removed_features.iter() {
-            if prev_counts[*f as usize] > 0 && counts[*f as usize] == 0 {
-                removed_rows.push(*f as u16);
+            if counts[f as usize] == 0 {
+                removed_rows.push(f);
             }
         }
 
