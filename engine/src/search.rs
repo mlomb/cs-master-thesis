@@ -392,6 +392,22 @@ impl Search {
     }
 
     fn sort_moves(&self, moves: &mut MoveList, pv_move: Option<Move>) {
+        let mvvlva = |move_: &Move| -> i32 {
+            const MVV_LVA: [i32; 36] = [
+                15, 25, 35, 45, 55, 65, // Pawn
+                14, 24, 34, 44, 54, 64, // Knight
+                13, 23, 33, 43, 53, 63, // Bishop
+                12, 22, 32, 42, 52, 62, // Rook
+                11, 21, 31, 41, 51, 61, // Queen
+                10, 20, 30, 40, 50, 60, // King
+            ];
+
+            let attacker = move_.role() as usize - 1;
+            let victim = move_.capture().unwrap() as usize - 1;
+
+            MVV_LVA[attacker * 6 + victim]
+        };
+
         moves.sort_by_cached_key(|move_| {
             let mut score = 0;
 
@@ -403,19 +419,7 @@ impl Search {
             }
 
             if move_.is_capture() {
-                pub const MVV_LVA: [i32; 36] = [
-                    15, 25, 35, 45, 55, 65, // Pawn
-                    14, 24, 34, 44, 54, 64, // Knight
-                    13, 23, 33, 43, 53, 63, // Bishop
-                    12, 22, 32, 42, 52, 62, // Rook
-                    11, 21, 31, 41, 51, 61, // Queen
-                    10, 20, 30, 40, 50, 60, // King
-                ];
-
-                let attacker = move_.role() as usize - 1;
-                let victim = move_.capture().unwrap() as usize - 1;
-
-                score += MVV_LVA[attacker * 6 + victim] + 10_000;
+                score += mvvlva(move_) + 10_000;
             } else {
                 // move is quiet
                 score += if self.killer_moves[self.ply][0] == *move_ {
