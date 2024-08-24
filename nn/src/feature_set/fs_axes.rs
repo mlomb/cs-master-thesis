@@ -126,8 +126,14 @@ impl FeatureSet for AxesFeatureSet {
         self.blocks.iter().map(|b| b.size()).sum::<usize>()
     }
 
-    fn requires_refresh(&self, board: &Board, mov: &Move, perspective: Color) -> bool {
-        if mov.role() == Role::King && board.color_at(mov.from().unwrap()).unwrap() == perspective {
+    fn requires_refresh(
+        &self,
+        _board: &Board,
+        mov: &Move,
+        turn: Color,
+        perspective: Color,
+    ) -> bool {
+        if mov.role() == Role::King && turn == perspective {
             for block in &self.blocks {
                 for ax in &block.axes {
                     if *ax == Axes::King {
@@ -141,7 +147,13 @@ impl FeatureSet for AxesFeatureSet {
     }
 
     #[inline(always)]
-    fn active_features(&self, board: &Board, perspective: Color, features: &mut Vec<u16>) {
+    fn active_features(
+        &self,
+        board: &Board,
+        _turn: Color,
+        perspective: Color,
+        features: &mut Vec<u16>,
+    ) {
         for (piece_square, piece) in board.clone().into_iter() {
             self.compute_indexes(
                 board,
@@ -159,13 +171,14 @@ impl FeatureSet for AxesFeatureSet {
         &self,
         board: &Board,
         mov: &Move,
+        turn: Color,
         perspective: Color,
         add_feats: &mut Vec<u16>,
         rem_feats: &mut Vec<u16>,
     ) {
         let from = mov.from().unwrap();
         let to = mov.to();
-        let who_plays = board.color_at(from).unwrap(); // unchecked?
+        let who_plays = turn;
 
         match mov {
             Move::Normal { from, to, .. } | Move::EnPassant { from, to } => {

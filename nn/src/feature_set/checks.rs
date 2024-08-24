@@ -49,10 +49,14 @@ fn check_flipped(pos: &Chess, feature_set: &dyn FeatureSet) {
     let mut feat_flip_white = vec![];
     let mut feat_flip_black = vec![];
 
-    feature_set.active_features(&board_orig, Color::White, &mut feat_orig_white);
-    feature_set.active_features(&board_orig, Color::Black, &mut feat_orig_black);
-    feature_set.active_features(&board_flip, Color::White, &mut feat_flip_white);
-    feature_set.active_features(&board_flip, Color::Black, &mut feat_flip_black);
+    #[rustfmt::skip]
+    feature_set.active_features(&board_orig, pos.turn(), Color::White, &mut feat_orig_white);
+    #[rustfmt::skip]
+    feature_set.active_features(&board_orig, pos.turn(), Color::Black, &mut feat_orig_black);
+    #[rustfmt::skip]
+    feature_set.active_features(&board_flip, pos.turn().other(), Color::White, &mut feat_flip_white);
+    #[rustfmt::skip]
+    feature_set.active_features(&board_flip, pos.turn().other(), Color::Black, &mut feat_flip_black);
 
     feat_orig_white.sort();
     feat_orig_black.sort();
@@ -73,13 +77,13 @@ fn check_flipped(pos: &Chess, feature_set: &dyn FeatureSet) {
 /// Check changed_features assuming that active_features is right
 fn check_changed(pos: &Chess, perspective: Color, feature_set: &dyn FeatureSet) {
     let mut pos_features = vec![];
-    feature_set.active_features(pos.board(), perspective, &mut pos_features);
+    feature_set.active_features(pos.board(), pos.turn(), perspective, &mut pos_features);
 
     for m in pos.legal_moves() {
         let mut pos_moved = pos.clone();
         pos_moved.play_unchecked(&m);
 
-        if feature_set.requires_refresh(&pos.board(), &m, perspective) {
+        if feature_set.requires_refresh(&pos.board(), &m, pos.turn(), perspective) {
             continue;
         }
 
@@ -89,6 +93,7 @@ fn check_changed(pos: &Chess, perspective: Color, feature_set: &dyn FeatureSet) 
         feature_set.changed_features(
             pos.board(),
             &m,
+            pos.turn(),
             perspective,
             &mut added_features,
             &mut removed_features,
@@ -109,7 +114,12 @@ fn check_changed(pos: &Chess, perspective: Color, feature_set: &dyn FeatureSet) 
         }
 
         let mut truth_features = vec![];
-        feature_set.active_features(pos_moved.board(), perspective, &mut truth_features);
+        feature_set.active_features(
+            pos_moved.board(),
+            pos_moved.turn(),
+            perspective,
+            &mut truth_features,
+        );
 
         truth_features.sort();
         actual_features.sort();

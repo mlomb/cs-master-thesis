@@ -43,7 +43,7 @@ impl NnueAccumulator {
 
         // gather active features
         features.clear();
-        feature_set.active_features(pos.board(), perspective, &mut features);
+        feature_set.active_features(pos.board(), pos.turn(), perspective, &mut features);
 
         // update the feature counts
         let counts = &mut self.features[perspective as usize];
@@ -61,12 +61,12 @@ impl NnueAccumulator {
     pub fn update(&mut self, pos: &Chess, mov: &Move, perspective: Color) {
         let board = pos.board();
 
-        if self
-            .nnue_model
-            .borrow()
-            .get_feature_set()
-            .requires_refresh(board, mov, perspective)
-        {
+        if self.nnue_model.borrow().get_feature_set().requires_refresh(
+            board,
+            mov,
+            pos.turn(),
+            perspective,
+        ) {
             let mut next_pos = pos.clone();
             next_pos.play_unchecked(mov);
             self.refresh(&next_pos, perspective);
@@ -86,6 +86,7 @@ impl NnueAccumulator {
         feature_set.changed_features(
             board,
             mov,
+            pos.turn(),
             perspective,
             &mut added_features,
             &mut removed_features,
