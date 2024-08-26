@@ -23,7 +23,7 @@ def train(config, use_wandb: bool):
     elif config.method == "eval":
         X_SHAPE = (config.batch_size, 2, math.ceil(config.num_features / 64))
         Y_SHAPE = (config.batch_size, 1)
-        INPUTS = glob("/mnt/c/datasets/eval-1700/*.csv")
+        INPUTS = glob("/mnt/c/datasets/raw/all.plain")
         loss_fn = EvalLoss()
 
     puzzles = PuzzleAccuracy('./data/puzzles.csv')
@@ -48,6 +48,15 @@ def train(config, use_wandb: bool):
 
     @torch.compile
     def train_step(X, y):
+        # expand bitset
+        # X.shape = [4096, 2, 43]
+        X = decode_int64_bitset(X) 
+        # X.shape = [4096, 2, 43, 64]
+        X = X.reshape(-1, 2, X.shape[-2] * 64)
+        # X.shape = [4096, 2, 2752]
+        X = X[:, :, :config.num_features] # truncate to the actual number of features
+        # X.shape = [4096, 2, 2700]
+
         # Clear the gradients
         optimizer.zero_grad()
 
@@ -61,9 +70,10 @@ def train(config, use_wandb: bool):
         # Update the parameters
         optimizer.step()
 
+        # Make sure the weights are clipped
         chessmodel.clip_weights()
 
-        return loss
+        return loss.item()
 
     # Make sure gradient tracking is on
     chessmodel.train()
@@ -79,17 +89,8 @@ def train(config, use_wandb: bool):
         for _ in tqdm(range(batches_per_epoch), desc=f'Epoch {epoch}/{config.epochs}'):
             X, y = samples_service.next_batch()
 
-            # expand bitset
-            # X.shape = [4096, 2, 43]
-            X = decode_int64_bitset(X) 
-            # X.shape = [4096, 2, 43, 64]
-            X = X.reshape(-1, 2, X.shape[-2] * 64)
-            # X.shape = [4096, 2, 2752]
-            X = X[:, :, :config.num_features] # truncate to the actual number of features
-            # X.shape = [4096, 2, 2700]
-
             loss = train_step(X, y)
-            avg_loss += loss.item()
+            avg_loss += loss
 
             if math.isnan(avg_loss):
                 raise Exception("Loss is NaN, exiting")
@@ -177,7 +178,7 @@ def main():
 
     # misc
     parser.add_argument("--checkpoint_interval", default=16, type=int)
-    parser.add_argument("--puzzle_interval", default=32, type=int)
+    parser.add_argument("--puzzle_interval", default=8, type=int)
     parser.add_argument("--wandb_project", default=None, type=str)
 
     config = parser.parse_args()
