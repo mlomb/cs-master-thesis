@@ -34,12 +34,13 @@ pub fn encoded_size(feature_set: &Box<dyn FeatureSet>) -> usize {
 pub fn encode_side(
     feature_set: &Box<dyn FeatureSet>,
     board: &Board,
+    turn: Color,
     perspective: Color,
     write: &mut dyn Write,
 ) {
     // extract features from position
     let mut features = vec![];
-    feature_set.active_features(board, perspective, &mut features);
+    feature_set.active_features(board, turn, perspective, &mut features);
 
     // write into bits of a u64 buffer
     let mut buffer = vec![0u64; feature_set.num_features().div_ceil(64)];
@@ -61,9 +62,10 @@ pub fn encode_side(
 }
 
 pub fn encode_position(feature_set: &Box<dyn FeatureSet>, position: &Chess, write: &mut dyn Write) {
+    let turn = position.turn();
     let board = position.board();
 
     // encode first side to move, then the other
-    encode_side(feature_set, board, position.turn(), write);
-    encode_side(feature_set, board, position.turn().other(), write);
+    encode_side(feature_set, board, turn, turn, write);
+    encode_side(feature_set, board, turn, turn.other(), write);
 }
