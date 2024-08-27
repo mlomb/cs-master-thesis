@@ -1,45 +1,14 @@
-use super::{encode_position, encoded_size, ReadSample, WriteSample};
+use super::ReadSample;
+use crate::encode::{encode_position, encoded_size};
 use nn::feature_set::FeatureSet;
-use rand::{seq::SliceRandom, Rng};
+use rand::seq::SliceRandom;
 use shakmaty::uci::UciMove;
 use shakmaty::CastlingMode;
-use shakmaty::{fen::Fen, Chess, EnPassantMode, Position};
+use shakmaty::{fen::Fen, Chess, Position};
 use std::io::BufRead;
-use std::io::{self, Write};
+use std::io::Write;
 
 pub struct PQR;
-
-impl WriteSample for PQR {
-    fn write_sample(&mut self, write: &mut dyn Write, positions: &Vec<Chess>) -> io::Result<()> {
-        let mut rng = rand::thread_rng();
-
-        loop {
-            let index: usize = rng.gen_range(0..positions.len() - 1); // dont pick last
-            let parent = &positions[index];
-            let observed = &positions[index + 1];
-            let moves = parent.legal_moves();
-
-            if moves.len() <= 1 {
-                // not enough moves to choose from
-                // e.g check
-                continue;
-            }
-
-            for _move in parent.legal_moves() {
-                if parent.clone().play(&_move).unwrap() == *observed {
-                    return writeln!(
-                        write,
-                        "{},{}",
-                        Fen(parent.clone().into_setup(EnPassantMode::Legal)),
-                        _move.to_uci(CastlingMode::Standard)
-                    );
-                }
-            }
-
-            unreachable!("No legal move found");
-        }
-    }
-}
 
 impl ReadSample for PQR {
     fn x_size(&self, feature_set: &Box<dyn FeatureSet>) -> usize {

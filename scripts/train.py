@@ -15,25 +15,34 @@ from lib.losses import EvalLoss, PQRLoss
 
 
 def train(config, use_wandb: bool):
-    if config.method == "pqr":
-        X_SHAPE = (config.batch_size, 3, 2, math.ceil(config.num_features / 64))
-        Y_SHAPE = (config.batch_size, 0)
-        INPUTS = glob("/mnt/c/datasets/pqr-1700/*.csv")
-        loss_fn = PQRLoss()
-    elif config.method == "eval":
-        X_SHAPE = (config.batch_size, 2, math.ceil(config.num_features / 64))
-        Y_SHAPE = (config.batch_size, 1)
-        INPUTS = glob("/mnt/c/datasets/raw/all.plain")
-        loss_fn = EvalLoss()
+    DATA_INPUT = "/mnt/c/datasets/raw/all.plain"
+    TEST_BYTES = 10_000_000
 
-    puzzles = PuzzleAccuracy('./data/puzzles.csv')
-    samples_service = SamplesService(
-        x_shape=X_SHAPE,
-        y_shape=Y_SHAPE,
-        inputs=INPUTS,
+    # datasets
+    # test_samples = SamplesService(
+    #     batch_size=config.batch_size,
+    #     input=DATA_INPUT,
+    #     input_length=TEST_BYTES,
+    #     feature_set=config.feature_set,
+    #     method=config.method
+    # )
+    train_samples = SamplesService(
+        batch_size=config.batch_size,
+        input=DATA_INPUT,
+        input_offset=TEST_BYTES,
         feature_set=config.feature_set,
         method=config.method
     )
+
+    if config.method == "pqr":
+        loss_fn = PQRLoss()
+    elif config.method == "eval":
+        loss_fn = EvalLoss()
+
+    # puzzles
+    puzzles = PuzzleAccuracy('./data/puzzles.csv')
+
+    # model
     chessmodel = NnueModel(
         num_features=config.num_features,
         l1_size=config.l1_size,
@@ -44,7 +53,7 @@ def train(config, use_wandb: bool):
     optimizer = torch.optim.Adam(chessmodel.parameters(), lr=config.learning_rate)
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=1, gamma=config.gamma)
     #scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', threshold=0.0001, factor=0.7, patience=30)
-    # scheduler = torch.optim.lr_scheduler.CyclicLR(optimizer, base_lr=0.000001, max_lr=0.0002, step_size_up=128)
+    #scheduler = torch.optim.lr_scheduler.CyclicLR(optimizer, base_lr=0.000001, max_lr=0.0002, step_size_up=128)
 
     @torch.compile
     def train_step(X, y):
@@ -87,7 +96,7 @@ def train(config, use_wandb: bool):
         avg_loss = 0.0
 
         for _ in tqdm(range(batches_per_epoch), desc=f'Epoch {epoch}/{config.epochs}'):
-            X, y = samples_service.next_batch()
+            X, y = train_samples.next_batch()
 
             loss = train_step(X, y)
             avg_loss += loss
@@ -113,6 +122,7 @@ def train(config, use_wandb: bool):
             "Weight/mean-l2": torch.mean(chessmodel.l2.weight),
             "Weight/mean-out": torch.mean(chessmodel.output.weight),
         }
+
         if use_wandb:
             wandb.log(step=epoch, data=metrics)
         else:
@@ -131,7 +141,7 @@ def train(config, use_wandb: bool):
                     wandb.log(step=epoch, data={"Puzzles/moveAccuracy": puzzles_move_accuracy})
                     wandb.log(step=epoch, data={f"Puzzles/{category}": accuracy for category, accuracy in puzzles_results})
                 else:
-                    print(f"step {epoch} - Puzzles move accuracy: {puzzles_move_accuracy}")
+                    print(f"Epoch {epoch} - Puzzles move accuracy: {puzzles_move_accuracy}")
 
             if epoch % config.checkpoint_interval == 0 or epoch == 1:
 
@@ -172,8 +182,8 @@ def main():
     parser.add_argument("--batch_size", default=16384, type=int, help="Number of samples per minibatch") # 16K
     parser.add_argument("--epoch_size", default=6104 * 16384, type=int, help="Number of samples in one epoch") # 100M
     parser.add_argument("--epochs", default=1024, type=int, help="Number of epochs to train")
-    parser.add_argument("--gamma", default=0.992, type=float, help="Multiplier for learning rate decay")
     parser.add_argument("--learning_rate", default=8.75e-4, type=float, help="Initial learning rate")
+    parser.add_argument("--gamma", default=0.992, type=float, help="Multiplier for learning rate decay")
     parser.add_argument("--method", default="eval", type=str)
 
     # misc

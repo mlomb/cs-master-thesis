@@ -1,10 +1,9 @@
-use super::{encode_position, encoded_size, ReadSample, WriteSample};
-use crate::uci_engine::{Score, UciEngine};
+use super::ReadSample;
+use crate::encode::{encode_position, encoded_size};
 use clap::Args;
 use nn::feature_set::FeatureSet;
-use rand::seq::SliceRandom;
-use shakmaty::{fen::Fen, uci::UciMove, CastlingMode, Chess, EnPassantMode, Position};
-use std::io::{self, BufRead, Write};
+use shakmaty::{fen::Fen, uci::UciMove, CastlingMode, Chess, Position};
+use std::io::{BufRead, Write};
 
 #[derive(Args, Clone)]
 pub struct EvalArgs {
@@ -17,43 +16,14 @@ pub struct EvalArgs {
     depth: usize,
 }
 
-pub struct Eval {
-    /// Engine instance
-    engine: UciEngine,
-}
+/// Score of a position, given by the engine
+#[derive(Debug)]
+pub enum Score {
+    /// Centipawn
+    Cp(i32),
 
-impl Eval {
-    pub fn new(args: EvalArgs) -> Self {
-        Eval {
-            engine: UciEngine::new(&args.engine, args.depth),
-        }
-    }
-}
-
-impl WriteSample for Eval {
-    fn write_sample(&mut self, write: &mut dyn Write, positions: &Vec<Chess>) -> io::Result<()> {
-        let mut rng = rand::thread_rng();
-
-        // choose random position
-        let position = positions.choose(&mut rng).unwrap().clone();
-
-        // convert to FEN string
-        let fen = Fen(position.into_setup(EnPassantMode::Always)).to_string();
-
-        // evaluate and return
-        let res = self.engine.evaluate(&fen);
-
-        writeln!(
-            write,
-            "{},{},{}",
-            fen,
-            match res.score {
-                Score::Cp(c) => format!("{}", c),
-                Score::Mate(m) => format!("#{}", m),
-            },
-            res.best_move
-        )
-    }
+    /// Mate/Mated in n
+    Mate(i32),
 }
 
 pub struct EvalRead;
@@ -87,9 +57,14 @@ impl ReadSample for EvalRead {
             return;
         }
 
-        // remove trailing comma
+        // remove trailing comma & newline
         fen_bytes.pop();
         score_bytes.pop();
+        if bestmove_bytes.last() == Some(&b'\n') {
+            // remove trailing newline
+            // it may not be present in the last line
+            bestmove_bytes.pop();
+        }
 
         let score_str = String::from_utf8_lossy(&score_bytes);
         let score = if let Ok(score) = score_str.parse::<i32>() {

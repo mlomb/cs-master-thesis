@@ -1,72 +1,101 @@
 use crate::method::pqr::PQR;
 use crate::method::{eval::EvalRead, ReadSample};
-use clap::{Args, Subcommand};
-use crossbeam::channel::{bounded, Receiver, Sender};
+use clap::{Args, ValueEnum};
+use crossbeam::channel::{bounded, Sender};
+use crossbeam::scope;
 use nn::feature_set::build::build_feature_set;
 use shared_memory::ShmemConf;
+use std::fs::metadata;
+use std::io::SeekFrom;
 use std::{
     error::Error,
     fs::File,
     io::{self, BufRead, BufReader, Cursor, Read, Seek, Write},
 };
 
-#[derive(Args, Clone)]
-pub struct SamplesServiceCommand {
-    /// List of .csv or .csv.zst files to read samples.
-    /// CSVs must be generated using the `build-dataset` command
-    #[arg(long, value_name = "input", required = true)]
-    inputs: Vec<String>,
-
-    /// The shared memory file to write the samples. Must have the correct size, otherwise it will panic
-    #[arg(long, value_name = "shmem")]
-    shmem: String,
-
-    /// The feature set to use
-    #[arg(long, value_name = "feature-set")]
-    feature_set: String,
-
-    /// Batch size
-    #[arg(long, default_value = "32")]
-    batch_size: usize,
-
-    /// Method to use
-    #[command(subcommand)]
-    subcommand: MethodSubcommand,
-
-    /// Number of batch threads to use
-    #[arg(long, default_value = "4")]
-    batch_threads: usize,
+struct BatchData {
+    x: Vec<u8>,
+    y: Vec<u8>,
 }
 
-#[derive(Subcommand, Clone)]
-pub enum MethodSubcommand {
+#[derive(ValueEnum, Clone)]
+pub enum Method {
     /// Given a transition P → Q in a game, R is selected from a legal move from P while R != Q.
     PQR,
-    ///
+    /// Score evaluations (most likely from Stockfish) are used as target
     Eval,
 }
 
+#[derive(Args, Clone)]
+pub struct SamplesServiceCommand {
+    /// Method to use
+    #[arg(long)]
+    method: Method,
+
+    /// List of .csv files to read samples from.
+    /// CSVs must have the format: `fen,score,bestmove`
+    #[arg(long, required = true)]
+    input: String,
+
+    /// Loop the input file indefinitely
+    #[arg(long, default_value = "true")]
+    input_loop: bool,
+
+    // Offset to start reading from
+    #[arg(long, default_value = "0")]
+    input_offset: u64,
+
+    // Length to read from the input file.
+    // If 0, it will read until the end of the file
+    #[arg(long, default_value = "0")]
+    input_length: u64,
+
+    /// The shared memory file to write the samples.
+    /// Must have the correct size, otherwise it will panic
+    #[arg(long)]
+    shmem: String,
+
+    /// The feature set to use
+    #[arg(long)]
+    feature_set: String,
+
+    /// Number of samples in one batch
+    #[arg(long, default_value = "8192")]
+    batch_size: usize,
+
+    /// Number of batch threads to use
+    #[arg(long, default_value = "4")]
+    threads: usize,
+}
+
 pub fn samples_service(cmd: SamplesServiceCommand) -> Result<(), Box<dyn Error>> {
-    let (line_sender, line_receiver) = bounded(1_000_000); // keep up to X sample lines in memory
-    let (batch_sender, batch_receiver) = bounded(128); // keep up to X batches ready in memory
+    let (batch_sender, batch_receiver) = bounded(8192); // keep up to X batches ready in memory
 
-    // start line thread
-    let inputs = cmd.inputs.clone();
-    std::thread::spawn(move || read_lines_thread(inputs, line_sender).unwrap());
+    // True length of the file
+    let file_length = metadata(&cmd.input)
+        .expect("Unable to query input size")
+        .len();
 
-    // start batch threads
-    for _ in 0..cmd.batch_threads {
-        let line_receiver = line_receiver.clone();
-        let batch_sender = batch_sender.clone();
-        let cmd = cmd.clone();
-        std::thread::spawn(move || build_samples_thread(cmd, line_receiver, batch_sender));
-    }
+    assert!(
+        cmd.input_offset + cmd.input_length <= file_length,
+        "Length is out of bounds"
+    );
+
+    // Length of the subfile to read from
+    let readable_length = if cmd.input_length == 0 {
+        file_length - cmd.input_offset
+    } else {
+        cmd.input_length
+    };
+
+    // Actual length to read from each thread
+    let thread_length = ((readable_length as f64) / cmd.threads as f64).ceil() as u64;
 
     let feature_set = build_feature_set(&cmd.feature_set);
     let method = build_method(&cmd);
 
     // open shared memory file
-    let mut shmem = ShmemConf::new().os_id(cmd.shmem).open()?;
+    let mut shmem = ShmemConf::new().os_id(&cmd.shmem).open()?;
     let shmem_slice = unsafe { shmem.as_slice_mut() };
 
     let x_batch_size = cmd.batch_size * method.x_size(&feature_set);
@@ -76,88 +105,100 @@ pub fn samples_service(cmd: SamplesServiceCommand) -> Result<(), Box<dyn Error>>
         "Unexpected shared memory size"
     );
 
+    // batch_sender is moved into the scope, sent to the threads and later dropped
+    // this means that when all threads are done, the channel will be disconnected
+    scope(move |scope| {
+        // start batch threads
+        for i in 0..cmd.threads {
+            let batch_sender = batch_sender.clone();
+            let cmd = cmd.clone();
+            let offset = cmd.input_offset + i as u64 * thread_length;
+
+            scope.spawn(move |_| {
+                build_samples_thread(
+                    cmd,
+                    offset,
+                    thread_length,
+                    x_batch_size,
+                    y_batch_size,
+                    batch_sender,
+                )
+            });
+        }
+    })
+    .unwrap();
+
     // loop to write batches
     loop {
-        let batch: BatchReady = batch_receiver.recv().unwrap();
-        assert!(batch.x.len() == x_batch_size);
-        assert!(batch.y.len() == y_batch_size);
+        // receive a batch from another thread
+        if let Ok(batch) = batch_receiver.recv() {
+            assert!(batch.x.len() == x_batch_size);
+            assert!(batch.y.len() == y_batch_size);
 
-        // wait for the reader to signal that it has finished copying the data of the last batch (1 byte)
-        io::stdin().read_exact(&mut [0])?;
+            // wait for the reader to signal that it has finished copying the data of the last batch (1 byte)
+            io::stdin().read_exact(&mut [0])?;
 
-        // copy new batch to shared memory
-        shmem_slice[..x_batch_size].copy_from_slice(&batch.x);
-        shmem_slice[x_batch_size..].copy_from_slice(&batch.y);
+            // copy new batch to shared memory
+            shmem_slice[..x_batch_size].copy_from_slice(&batch.x);
+            shmem_slice[x_batch_size..].copy_from_slice(&batch.y);
 
-        // send a signal to the consumer (1 byte)
-        io::stdout().write_all(&[64])?;
-        io::stdout().flush()?;
-    }
-}
-
-struct BatchReady {
-    x: Vec<u8>,
-    y: Vec<u8>,
-}
-
-fn read_lines_thread(
-    inputs: Vec<String>,
-    line_sender: Sender<Vec<u8>>,
-) -> Result<(), Box<dyn Error>> {
-    // loop over the dataset indefinitely
-    loop {
-        // loop over every input file
-        for filename in &inputs {
-            let file = File::open(filename)?;
-
-            // decompress if necessary
-            let reader: Box<dyn io::Read> = if filename.ends_with(".zst") {
-                Box::new(zstd::Decoder::new(file)?)
-            } else {
-                Box::new(file)
-            };
-
-            let reader = BufReader::with_capacity(50_000_000, reader);
-
-            // send every line
-            reader
-                .split('\n' as u8)
-                .for_each(|line| line_sender.send(line.unwrap()).unwrap());
+            // send a signal to the consumer (1 byte)
+            io::stdout().write_all(&[64])?;
+            io::stdout().flush()?;
+        } else {
+            // no more batches to read
+            // all producers have disconnected
+            return Ok(());
         }
     }
 }
 
 fn build_samples_thread(
     cmd: SamplesServiceCommand,
-    line_receiver: Receiver<Vec<u8>>,
-    batch_sender: Sender<BatchReady>,
+    offset: u64,
+    length: u64,
+    x_batch_size: usize,
+    y_batch_size: usize,
+    batch_sender: Sender<BatchData>,
 ) {
     let feature_set = build_feature_set(&cmd.feature_set);
     let mut method = build_method(&cmd);
 
-    let x_batch_size = cmd.batch_size * method.x_size(&feature_set);
-    let y_batch_size = cmd.batch_size * method.y_size();
-
     let mut x_cursor = Cursor::new(vec![0u8; x_batch_size]);
     let mut y_cursor = Cursor::new(vec![0u8; y_batch_size]);
 
+    let file = File::open(&cmd.input).expect("Open input file");
+    let mut reader = BufReader::with_capacity(256 * 1024 * 1024, file); // 256 MB
+
     loop {
         while x_cursor.position() < x_batch_size as u64 {
-            let line = line_receiver.recv().unwrap();
+            // read one more sample from the file
+            let pos = reader.stream_position().unwrap();
 
-            method.read_sample(
-                &mut line.as_slice(),
-                &mut x_cursor,
-                &mut y_cursor,
-                &feature_set,
-            );
+            // break in EOF
+            if !cmd.input_loop && pos >= offset + length {
+                // no more samples to read
+                // discard the batch
+                // exiting the thread will disconnect the channel
+                eprintln!("Thread finished");
+                return;
+            }
+
+            if pos < offset || pos >= offset + length {
+                // reset to offset if we are out of bounds
+                reader.seek(SeekFrom::Start(offset)).unwrap();
+                // make sure we skip to the first valid sample
+                reader.read_until(b'\n', &mut vec![]).unwrap();
+            }
+
+            method.read_sample(&mut reader, &mut x_cursor, &mut y_cursor, &feature_set);
         }
 
         assert!(x_cursor.position() == x_batch_size as u64);
         assert!(y_cursor.position() == y_batch_size as u64);
 
         batch_sender
-            .send(BatchReady {
+            .send(BatchData {
                 x: x_cursor.clone().into_inner(),
                 y: y_cursor.clone().into_inner(),
             })
@@ -170,8 +211,8 @@ fn build_samples_thread(
 }
 
 fn build_method(cmd: &SamplesServiceCommand) -> Box<dyn ReadSample> {
-    match cmd.subcommand {
-        MethodSubcommand::PQR => Box::new(PQR {}),
-        MethodSubcommand::Eval => Box::new(EvalRead {}),
+    match cmd.method {
+        Method::PQR => Box::new(PQR {}),
+        Method::Eval => Box::new(EvalRead {}),
     }
 }
