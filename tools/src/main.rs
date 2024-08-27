@@ -1,15 +1,15 @@
 #![feature(buf_read_has_data_left)]
 
+mod batch_loader;
 mod encode;
 mod feature_set_size;
 mod method;
-mod samples_service;
 
+use crate::batch_loader::batch_loader;
 use crate::feature_set_size::feature_set_size;
-use crate::samples_service::samples_service;
+use batch_loader::BatchLoaderCommand;
 use clap::{Parser, Subcommand};
 use feature_set_size::FeatureSetSizeCommand;
-use samples_service::SamplesServiceCommand;
 use std::error::Error;
 
 #[derive(Parser)]
@@ -21,7 +21,7 @@ struct Cli {
 #[derive(Subcommand)]
 enum Commands {
     /// Starts a process that writes samples to a shared memory file on demand (e.g. for training)
-    SamplesService(SamplesServiceCommand),
+    BatchLoader(BatchLoaderCommand),
     /// Displays the size of a feature set
     FeatureSetSize(FeatureSetSizeCommand),
 }
@@ -30,7 +30,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let args = Cli::parse();
 
     match args.command {
-        Commands::SamplesService(cmd) => samples_service(cmd),
+        Commands::BatchLoader(cmd) => batch_loader(cmd),
         Commands::FeatureSetSize(cmd) => feature_set_size(cmd),
     }
 }

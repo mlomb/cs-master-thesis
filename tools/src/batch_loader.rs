@@ -2,11 +2,11 @@ use crate::method::pqr::PQR;
 use crate::method::{eval::EvalRead, ReadSample};
 use clap::{Args, ValueEnum};
 use crossbeam::channel::{bounded, Sender};
-use crossbeam::scope;
 use nn::feature_set::build::build_feature_set;
 use shared_memory::ShmemConf;
 use std::fs::metadata;
 use std::io::SeekFrom;
+use std::time::Duration;
 use std::{
     error::Error,
     fs::File,
@@ -27,7 +27,7 @@ pub enum Method {
 }
 
 #[derive(Args, Clone)]
-pub struct SamplesServiceCommand {
+pub struct BatchLoaderCommand {
     /// Method to use
     #[arg(long)]
     method: Method,
@@ -64,11 +64,11 @@ pub struct SamplesServiceCommand {
     batch_size: usize,
 
     /// Number of batch threads to use
-    #[arg(long, default_value = "4")]
+    #[arg(long, default_value = "10")]
     threads: usize,
 }
 
-pub fn samples_service(cmd: SamplesServiceCommand) -> Result<(), Box<dyn Error>> {
+pub fn batch_loader(cmd: BatchLoaderCommand) -> Result<(), Box<dyn Error>> {
     let (batch_sender, batch_receiver) = bounded(8192); // keep up to X batches ready in memory
 
     // True length of the file
@@ -107,31 +107,30 @@ pub fn samples_service(cmd: SamplesServiceCommand) -> Result<(), Box<dyn Error>>
 
     // batch_sender is moved into the scope, sent to the threads and later dropped
     // this means that when all threads are done, the channel will be disconnected
-    scope(move |scope| {
-        // start batch threads
-        for i in 0..cmd.threads {
-            let batch_sender = batch_sender.clone();
-            let cmd = cmd.clone();
-            let offset = cmd.input_offset + i as u64 * thread_length;
+    // start batch threads
+    let mut join_handles = vec![];
 
-            scope.spawn(move |_| {
-                build_samples_thread(
-                    cmd,
-                    offset,
-                    thread_length,
-                    x_batch_size,
-                    y_batch_size,
-                    batch_sender,
-                )
-            });
-        }
-    })
-    .unwrap();
+    for i in 0..cmd.threads {
+        let batch_sender = batch_sender.clone();
+        let cmd = cmd.clone();
+        let offset = cmd.input_offset + i as u64 * thread_length;
+
+        join_handles.push(std::thread::spawn(move || {
+            build_samples_thread(
+                cmd,
+                offset,
+                thread_length,
+                x_batch_size,
+                y_batch_size,
+                batch_sender,
+            )
+        }));
+    }
 
     // loop to write batches
     loop {
         // receive a batch from another thread
-        if let Ok(batch) = batch_receiver.recv() {
+        if let Ok(batch) = batch_receiver.recv_timeout(Duration::from_millis(10)) {
             assert!(batch.x.len() == x_batch_size);
             assert!(batch.y.len() == y_batch_size);
 
@@ -146,15 +145,18 @@ pub fn samples_service(cmd: SamplesServiceCommand) -> Result<(), Box<dyn Error>>
             io::stdout().write_all(&[64])?;
             io::stdout().flush()?;
         } else {
-            // no more batches to read
-            // all producers have disconnected
-            return Ok(());
+            // After a timeout, check:
+            // - There are no more batches to read
+            // - All threads are done
+            if batch_receiver.is_empty() && join_handles.iter().all(|h| h.is_finished()) {
+                return Ok(());
+            }
         }
     }
 }
 
 fn build_samples_thread(
-    cmd: SamplesServiceCommand,
+    cmd: BatchLoaderCommand,
     offset: u64,
     length: u64,
     x_batch_size: usize,
@@ -169,6 +171,8 @@ fn build_samples_thread(
 
     let file = File::open(&cmd.input).expect("Open input file");
     let mut reader = BufReader::with_capacity(256 * 1024 * 1024, file); // 256 MB
+
+    eprintln!("Thread started offset={} length={}", offset, length);
 
     loop {
         while x_cursor.position() < x_batch_size as u64 {
@@ -210,7 +214,7 @@ fn build_samples_thread(
     }
 }
 
-fn build_method(cmd: &SamplesServiceCommand) -> Box<dyn ReadSample> {
+fn build_method(cmd: &BatchLoaderCommand) -> Box<dyn ReadSample> {
     match cmd.method {
         Method::PQR => Box::new(PQR {}),
         Method::Eval => Box::new(EvalRead {}),

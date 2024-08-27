@@ -6,7 +6,7 @@ import torch
 import wandb
 import tempfile
 
-from lib.service import SamplesService, get_feature_set_size
+from lib.batch_loader import BatchLoader, get_feature_set_size
 from lib.model import NnueModel
 from lib.model import decode_int64_bitset
 from lib.serialize import NnueWriter
@@ -19,14 +19,14 @@ def train(config, use_wandb: bool):
     TEST_BYTES = 10_000_000
 
     # datasets
-    # test_samples = SamplesService(
-    #     batch_size=config.batch_size,
-    #     input=DATA_INPUT,
-    #     input_length=TEST_BYTES,
-    #     feature_set=config.feature_set,
-    #     method=config.method
-    # )
-    train_samples = SamplesService(
+    test_samples = BatchLoader(
+        batch_size=config.batch_size,
+        input=DATA_INPUT,
+        input_length=TEST_BYTES,
+        feature_set=config.feature_set,
+        method=config.method
+    )
+    train_samples = BatchLoader(
         batch_size=config.batch_size,
         input=DATA_INPUT,
         input_offset=TEST_BYTES,
@@ -55,8 +55,7 @@ def train(config, use_wandb: bool):
     #scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', threshold=0.0001, factor=0.7, patience=30)
     #scheduler = torch.optim.lr_scheduler.CyclicLR(optimizer, base_lr=0.000001, max_lr=0.0002, step_size_up=128)
 
-    @torch.compile
-    def train_step(X, y):
+    def forward_loss(X, y):
         # expand bitset
         # X.shape = [4096, 2, 43]
         X = decode_int64_bitset(X) 
@@ -66,14 +65,24 @@ def train(config, use_wandb: bool):
         X = X[:, :, :config.num_features] # truncate to the actual number of features
         # X.shape = [4096, 2, 2700]
 
-        # Clear the gradients
-        optimizer.zero_grad()
-
         # Forward pass
         outputs = chessmodel(X)
 
         # Compute the loss
         loss = loss_fn(outputs, y)
+
+        return loss
+
+    @torch.compile
+    def train_step(X, y):
+        # Make sure gradient tracking is on
+        chessmodel.train()
+
+        # Clear the gradients
+        optimizer.zero_grad()
+
+        # Compute loss
+        loss = forward_loss(X, y)
         loss.backward()
 
         # Update the parameters
@@ -84,8 +93,43 @@ def train(config, use_wandb: bool):
 
         return loss.item()
 
-    # Make sure gradient tracking is on
-    chessmodel.train()
+    @torch.compile
+    def test_step(X, y):
+        # Make sure we are not tracking gradients
+        chessmodel.eval()
+        
+        # Compute loss
+        loss = forward_loss(X, y)
+
+        return loss.item()
+
+
+    def train_iter():
+        loss_sum = 0.0
+
+        for _ in tqdm(range(batches_per_epoch), desc=f'Epoch {epoch}/{config.epochs}'):
+            X, y = train_samples.next_batch()
+            loss_sum += train_step(X, y)
+
+        # Step the scheduler
+        scheduler.step()
+
+        return loss_sum / batches_per_epoch
+
+    def test_iter():
+        loss_sum = 0.0
+        count = 0
+
+        while True:
+            X, y = test_samples.next_batch()
+            if X is None:
+                break
+
+            loss_sum += test_step(X, y)
+            count += 1
+
+        return loss_sum / count
+
 
     batches_per_epoch = config.epoch_size // config.batch_size
 
@@ -93,28 +137,15 @@ def train(config, use_wandb: bool):
     checkpoint_is_best = True
 
     for epoch in range(1, config.epochs+1):
-        avg_loss = 0.0
-
-        for _ in tqdm(range(batches_per_epoch), desc=f'Epoch {epoch}/{config.epochs}'):
-            X, y = train_samples.next_batch()
-
-            loss = train_step(X, y)
-            avg_loss += loss
-
-            if math.isnan(avg_loss):
-                raise Exception("Loss is NaN, exiting")
-
-        avg_loss /= batches_per_epoch
-
-        # Step the scheduler
-        scheduler.step()
+        train_loss = train_iter()
+        test_loss = test_iter()
         
-        checkpoint_is_best = checkpoint_is_best or avg_loss < best_loss
-        best_loss = min(best_loss, avg_loss)
+        checkpoint_is_best = checkpoint_is_best or test_loss < best_loss
+        best_loss = min(best_loss, test_loss)
 
         # log metrics to W&B
         metrics = {
-            "Train/loss": avg_loss,
+            "Train/loss": test_loss,
             "Train/lr": scheduler._last_lr[0], # get_last_lr()
             "Train/samples": config.batch_size * batches_per_epoch * (epoch + 1),
 
@@ -126,7 +157,7 @@ def train(config, use_wandb: bool):
         if use_wandb:
             wandb.log(step=epoch, data=metrics)
         else:
-            print(f"Step {epoch} - Loss: {avg_loss}, LR: {scheduler._last_lr[0]}")
+            print(f"Step {epoch} - Loss: {test_loss}, LR: {scheduler._last_lr[0]}")
 
         with tempfile.NamedTemporaryFile() as tmp:
             tmp.write(NnueWriter(chessmodel, config.feature_set).buf)

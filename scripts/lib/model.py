@@ -1,6 +1,7 @@
 import torch
 from torch import nn
 
+@torch.compile
 def decode_int64_bitset(x: torch.Tensor):
     """
     Convert a int64 into a 64-element float32 tensor

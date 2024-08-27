@@ -4,16 +4,20 @@ import numpy as np
 import subprocess
 from multiprocessing.shared_memory import SharedMemory
 
+TOOLS_BIN = "../tools/target/release/tools"
 
-class SamplesService:
+class BatchLoader:
+    """
+    A class that loads batches of samples from the Rust tool binary.
+    """
     def __init__(
         self,
         batch_size: int,
+        feature_set: str,
+        method: str,
         input: str,
         input_offset: int = 0,
         input_length: int = 0,
-        feature_set: str = "hv",
-        method: str = "eval",
     ):
         num_features = get_feature_set_size(feature_set)
 
@@ -32,9 +36,8 @@ class SamplesService:
 
         # Start the program subprocess.
         args = [
-            "../tools/target/release/tools",
-            "samples-service",
-        ] + [
+            TOOLS_BIN,
+            "batch-loader",
             "--method=" + method,
             "--input=" + input,
             "--input-offset=" + str(input_offset),
@@ -61,7 +64,9 @@ class SamplesService:
         """
         Waits until the generator has written the next batch of samples into the shared memory.
         """
-        self.program.stdout.read(1)
+        read = self.program.stdout.read(1)
+        if len(read) == 0:
+            raise Exception("Generator process has terminated")
 
     def notify_ready_for_next(self):
         """
@@ -76,10 +81,13 @@ class SamplesService:
         Gets the next batch of samples.
 
         Returns:
-            A TensorFlow tensor containing the next batch of samples.
+            A Pytorch tensor containing the next batch of samples.
         """
         # Wait until batch is ready
-        self.wait_until_ready()
+        try:
+            self.wait_until_ready()
+        except Exception as e:
+            return None
 
         # Create PyTorch tensors using the numpy arrays.
         # This will copy the data into the device, so after this line we don't care about self.data/x/y
@@ -87,7 +95,10 @@ class SamplesService:
         y_tensor = torch.tensor(self.y, dtype=torch.float32, device="cuda")
 
         # Release the shared memory for the generator to use.
-        self.notify_ready_for_next()
+        try:
+            self.notify_ready_for_next()
+        except:
+            pass
 
         return x_tensor, y_tensor
 
@@ -95,7 +106,7 @@ class SamplesService:
         """
         Destructor.
         """
-        print("Samples service cleanup")
+        print("Batch loader cleanup")
 
         # Kill the subprocess and close the shared memory.
         self.program.kill()
@@ -110,7 +121,7 @@ def get_feature_set_size(name: str):
     return int(
         subprocess.check_output(
             [
-                "../tools/target/release/tools",
+                TOOLS_BIN,
                 "feature-set-size",
                 "--feature-set=" + name,
             ]

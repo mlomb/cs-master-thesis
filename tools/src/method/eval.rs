@@ -23,7 +23,7 @@ pub enum Score {
     Cp(i32),
 
     /// Mate/Mated in n
-    Mate(i32),
+    Mate(),
 }
 
 pub struct EvalRead;
@@ -70,7 +70,8 @@ impl ReadSample for EvalRead {
         let score = if let Ok(score) = score_str.parse::<i32>() {
             Score::Cp(score)
         } else {
-            Score::Mate(score_str[1..].parse::<i32>().unwrap())
+            // Score::Mate(score_str[1..].parse::<i32>().unwrap())
+            Score::Mate()
         };
 
         if let Score::Cp(cp_score) = score {
