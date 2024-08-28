@@ -1,4 +1,4 @@
-use super::ReadSample;
+use super::Sample;
 use crate::encode::{encode_position, encoded_size};
 use clap::Args;
 use nn::feature_set::FeatureSet;
@@ -28,7 +28,7 @@ pub enum Score {
 
 pub struct EvalRead;
 
-impl ReadSample for EvalRead {
+impl Sample for EvalRead {
     fn x_size(&self, feature_set: &Box<dyn FeatureSet>) -> usize {
         encoded_size(feature_set)
     }
@@ -38,7 +38,7 @@ impl ReadSample for EvalRead {
     }
 
     fn read_sample(
-        &mut self,
+        &self,
         read: &mut dyn BufRead,
         write_x: &mut dyn Write,
         write_y: &mut dyn Write,
@@ -83,11 +83,6 @@ impl ReadSample for EvalRead {
 
             if best_move.is_capture() || position.is_check() {
                 // skip capture and check positions
-                return;
-            }
-
-            // random fen skipping
-            if rand::random::<f64>() < 0.3 {
                 return;
             }
 

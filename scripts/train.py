@@ -109,6 +109,8 @@ def train(config, use_wandb: bool):
 
         for _ in tqdm(range(batches_per_epoch), desc=f'Epoch {epoch}/{config.epochs}'):
             X, y = train_samples.next_batch()
+            X, y = X.cuda(), y.cuda()
+            
             loss_sum += train_step(X, y)
 
         # Step the scheduler
@@ -122,6 +124,8 @@ def train(config, use_wandb: bool):
 
         while True:
             X, y = test_samples.next_batch()
+            X, y = X.cuda(), y.cuda()
+
             if X is None:
                 break
 

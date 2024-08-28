@@ -3,13 +3,31 @@ import torch
 import numpy as np
 import subprocess
 from multiprocessing.shared_memory import SharedMemory
+import os
 
-TOOLS_BIN = "../tools/target/release/tools"
+TOOLS_BIN = os.path.join(os.path.dirname(__file__), "../../tools/target/release/tools")
+
+
+def get_feature_set_size(name: str):
+    """
+    Get the number of features in a feature set by name
+    """
+    return int(
+        subprocess.check_output(
+            [
+                TOOLS_BIN,
+                "feature-set-size",
+                "--feature-set=" + name,
+            ]
+        )
+    )
+
 
 class BatchLoader:
     """
-    A class that loads batches of samples from the Rust tool binary.
+    A class that loads batches of samples from the Rust tool binary
     """
+
     def __init__(
         self,
         batch_size: int,
@@ -87,43 +105,119 @@ class BatchLoader:
         try:
             self.wait_until_ready()
         except Exception as e:
+            print("process terminated1")
             return None
 
         # Create PyTorch tensors using the numpy arrays.
         # This will copy the data into the device, so after this line we don't care about self.data/x/y
-        x_tensor = torch.tensor(self.x, dtype=torch.int64, device="cuda")
-        y_tensor = torch.tensor(self.y, dtype=torch.float32, device="cuda")
+        x_tensor = torch.tensor(self.x, dtype=torch.int64)
+        y_tensor = torch.tensor(self.y, dtype=torch.float32)
 
         # Release the shared memory for the generator to use.
         try:
             self.notify_ready_for_next()
         except:
+            print("process terminated2")
             pass
 
         return x_tensor, y_tensor
 
-    def __del__(self):
+    def cleanup(self):
         """
-        Destructor.
+        Kill the subprocess and close the shared memory. Idempotent.
         """
-        print("Batch loader cleanup")
-
-        # Kill the subprocess and close the shared memory.
-        self.program.kill()
-        self.program.wait()
         self.x = None
         self.y = None
         self.data = None
-        self.shmem.close()
+
+        if self.program is not None:
+            self.program.kill()
+            self.program.wait()
+            self.program = None
+
+        if self.shmem is not None:
+            self.shmem.unlink()
+            self.shmem.close()
+            self.shmem = None
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, _1, _2, _3):
+        self.cleanup()
+
+    def __del__(self):
+        self.cleanup()
 
 
-def get_feature_set_size(name: str):
-    return int(
-        subprocess.check_output(
-            [
-                TOOLS_BIN,
-                "feature-set-size",
-                "--feature-set=" + name,
-            ]
+class BatchLoaderDataset(torch.utils.data.IterableDataset):
+    """
+    Pytorch iterable dataset for the BatchLoader class
+    """
+
+    def __init__(
+        self,
+        batch_size: int,
+        feature_set: str,
+        method: str,
+        input: str,
+        input_offset: int = 0,
+        input_length: int = 0,
+    ):
+        self.batch_size = batch_size
+        self.feature_set = feature_set
+        self.method = method
+        self.input = input
+        self.input_offset = input_offset
+        self.input_length = input_length
+
+    def __iter__(self):
+        worker_info = torch.utils.data.get_worker_info()
+
+        overall_start = self.input_offset
+        overall_end = os.path.getsize(self.input)
+
+        # configure the dataset to only process the split workload
+        per_worker = int(math.ceil((overall_end - overall_start) // float(worker_info.num_workers)))
+        self.input_offset = overall_start + worker_info.id * per_worker
+        self.input_length = per_worker
+
+        with BatchLoader(
+            batch_size=self.batch_size,
+            feature_set=self.feature_set,
+            method=self.method,
+            input=self.input,
+            input_offset=self.input_offset,
+            input_length=self.input_length,
+        ) as loader:
+            while True:
+                batch = loader.next_batch()
+                if batch is None:
+                    break
+                yield batch
+
+
+if __name__ == "__main__":
+    # Performance test
+
+    import torch.utils
+    from tqdm import tqdm
+
+    for num_workers in [2, 4, 6, 8, 10, 12, 14, 16]:
+        dl = torch.utils.data.dataloader.DataLoader(
+            BatchLoaderDataset(
+                batch_size=16384,
+                feature_set="hv",
+                method="eval",
+                input="/mnt/c/datasets/raw/all.plain",
+            ),
+            num_workers=num_workers,
+            batch_size=None,
+            sampler=None,
+            shuffle=False,
         )
-    )
+        iterloader = iter(dl)
+
+        for i in tqdm(range(1_000), desc=f"num_workers={num_workers}"):
+            X, y = next(iterloader)
+            X, y = X.cuda(), y.cuda()

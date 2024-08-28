@@ -1,4 +1,5 @@
-#![feature(buf_read_has_data_left)]
+#![feature(bufread_skip_until)]
+#![feature(slice_pattern)]
 
 mod batch_loader;
 mod encode;

@@ -1,4 +1,4 @@
-use super::ReadSample;
+use super::Sample;
 use crate::encode::{encode_position, encoded_size};
 use nn::feature_set::FeatureSet;
 use rand::seq::SliceRandom;
@@ -10,7 +10,7 @@ use std::io::Write;
 
 pub struct PQR;
 
-impl ReadSample for PQR {
+impl Sample for PQR {
     fn x_size(&self, feature_set: &Box<dyn FeatureSet>) -> usize {
         encoded_size(feature_set) * 3
     }
@@ -20,7 +20,7 @@ impl ReadSample for PQR {
     }
 
     fn read_sample(
-        &mut self,
+        &self,
         read: &mut dyn BufRead,
         write_x: &mut dyn Write,
         _write_y: &mut dyn Write,

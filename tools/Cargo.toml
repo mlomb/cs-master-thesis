@@ -15,6 +15,7 @@ indicatif = "0.17.8"
 shared_memory = "0.12.4"
 crossbeam = "0.8.4"
 rayon = "1.10.0"
+memmap2 = "0.9.4"
 
 [patch.crates-io]
 shakmaty = { git = "https://github.com/niklasf/shakmaty" }
