@@ -1,3 +1,4 @@
+use crate::method::Sample;
 use memmap2::{Mmap, MmapOptions};
 use shakmaty::{fen::Fen, uci::UciMove, CastlingMode, Chess, EnPassantMode, Move, Position};
 use std::io::{self, Seek, Write};
@@ -5,13 +6,6 @@ use std::{
     fs::File,
     io::{BufRead, BufWriter, Cursor},
 };
-
-#[derive(Debug)]
-pub struct Sample {
-    position: Chess,
-    bestmove: Move,
-    score: i32,
-}
 
 /// Read files in .plain and .plainpack formats
 pub struct PlainReader {
@@ -77,15 +71,6 @@ impl PlainReader {
             score_bytes.pop();
             if move_bytes.last() == Some(&b',') {
                 move_bytes.pop();
-            }
-
-            if UciMove::from_ascii(move_bytes.as_slice()).is_err() {
-                println!(
-                    "{:?} {:?} {:?}",
-                    String::from_utf8_lossy(&fen_bytes),
-                    String::from_utf8_lossy(&score_bytes),
-                    String::from_utf8_lossy(&move_bytes)
-                );
             }
 
             let score_str = String::from_utf8_lossy(&score_bytes);

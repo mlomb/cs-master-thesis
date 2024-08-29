@@ -1,16 +1,11 @@
-use super::Sample;
-use crate::encode::{encode_position, encoded_size};
+use super::SampleEncoder;
+use crate::encode::encoded_size;
 use nn::feature_set::FeatureSet;
-use rand::seq::SliceRandom;
-use shakmaty::uci::UciMove;
-use shakmaty::CastlingMode;
-use shakmaty::{fen::Fen, Chess, Position};
-use std::io::BufRead;
 use std::io::Write;
 
 pub struct PQR;
 
-impl Sample for PQR {
+impl SampleEncoder for PQR {
     fn x_size(&self, feature_set: &Box<dyn FeatureSet>) -> usize {
         encoded_size(feature_set) * 3
     }
@@ -19,6 +14,16 @@ impl Sample for PQR {
         0
     }
 
+    fn write_sample(
+        &self,
+        sample: &super::Sample,
+        write_x: &mut dyn Write,
+        write_y: &mut dyn Write,
+        feature_set: &Box<dyn FeatureSet>,
+    ) {
+    }
+
+    /*
     fn read_sample(
         &self,
         read: &mut dyn BufRead,
@@ -65,4 +70,5 @@ impl Sample for PQR {
         encode_position(feature_set, &q_position, write_x);
         encode_position(feature_set, &r_position, write_x);
     }
+    */
 }
