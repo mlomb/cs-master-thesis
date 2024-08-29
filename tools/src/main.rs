@@ -5,8 +5,8 @@ mod batch_loader;
 mod convert;
 mod encode;
 mod feature_set_size;
+mod format;
 mod method;
-mod plain_format;
 
 use crate::batch_loader::batch_loader;
 use crate::convert::convert;

@@ -1,7 +1,11 @@
-use crate::plain_format::{PlainReader, PlainWriter};
 use clap::Args;
 use indicatif::{HumanBytes, HumanCount, ProgressBar, ProgressStyle};
 use std::{error::Error, fs::File, io::BufWriter};
+
+use crate::format::{
+    cbin::CbinWriter,
+    plain::{PlainReader, PlainWriter},
+};
 
 #[derive(Args)]
 pub struct ConvertCommand {
@@ -18,7 +22,7 @@ pub fn convert(cmd: ConvertCommand) -> Result<(), Box<dyn Error>> {
 
     let mut count = 0;
     let mut reader = PlainReader::new(File::open(&cmd.input).expect("can't open input file"));
-    let mut writer = PlainWriter::new(File::create(cmd.output).expect("can't open output file"));
+    let mut writer = CbinWriter::new(File::create(cmd.output).expect("can't open output file"));
 
     let bar = ProgressBar::new_spinner()
         .with_style(ProgressStyle::default_spinner()

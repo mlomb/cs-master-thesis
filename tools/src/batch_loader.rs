@@ -1,6 +1,6 @@
+use crate::format::plain::PlainReader;
 use crate::method::pqr::PQR;
 use crate::method::{eval::EvalRead, SampleEncoder};
-use crate::plain_format::PlainReader;
 use clap::{Args, ValueEnum};
 use core::slice::SlicePattern;
 use memmap2::MmapOptions;
