@@ -5,8 +5,8 @@ mod batch_loader;
 mod convert;
 mod encode;
 mod feature_set_size;
-mod format;
 mod method;
+mod plain_format;
 
 use crate::batch_loader::batch_loader;
 use crate::convert::convert;
@@ -25,7 +25,7 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-    /// Convert from .plain to .plainpack
+    /// Convert from .plain to .plain. This is used to compact plain files
     Convert(ConvertCommand),
     /// Starts a process that writes samples to a shared memory file on demand (e.g. for training)
     BatchLoader(BatchLoaderCommand),

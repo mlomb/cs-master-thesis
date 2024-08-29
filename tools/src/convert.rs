@@ -1,11 +1,7 @@
+use crate::plain_format::{PlainReader, PlainWriter};
 use clap::Args;
-use indicatif::{HumanBytes, HumanCount, ProgressBar, ProgressStyle};
-use std::{error::Error, fs::File, io::BufWriter};
-
-use crate::format::{
-    cbin::CbinWriter,
-    plain::{PlainReader, PlainWriter},
-};
+use indicatif::{HumanBytes, ProgressBar, ProgressStyle};
+use std::error::Error;
 
 #[derive(Args)]
 pub struct ConvertCommand {
@@ -20,9 +16,8 @@ pub fn convert(cmd: ConvertCommand) -> Result<(), Box<dyn Error>> {
     println!("Input file: {}", cmd.input);
     println!("Output file: {}", cmd.output);
 
-    let mut count = 0;
-    let mut reader = PlainReader::new(File::open(&cmd.input).expect("can't open input file"));
-    let mut writer = CbinWriter::new(File::create(cmd.output).expect("can't open output file"));
+    let mut reader = PlainReader::open(&cmd.input).expect("can't open input file");
+    let mut writer = PlainWriter::open(&cmd.output).expect("can't open output file");
 
     let bar = ProgressBar::new_spinner()
         .with_style(ProgressStyle::default_spinner()
@@ -35,13 +30,12 @@ pub fn convert(cmd: ConvertCommand) -> Result<(), Box<dyn Error>> {
         bar.inc(samples.len() as u64);
 
         for sample in samples {
-            writer.write_sample(sample)?;
+            writer.write_sample(&sample)?;
 
-            count += 1;
-            if count % 100_000 == 0 {
+            if bar.position() % 100_000 == 0 {
                 bar.set_message(format!(
                     "[Read {} Written {}]",
-                    HumanBytes(reader.bytes_read()),
+                    HumanBytes(reader.bytes_read().unwrap()),
                     HumanBytes(writer.bytes_written().unwrap())
                 ));
             }
@@ -50,7 +44,7 @@ pub fn convert(cmd: ConvertCommand) -> Result<(), Box<dyn Error>> {
 
     bar.set_message(format!(
         "[Read {} Written {}]",
-        HumanBytes(reader.bytes_read()),
+        HumanBytes(reader.bytes_read().unwrap()),
         HumanBytes(writer.bytes_written().unwrap())
     ));
     bar.finish();

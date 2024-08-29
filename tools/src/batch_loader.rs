@@ -1,16 +1,13 @@
-use crate::format::plain::PlainReader;
 use crate::method::pqr::PQR;
 use crate::method::{eval::EvalRead, SampleEncoder};
+use crate::plain_format::PlainReader;
 use clap::{Args, ValueEnum};
-use core::slice::SlicePattern;
-use memmap2::MmapOptions;
+use indicatif::{ProgressBar, ProgressStyle};
 use nn::feature_set::build::build_feature_set;
 use shared_memory::ShmemConf;
-use std::io::SeekFrom;
 use std::{
     error::Error,
-    fs::File,
-    io::{self, BufRead, Cursor, Read, Seek, Write},
+    io::{self, Cursor, Read, Seek, Write},
 };
 
 #[derive(ValueEnum, Clone)]
@@ -35,10 +32,11 @@ pub struct BatchLoaderCommand {
     #[arg(long, default_value = "8192")]
     batch_size: usize,
 
-    /// The shared memory file to write the samples.
-    /// Must have the correct size, otherwise it will panic
+    /// The shared memory file to write the samples. Must have the correct size, otherwise it will panic.
+    /// If it is not provided, it will measure the performance of the batch loader without writing to shared memory
+    /// (with a progress bar)
     #[arg(long)]
-    shmem: String,
+    shmem: Option<String>,
 
     /// List of .csv files to read samples from.
     /// CSVs must have the format: `fen,score,bestmove`
@@ -76,19 +74,34 @@ pub fn batch_loader(cmd: BatchLoaderCommand) -> Result<(), Box<dyn Error>> {
     let mut y_cursor = Cursor::new(vec![0u8; y_batch_size]);
 
     // open shared memory buffer
-    let mut shmem = ShmemConf::new().os_id(&cmd.shmem).open()?;
-    let shmem_slice = unsafe { shmem.as_slice_mut() };
+    let mut shmem = if let Some(shmem) = &cmd.shmem {
+        let shmem = ShmemConf::new().os_id(&shmem).open()?;
 
-    assert!(
-        shmem_slice.len() == x_batch_size + y_batch_size,
-        "unexpected shared memory size"
-    );
+        assert!(
+            shmem.len() == x_batch_size + y_batch_size,
+            "unexpected shared memory size"
+        );
+
+        Some(shmem)
+    } else {
+        None
+    };
+
+    // perf testing bar
+    let bar = if shmem.is_none() {
+        ProgressBar::new_spinner()
+        .with_style(ProgressStyle::default_spinner()
+        .template(
+            "{spinner:.green} [Elapsed {elapsed_precise}] [Batches {human_pos} @ {per_sec}] {msg}",
+        )
+        .unwrap())
+    } else {
+        ProgressBar::hidden()
+    };
 
     // loop to write batches
     loop {
-        let file = File::open(&cmd.input).expect("can't open input file");
-        let mut reader = PlainReader::new(file);
-        eprintln!("Opened file {}", cmd.input);
+        let mut reader = PlainReader::open(&cmd.input)?;
 
         while let Ok(Some(samples)) = reader.read_samples_line() {
             for sample in samples {
@@ -100,22 +113,28 @@ pub fn batch_loader(cmd: BatchLoaderCommand) -> Result<(), Box<dyn Error>> {
                     assert!(x_cursor.position() == x_batch_size as u64);
                     assert!(y_cursor.position() == y_batch_size as u64);
 
-                    // wait for the reader to signal that it has finished copying the data of the last batch (1 byte)
-                    if let Err(_) = io::stdin().read_exact(&mut [0]) {
-                        // reader disconnected
-                        return Ok(());
+                    if let Some(shmem) = &mut shmem {
+                        // wait for the reader to signal that it has finished copying the data of the last batch (1 byte)
+                        if let Err(_) = io::stdin().read_exact(&mut [0]) {
+                            // reader disconnected
+                            return Ok(());
+                        }
+
+                        // copy new batch to shared memory
+                        // this means rewind the cursors, then read to shmem
+                        x_cursor.rewind().unwrap();
+                        y_cursor.rewind().unwrap();
+                        let shmem_slice = unsafe { shmem.as_slice_mut() };
+                        x_cursor.read_exact(&mut shmem_slice[..x_batch_size])?;
+                        y_cursor.read_exact(&mut shmem_slice[x_batch_size..])?;
+
+                        // send a signal to the consumer (1 byte)
+                        io::stdout().write_all(&[64])?;
+                        io::stdout().flush()?;
+                    } else {
+                        // perf testing
+                        bar.inc(1);
                     }
-
-                    // copy new batch to shared memory
-                    // this means rewind the cursors, then read to shmem
-                    x_cursor.rewind().unwrap();
-                    y_cursor.rewind().unwrap();
-                    x_cursor.read_exact(&mut shmem_slice[..x_batch_size])?;
-                    y_cursor.read_exact(&mut shmem_slice[x_batch_size..])?;
-
-                    // send a signal to the consumer (1 byte)
-                    io::stdout().write_all(&[64])?;
-                    io::stdout().flush()?;
 
                     // reset buffers
                     x_cursor.rewind().unwrap();
