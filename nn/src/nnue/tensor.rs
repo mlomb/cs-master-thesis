@@ -1,5 +1,5 @@
 use std::fmt::Debug;
-use std::io::{Cursor, Read};
+use std::io::{self, Cursor, Read};
 use std::{
     alloc::{alloc, dealloc, Layout},
     fmt::Formatter,
@@ -12,6 +12,7 @@ pub struct Tensor<T> {
 }
 
 impl<T> Tensor<T> {
+    /// Initializes a zeroed tensor
     pub fn zeros(size: usize) -> Self {
         let layout = Layout::from_size_align(size * std::mem::size_of::<T>(), 32).unwrap();
         let data = unsafe { alloc(layout) } as *mut T;
@@ -21,7 +22,8 @@ impl<T> Tensor<T> {
         Self { layout, data }
     }
 
-    pub fn from_cursor(cursor: &mut Cursor<&[u8]>, len: usize) -> std::io::Result<Self> {
+    /// Initializes a tensor reading T elements from a cursor
+    pub fn from_cursor(cursor: &mut Cursor<&[u8]>, len: usize) -> io::Result<Self> {
         let tensor = Self::zeros(len);
 
         cursor.read_exact(unsafe {

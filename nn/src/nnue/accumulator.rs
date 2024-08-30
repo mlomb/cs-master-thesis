@@ -10,17 +10,21 @@ thread_local! {
     static INDEX_BUFFER4: RefCell<Vec<u16>> = RefCell::new(Vec::with_capacity(128));
 }
 
+/// Accumulator for the first layer of the neural network. It tracks the features of both perspectives
 pub struct NnueAccumulator {
-    accumulation: [Tensor<i16>; 2], // indexed by perspective (Color as usize)
+    // indexed by perspective (Color as usize)
+    accumulation: [Tensor<i16>; 2],
     features: [Vec<i8>; 2],
 
     nnue_model: Rc<RefCell<NnueModel>>,
 }
 
 impl NnueAccumulator {
+    /// Creates an accumulator for the given NNUE model
     pub fn new(nnue_model: Rc<RefCell<NnueModel>>) -> Self {
-        let num_l1 = nnue_model.borrow().get_num_ft();
+        let num_l1 = nnue_model.borrow().get_num_features();
         let num_features = nnue_model.borrow().get_feature_set().num_features();
+
         NnueAccumulator {
             nnue_model,
             accumulation: [Tensor::zeros(num_l1), Tensor::zeros(num_l1)],
@@ -28,6 +32,7 @@ impl NnueAccumulator {
         }
     }
 
+    /// Returns the forward pass result for the given perspective, based on the current accumulator state
     pub fn forward(&self, perspective: Color) -> i32 {
         self.nnue_model.borrow().forward(
             &self.accumulation[perspective as usize],
@@ -35,6 +40,7 @@ impl NnueAccumulator {
         )
     }
 
+    /// Throw away the current accumulator state for the given perspective and refresh it based on the given position
     pub fn refresh(&mut self, pos: &Chess, perspective: Color) {
         let nnue_model = self.nnue_model.borrow();
         let feature_set = nnue_model.get_feature_set();
@@ -54,10 +60,11 @@ impl NnueAccumulator {
 
         // refresh the accumulator
         features.sort_unstable();
-        features.dedup();
+        features.dedup(); // do not add rows twice!
         nnue_model.refresh_accumulator(&self.accumulation[perspective as usize], &features);
     }
 
+    /// Update the accumulator state based on the given move, for the given position and perspective
     pub fn update(&mut self, pos: &Chess, mov: &Move, perspective: Color) {
         let board = pos.board();
 
@@ -70,6 +77,7 @@ impl NnueAccumulator {
             let mut next_pos = pos.clone();
             next_pos.play_unchecked(mov);
             self.refresh(&next_pos, perspective);
+
             return;
         }
 
@@ -121,6 +129,7 @@ impl NnueAccumulator {
         );
     }
 
+    /// Copies the state of the given accumulator into this one
     pub fn copy_from(&mut self, other: &NnueAccumulator) {
         self.accumulation[0]
             .as_mut_slice()

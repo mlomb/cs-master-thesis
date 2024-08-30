@@ -5,16 +5,17 @@ use crate::feature_set::build::build_feature_set;
 use crate::feature_set::FeatureSet;
 use byteorder::{LittleEndian, ReadBytesExt};
 use std::fs::File;
-use std::io::{BufRead, Cursor, Read};
+use std::io::{self, BufRead, Cursor, Read};
 
+/// A linear layer in the network
 struct LinearLayer<W, B> {
     num_inputs: usize,
     num_outputs: usize,
 
-    weight: Tensor<W>,
-    bias: Tensor<B>,
+    weight: Tensor<W>, // num_inputs * num_outputs
+    bias: Tensor<B>,   // num_outputs
 
-    // this buffer is used by the previous layer to prepare the data for this layer
+    // this buffer is used by the previous layer to prepare the data for this layer (to avoid allocations)
     // note: this is unused in the feature transform layer :(
     input_buffer: Tensor<W>,
     // this buffer is used just after computing the linear layer, before applying the activation
@@ -36,7 +37,21 @@ impl<W, B> LinearLayer<W, B> {
     }
 }
 
-/// Neural Network Update Efficent (NNUE)
+impl LinearLayer<i8, i32> {
+    /// Forward pass of a hidden layer, using the input buffer and storing the result in the intermediate buffer.
+    unsafe fn forward_hidden(&self) {
+        linear(
+            self.num_inputs,
+            self.num_outputs,
+            self.input_buffer.as_ptr(),
+            self.weight.as_ptr(),
+            self.bias.as_ptr(),
+            self.intermediate_buffer.as_mut_ptr(),
+        );
+    }
+}
+
+/// Neural Network Update Efficient (NNUE)
 /// https://github.com/official-stockfish/nnue-pytorch/blob/master/docs/nnue.md
 pub struct NnueModel {
     feature_set: Box<dyn FeatureSet>,
@@ -47,7 +62,8 @@ pub struct NnueModel {
 }
 
 impl NnueModel {
-    pub fn load(model_path: &str) -> std::io::Result<Self> {
+    /// Loads a model from a .nn file
+    pub fn load(model_path: &str) -> io::Result<Self> {
         let mut file = File::open(model_path)?;
         let mut buffer = Vec::new();
         file.read_to_end(&mut buffer)?;
@@ -55,31 +71,49 @@ impl NnueModel {
         Self::from_memory(&buffer)
     }
 
-    pub fn from_memory(buffer: &[u8]) -> std::io::Result<Self> {
+    /// Loads a model from a .nn file in memory.
+    /// Format description can be found in `scripts/lib/serialize.py`
+    pub fn from_memory(buffer: &[u8]) -> io::Result<Self> {
         let mut cursor = Cursor::new(buffer);
 
+        // read feature set name
         let mut str_buffer = Vec::new();
         cursor.read_until(0, &mut str_buffer).unwrap();
         str_buffer.pop(); // remove null byte
         let feature_set_str = std::str::from_utf8(&str_buffer).unwrap();
 
+        // read network sizes
         let num_features = cursor.read_u32::<LittleEndian>().unwrap() as usize;
         let num_l1 = cursor.read_u32::<LittleEndian>().unwrap() as usize;
         let num_l2 = cursor.read_u32::<LittleEndian>().unwrap() as usize;
+        let num_out = 1;
 
         let feature_set = build_feature_set(feature_set_str);
         assert_eq!(num_features as usize, feature_set.num_features());
 
-        println!("info string NNUE feature set: {}", feature_set_str);
+        println!(
+            "info string NNUE net: {}[{}]->{}x2->{}->1",
+            feature_set_str, num_features, num_l1, num_l2
+        );
+        println!(
+            "info string NNUE size: {} params",
+            // l1
+            num_features * num_l1 + num_l1 +
+            // l2
+            (2 * num_l1) * num_l2 + num_l2 +
+            // out
+            num_out * num_l2 + num_l2 + num_out
+        );
 
         Ok(Self {
             feature_set,
             linear1: LinearLayer::new(&mut cursor, num_features, num_l1),
             linear2: LinearLayer::new(&mut cursor, 2 * num_l1, num_l2),
-            linear_out: LinearLayer::new(&mut cursor, num_l2, 1),
+            linear_out: LinearLayer::new(&mut cursor, num_l2, num_out),
         })
     }
 
+    /// Refreshes the accumulator with the given features (slow)
     pub fn refresh_accumulator(&self, accumulator: &Tensor<i16>, active_features: &[u16]) {
         unsafe {
             linear_partial_refresh(
@@ -93,6 +127,9 @@ impl NnueModel {
         }
     }
 
+    /// Updates the accumulator with the given added and removed features (rows).
+    /// It does not know if the features were already active. It is the caller's responsibility to
+    /// ensure that rows are not added/removed twice.
     pub fn update_accumulator(
         &self,
         accumulator: &Tensor<i16>,
@@ -111,45 +148,45 @@ impl NnueModel {
         }
     }
 
+    /// Forward pass of the network, skipping the first layer and instead taking the accumulated values for each side
     pub fn forward(&self, to_move_accum: &Tensor<i16>, not_to_move_accum: &Tensor<i16>) -> i32 {
         unsafe {
+            // layer 1 already computed in accumulator
             let to_move_accum = to_move_accum.as_ptr();
             let not_to_move_accum = not_to_move_accum.as_ptr();
+            let l1_out = self.linear1.num_outputs; // size of each accumulator
 
-            let l2 = self.linear1.num_outputs;
-            let (to_move, not_to_move) = self.linear2.input_buffer.as_mut_slice().split_at_mut(l2);
-            crelu_16(l2, to_move_accum, to_move.as_mut_ptr());
-            crelu_16(l2, not_to_move_accum, not_to_move.as_mut_ptr());
+            // split the input buffer of the layer 2 into two parts
+            let (to_move, not_to_move) = self
+                .linear2
+                .input_buffer
+                .as_mut_slice()
+                .split_at_mut(l1_out);
 
-            Self::forward_hidden(&self.linear2);
+            // fill the input to the layer 2 doing the crelu of the two accumulators (output of the first layer)
+            crelu_16(l1_out, to_move_accum, to_move.as_mut_ptr());
+            crelu_16(l1_out, not_to_move_accum, not_to_move.as_mut_ptr());
+
+            // forward layer 2
+            self.linear2.forward_hidden();
             crelu_32(
                 self.linear2.num_outputs,
                 self.linear2.intermediate_buffer.as_ptr(),
                 self.linear_out.input_buffer.as_mut_ptr(),
             );
 
-            Self::forward_hidden(&self.linear_out);
+            // forward output layer
+            self.linear_out.forward_hidden();
 
             self.linear_out.intermediate_buffer.as_slice()[0]
         }
-    }
-
-    unsafe fn forward_hidden(layer: &LinearLayer<i8, i32>) {
-        linear(
-            layer.num_inputs,
-            layer.num_outputs,
-            layer.input_buffer.as_ptr(),
-            layer.weight.as_ptr(),
-            layer.bias.as_ptr(),
-            layer.intermediate_buffer.as_mut_ptr(),
-        );
     }
 
     pub fn get_feature_set(&self) -> &dyn FeatureSet {
         self.feature_set.as_ref()
     }
 
-    pub fn get_num_ft(&self) -> usize {
+    pub fn get_num_features(&self) -> usize {
         self.linear1.num_outputs
     }
 }
@@ -182,7 +219,7 @@ mod tests {
             548, 266, 67, 290, 78, 72, 23, 79, 338, 81, 86, 328, 631, 702, 419, 616,
         ];
 
-        let accum_updates = Tensor::zeros(nnue_model.get_num_ft());
+        let accum_updates = Tensor::zeros(nnue_model.get_num_features());
         nnue_model.refresh_accumulator(&accum_updates, initial_features.as_slice());
         nnue_model.update_accumulator(&accum_updates, &[213, 512, 97, 120], &[631, 702, 419, 616]);
         nnue_model.update_accumulator(&accum_updates, &[275, 428, 265, 466], &[6, 728, 683, 723]);
@@ -195,7 +232,7 @@ mod tests {
         nnue_model.update_accumulator(&accum_updates, &[181, 487, 168, 470], &[553, 755, 652, 537]);
         nnue_model.update_accumulator(&accum_updates, &[361, 324, 728, 10], &[47, 726, 333, 3]);
 
-        let accum_refresh = Tensor::zeros(nnue_model.get_num_ft());
+        let accum_refresh = Tensor::zeros(nnue_model.get_num_features());
         nnue_model.refresh_accumulator(&accum_refresh, &all_features.as_slice());
 
         assert_eq!(accum_updates.as_slice(), accum_refresh.as_slice()); // thus forward gives the same output
