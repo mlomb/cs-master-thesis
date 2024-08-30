@@ -37,7 +37,7 @@ pub struct BatchLoaderCommand {
     feature_set: String,
 
     /// Number of samples in one batch
-    #[arg(long, default_value = "8192")]
+    #[arg(long, default_value = "16384")]
     batch_size: usize,
 
     /// The shared memory file to write the samples. Must have the correct size, otherwise it will panic.
