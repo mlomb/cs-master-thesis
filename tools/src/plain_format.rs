@@ -208,16 +208,16 @@ impl<W: Write + Seek> PlainWriter<W> {
             }
         }
 
-        if let Some(actualmove) = chain_with {
-            // write `,actualmove,`
-            if self.last_bestmove.as_ref() == Some(&actualmove) {
+        if let Some(playedmove) = chain_with {
+            // write `,playedmove,`
+            if self.last_bestmove.as_ref() == Some(&playedmove) {
                 // if it matches, skip it
                 write!(self.writer, ",,")?;
             } else {
                 write!(
                     self.writer,
                     ",{},",
-                    UciMove::from_move(&actualmove, CastlingMode::Standard)
+                    UciMove::from_move(&playedmove, CastlingMode::Standard)
                 )?
             }
         } else {

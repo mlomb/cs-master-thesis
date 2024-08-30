@@ -13,6 +13,7 @@ use std::{
     io::{self, Cursor, Read, Seek, Write},
 };
 
+/// A single batch, passed between threads
 struct BatchData {
     x: Vec<u8>,
     y: Vec<u8>,
@@ -73,7 +74,7 @@ pub struct BatchLoaderCommand {
 }
 
 pub fn batch_loader(cmd: BatchLoaderCommand) -> Result<(), Box<dyn Error>> {
-    // True length of the file
+    // true length of the file
     let file_length = metadata(&cmd.input)
         .expect("Unable to query input size")
         .len();
@@ -83,14 +84,14 @@ pub fn batch_loader(cmd: BatchLoaderCommand) -> Result<(), Box<dyn Error>> {
         "Length is out of bounds"
     );
 
-    // Length of the subfile to read from
+    // length of the subfile to read from
     let readable_length = if cmd.input_length == 0 {
         file_length - cmd.input_offset
     } else {
         cmd.input_length
     };
 
-    // Actual length to read from each thread
+    // actual length to read from each thread
     let thread_length = ((readable_length as f64) / cmd.threads as f64).floor() as u64;
 
     // open shared memory buffer
