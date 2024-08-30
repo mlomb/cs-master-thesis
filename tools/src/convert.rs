@@ -5,9 +5,11 @@ use std::error::Error;
 
 #[derive(Args)]
 pub struct ConvertCommand {
+    /// Input file
     #[arg(long, required = true)]
     input: String,
 
+    /// Output file (will be overwritten)
     #[arg(long, required = true)]
     output: String,
 }

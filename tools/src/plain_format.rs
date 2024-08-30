@@ -57,6 +57,7 @@ impl<'a> PlainReader<Cursor<&'a [u8]>> {
 }
 
 impl<R: BufRead + Seek> PlainReader<R> {
+    #[allow(dead_code)]
     fn new(reader: R) -> PlainReader<R> {
         PlainReader { reader, mmap: None }
     }
@@ -180,6 +181,7 @@ impl<'a> PlainWriter<BufWriter<File>> {
 }
 
 impl<W: Write + Seek> PlainWriter<W> {
+    #[allow(dead_code)]
     pub fn new(writer: W) -> PlainWriter<W> {
         PlainWriter {
             writer,

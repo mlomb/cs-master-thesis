@@ -3,10 +3,10 @@
 
 mod batch_loader;
 mod convert;
-mod encode;
 mod feature_set_size;
 mod method;
 mod plain_format;
+mod pos_encoding;
 
 use crate::batch_loader::batch_loader;
 use crate::convert::convert;
@@ -17,6 +17,7 @@ use convert::ConvertCommand;
 use feature_set_size::FeatureSetSizeCommand;
 use std::error::Error;
 
+/// Collection of tools to enable training of NNUE models
 #[derive(Parser)]
 struct Cli {
     #[command(subcommand)]
@@ -29,7 +30,7 @@ enum Commands {
     Convert(ConvertCommand),
     /// Starts a process that writes samples to a shared memory file on demand (e.g. for training)
     BatchLoader(BatchLoaderCommand),
-    /// Displays the size of a feature set
+    /// Prints the size of a feature set. Convenient for Python scripts
     FeatureSetSize(FeatureSetSizeCommand),
 }
 
@@ -39,6 +40,6 @@ fn main() -> Result<(), Box<dyn Error>> {
     match args.command {
         Commands::Convert(cmd) => convert(cmd),
         Commands::BatchLoader(cmd) => batch_loader(cmd),
-        Commands::FeatureSetSize(cmd) => feature_set_size(cmd),
+        Commands::FeatureSetSize(cmd) => Ok(feature_set_size(cmd)),
     }
 }

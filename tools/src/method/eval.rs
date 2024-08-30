@@ -1,36 +1,13 @@
 use super::{Sample, SampleEncoder};
-use crate::encode::{encode_position, encoded_size};
-use clap::Args;
+use crate::pos_encoding::{encode_position, encoded_size};
 use nn::feature_set::FeatureSet;
-use shakmaty::{fen::Fen, uci::UciMove, CastlingMode, Chess, Position};
-use std::io::{BufRead, Write};
+use std::io::Write;
 
-#[derive(Args, Clone)]
-pub struct EvalArgs {
-    /// UCI engine command to use for evaluation
-    #[arg(long, value_name = "engine")]
-    engine: String,
+pub struct EvalEncoding;
 
-    /// Target depth for search
-    #[arg(long, value_name = "depth", default_value = "10")]
-    depth: usize,
-}
-
-/// Score of a position, given by the engine
-#[derive(Debug)]
-pub enum Score {
-    /// Centipawn
-    Cp(i32),
-
-    /// Mate/Mated in n
-    Mate(),
-}
-
-pub struct EvalRead;
-
-impl SampleEncoder for EvalRead {
+impl SampleEncoder for EvalEncoding {
     fn x_size(&self, feature_set: &Box<dyn FeatureSet>) -> usize {
-        encoded_size(feature_set)
+        1 * encoded_size(feature_set)
     }
 
     fn y_size(&self) -> usize {
@@ -44,7 +21,7 @@ impl SampleEncoder for EvalRead {
         write_y: &mut dyn Write,
         feature_set: &Box<dyn FeatureSet>,
     ) {
-        encode_position(feature_set, &sample.position, write_x);
+        encode_position(&sample.position, feature_set, write_x);
 
         // side to move score
         write_y

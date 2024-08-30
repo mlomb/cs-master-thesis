@@ -1,5 +1,5 @@
-use crate::method::pqr::PQR;
-use crate::method::{eval::EvalRead, SampleEncoder};
+use crate::method::pqr::PQREncoding;
+use crate::method::{eval::EvalEncoding, SampleEncoder};
 use crate::plain_format::PlainReader;
 use clap::{Args, ValueEnum};
 use crossbeam::channel::{bounded, Sender};
@@ -20,10 +20,10 @@ struct BatchData {
 
 #[derive(ValueEnum, Clone)]
 pub enum Method {
-    /// Given a transition P → Q in a game, R is selected from a legal move from P while R != Q.
-    PQR,
     /// Score evaluations (most likely from Stockfish) are used as target
     Eval,
+    /// Given a transition P → Q in a game, R is selected from a legal move from P while R != Q
+    PQR,
 }
 
 #[derive(Args, Clone)]
@@ -46,11 +46,11 @@ pub struct BatchLoaderCommand {
     #[arg(long)]
     shmem: Option<String>,
 
-    /// List of .plain files to read samples from.
+    /// Input .plain file to read samples from
     #[arg(long, required = true)]
     input: String,
 
-    /// Loop the input file indefinitely
+    /// Loop the input file indefinitely. Used for training
     #[arg(long)]
     input_loop: bool,
 
@@ -181,6 +181,8 @@ fn build_samples_thread(
             for sample in samples {
                 method.write_sample(&sample, &mut x_cursor, &mut y_cursor, &feature_set);
 
+                // TODO: filtering
+
                 // is batch full?
                 if x_cursor.position() >= x_batch_size as u64 {
                     assert!(x_cursor.position() == x_batch_size as u64);
@@ -209,7 +211,7 @@ fn build_samples_thread(
 
 fn build_method(cmd: &BatchLoaderCommand) -> Box<dyn SampleEncoder> {
     match cmd.method {
-        Method::PQR => Box::new(PQR {}),
-        Method::Eval => Box::new(EvalRead {}),
+        Method::PQR => Box::new(PQREncoding {}),
+        Method::Eval => Box::new(EvalEncoding {}),
     }
 }
