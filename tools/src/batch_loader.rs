@@ -51,7 +51,7 @@ pub struct BatchLoaderCommand {
     input: String,
 
     /// Loop the input file indefinitely
-    #[arg(long, default_value = "true")]
+    #[arg(long)]
     input_loop: bool,
 
     // Offset to start reading from.
@@ -91,7 +91,7 @@ pub fn batch_loader(cmd: BatchLoaderCommand) -> Result<(), Box<dyn Error>> {
     };
 
     // Actual length to read from each thread
-    let thread_length = ((readable_length as f64) / cmd.threads as f64).ceil() as u64;
+    let thread_length = ((readable_length as f64) / cmd.threads as f64).floor() as u64;
 
     // open shared memory buffer
     let mut shmem = if let Some(shmem) = &cmd.shmem {
@@ -177,7 +177,8 @@ fn build_samples_thread(
 
     // loop to write batches
     loop {
-        let mut reader = PlainReader::open(&cmd.input).expect("can't open input file");
+        let mut reader = PlainReader::open_with_limits(&cmd.input, offset, length)
+            .expect("can't open input file");
 
         while let Ok(Some(samples)) = reader.read_samples_line() {
             for sample in samples {
@@ -201,6 +202,10 @@ fn build_samples_thread(
                     y_cursor.rewind().unwrap();
                 }
             }
+        }
+
+        if !cmd.input_loop {
+            break;
         }
     }
 }

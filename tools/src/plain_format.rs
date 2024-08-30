@@ -3,7 +3,7 @@ use memmap2::{Mmap, MmapOptions};
 use shakmaty::{fen::Fen, uci::UciMove, CastlingMode, EnPassantMode, Position};
 use shakmaty::{Chess, Move};
 use std::fs::File;
-use std::io::{self, BufReader, BufWriter, Read, Seek, Write};
+use std::io::{self, BufWriter, Read, Seek, Write};
 use std::io::{BufRead, Cursor};
 use std::path::Path;
 
@@ -17,14 +17,29 @@ pub struct PlainReader<R: Read> {
 }
 
 impl<'a> PlainReader<Cursor<&'a [u8]>> {
-    pub fn open<P>(path: P) -> io::Result<PlainReader<Cursor<&'a [u8]>>>
+    pub fn open_with_limits<P>(
+        path: P,
+        offset: u64,
+        length: u64,
+    ) -> io::Result<PlainReader<Cursor<&'a [u8]>>>
     where
         P: AsRef<Path>,
     {
         let file = File::open(path)?;
         let mmap = unsafe { MmapOptions::new().map(&file).expect("can't mmap file") };
         let slice: &'a [u8] = unsafe { std::mem::transmute(mmap.as_ref()) };
-        let reader = Cursor::new(slice);
+        let subslice = if length > 0 {
+            &slice[offset as usize..(offset + length) as usize]
+        } else {
+            &slice[offset as usize..]
+        };
+
+        let mut reader = Cursor::new(subslice);
+
+        if offset > 0 {
+            // skip until the next valid line
+            reader.skip_until(b'\n')?;
+        }
 
         Ok(PlainReader {
             reader,
@@ -32,10 +47,17 @@ impl<'a> PlainReader<Cursor<&'a [u8]>> {
         })
         // TODO: are we leaking the file?
     }
+
+    pub fn open<P>(path: P) -> io::Result<PlainReader<Cursor<&'a [u8]>>>
+    where
+        P: AsRef<Path>,
+    {
+        Self::open_with_limits(path, 0, 0)
+    }
 }
 
 impl<R: BufRead + Seek> PlainReader<R> {
-    pub fn new(reader: R) -> PlainReader<R> {
+    fn new(reader: R) -> PlainReader<R> {
         PlainReader { reader, mmap: None }
     }
 
@@ -48,16 +70,15 @@ impl<R: BufRead + Seek> PlainReader<R> {
 
         // read whole line
         self.reader.read_line(&mut line).unwrap();
-        if line.ends_with('\n') {
-            // remove trailing newline
-            // the last line may not have it
-            line.pop();
-        }
-
-        // exit if there is no more to read
-        if line.is_empty() {
+        if !line.ends_with('\n') || line.len() == 0 {
+            // exit if there is no more to read
+            // the last line may not have a newline
+            // however we must account for the case where the sample is cut off
+            // so we just skip it
             return Ok(None);
         }
+        // remove trailing newline
+        line.pop();
 
         let mut cursor = Cursor::new(line.as_bytes());
 
@@ -237,6 +258,19 @@ impl<W: Write + Seek> PlainWriter<W> {
 mod tests {
     use super::*;
     use io::{BufReader, BufWriter};
+
+    #[test]
+    fn test_ignore_last() {
+        let plain =
+            "r7/6p1/2q1bpkp/1p1Np3/1P2P3/7P/2P1QPP1/3R2K1 b - - 6 24,-398,g6h7\nr7/6pk/2q1bp1p/1p";
+        let mut reader = PlainReader::new(BufReader::new(Cursor::new(plain)));
+
+        let res1 = reader.read_samples_line();
+        let res2 = reader.read_samples_line();
+
+        assert_eq!(res1.unwrap().unwrap().len(), 1);
+        assert!(res2.unwrap().is_none());
+    }
 
     #[test]
     fn test_individual() {
