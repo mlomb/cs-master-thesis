@@ -1,8 +1,10 @@
 use super::FeatureSet;
 use shakmaty::{fen::Fen, Chess, Color, Position};
 
+/// Runs some correctness checks on the feature set
+/// Well crafted feature sets should be able to pass these checks
 #[allow(dead_code)]
-pub(super) fn sanity_checks(feature_set: &dyn FeatureSet) {
+pub(super) fn fs_correctness_checks(feature_set: &dyn FeatureSet) {
     const FENS: [&str; 20] = [
         "4nrk1/3q1pp1/2n1p1p1/8/1P2Q3/7P/PB1N1PP1/2R3K1 w - - 5 26",
         "5r2/1p2ppkp/p2p1nP1/qn6/4P3/2r2B2/1PPQ1PP1/2KR3R w - - 0 21",
@@ -76,6 +78,7 @@ fn check_flipped(pos: &Chess, feature_set: &dyn FeatureSet) {
 
 /// Check changed_features assuming that active_features is right
 fn check_changed(pos: &Chess, perspective: Color, feature_set: &dyn FeatureSet) {
+    // expected features before making any moves
     let mut pos_features = vec![];
     feature_set.active_features(pos.board(), pos.turn(), perspective, &mut pos_features);
 
@@ -84,6 +87,7 @@ fn check_changed(pos: &Chess, perspective: Color, feature_set: &dyn FeatureSet) 
         pos_moved.play_unchecked(&m);
 
         if feature_set.requires_refresh(&pos.board(), &m, pos.turn(), perspective) {
+            // if this move requires a full refresh, changed_features is invalid
             continue;
         }
 
@@ -113,6 +117,7 @@ fn check_changed(pos: &Chess, perspective: Color, feature_set: &dyn FeatureSet) 
             actual_features.remove(pos);
         }
 
+        // expected features after making the move
         let mut truth_features = vec![];
         feature_set.active_features(
             pos_moved.board(),

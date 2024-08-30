@@ -44,8 +44,10 @@ fn encode_side(
         buffer[elem_index] |= 1 << bit_index;
     }
 
+    #[cfg(target_endian = "big")]
+    assert!(false, "big endian not supported"); // TODO: support big endian ↓
+
     // write buffer into cursor
-    #[cfg(target_endian = "little")]
     write
         .write_all(unsafe {
             std::slice::from_raw_parts(buffer.as_ptr() as *const u8, buffer.len() * 8)

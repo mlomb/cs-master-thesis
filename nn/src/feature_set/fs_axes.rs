@@ -3,18 +3,19 @@ use shakmaty::{Board, Color, File, Move, Role, Square};
 
 #[derive(PartialEq, Eq)]
 pub enum Axes {
-    // Across files (↔)
+    /// Across files (↔)
     Horizontal,
-    // Across ranks (↕)
+    /// Across ranks (↕)
     Vertical,
-    // Forward diagonal (/)
+    /// Forward diagonal (/)
     Diagonal1,
-    // Backward diagonal (\)
+    /// Backward diagonal (\)
     Diagonal2,
-    // King
+    /// The king of the perspective
     King,
 }
 
+/// Correct square based on perspective
 #[inline(always)]
 fn correct_square(piece_square: Square, perspective: Color) -> Square {
     if perspective == Color::Black {
@@ -27,7 +28,7 @@ fn correct_square(piece_square: Square, perspective: Color) -> Square {
 }
 
 impl Axes {
-    // Number of indexable steps
+    /// Size of the axis dimension
     #[inline(always)]
     pub fn size(&self) -> usize {
         match self {
@@ -39,6 +40,7 @@ impl Axes {
         }
     }
 
+    /// Index of the square based on the axis
     #[inline(always)]
     pub fn index(&self, board: &Board, perspective: Color, piece_square: Square) -> u16 {
         let file = piece_square.file() as u16;
@@ -54,12 +56,14 @@ impl Axes {
     }
 }
 
+/// Represents the features made by the cartesian product of a list of axes
 pub struct AxesBlock {
     pub axes: Vec<Axes>,
     pub incl_king: bool,
 }
 
 impl AxesBlock {
+    /// Number of features in the block: the product of the axes sizes
     #[inline(always)]
     pub fn size(&self) -> usize {
         self.axes.iter().map(|ax| ax.size()).product::<usize>()
@@ -68,6 +72,7 @@ impl AxesBlock {
     }
 }
 
+/// A feature set built using the features of multiple AxesBlocks (the sum operator)
 pub struct AxesFeatureSet {
     pub blocks: Vec<AxesBlock>,
 }

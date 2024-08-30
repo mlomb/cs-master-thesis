@@ -44,6 +44,9 @@ pub fn convert(cmd: ConvertCommand) -> Result<(), Box<dyn Error>> {
         }
     }
 
+    // finalize last line and flush
+    writer.finish()?;
+
     bar.set_message(format!(
         "[Read {} Written {}]",
         HumanBytes(reader.bytes_read().unwrap()),

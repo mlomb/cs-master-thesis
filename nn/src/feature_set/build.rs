@@ -87,7 +87,7 @@ pub fn build_feature_set(name: &str) -> Box<dyn FeatureSet> {
 
 #[cfg(test)]
 mod tests {
-    use crate::feature_set::checks::sanity_checks;
+    use crate::feature_set::checks::fs_correctness_checks;
 
     use super::*;
 
@@ -96,7 +96,7 @@ mod tests {
         $(
             #[test]
             fn $name() {
-                sanity_checks(build_feature_set($value).as_ref());
+                fs_correctness_checks(build_feature_set($value).as_ref());
             }
         )*
         }

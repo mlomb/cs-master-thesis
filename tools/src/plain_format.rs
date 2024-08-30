@@ -251,6 +251,11 @@ impl<W: Write + Seek> PlainWriter<W> {
         Ok(())
     }
 
+    pub fn finish(&mut self) -> io::Result<()> {
+        writeln!(self.writer)?;
+        self.writer.flush()
+    }
+
     pub fn bytes_written(&mut self) -> io::Result<u64> {
         self.writer.stream_position()
     }
@@ -283,6 +288,7 @@ mod tests {
             {
                 let mut writer = PlainWriter::new(BufWriter::new(Cursor::new(&mut buffer)));
                 writer.write_sample(&true_sample).unwrap();
+                writer.finish().unwrap();
             }
 
             println!("{:?}", String::from_utf8_lossy(&buffer));
@@ -305,6 +311,7 @@ mod tests {
             for true_sample in test_samples() {
                 writer.write_sample(&true_sample).unwrap();
             }
+            writer.finish().unwrap();
         }
 
         println!("{:?}", String::from_utf8_lossy(&buffer));
@@ -360,16 +367,14 @@ mod tests {
         }
 
         vec![
-            make_sample(
-                "r3k2r/3b1p2/1p1np3/p1bpn2p/3N4/1PP2P2/P3B1PP/RNBR2K1 w kq - 1 9",
-                "a2a4",
-                -194,
-            ),
-            make_sample(
-                "r3k2r/3b1p2/1p1np3/p1bpn2p/P2N4/1PP2P2/4B1PP/RNBR2K1 b kq - 0 9",
-                "f7f6",
-                183,
-            ),
+            make_sample("2K5/p2P4/6k1/6n1/1P2P3/1P1N4/8/8 b - - 0 56", "g5e4", -1728),
+            make_sample("8/3k4/1B1P2b1/5n2/8/P1K5/8/8 w - - 0 49", "b6c7", -7),
+            make_sample("8/2Bk4/3P2b1/5n2/8/P1K5/8/8 b - - 1 49", "f5e3", 18),
+            make_sample("8/2Bk4/3P2b1/8/8/P1K1n3/8/8 w - - 2 50", "c3d4", -17),
+            make_sample("8/2Bk4/3P2b1/8/3K4/P3n3/8/8 b - - 3 50", "e3c2", 21),
+            make_sample("8/2k5/p1P5/5r2/2K5/8/P7/7R b - - 4 39", "f5f7", -1),
+            make_sample("8/3kn3/p7/3P3p/3K2p1/P5B1/6PP/8 b - - 2 31", "h5h4", -730),
+            make_sample("8/5k2/1p5r/p1pPR3/P1P3K1/8/8/8 w - - 2 57", "g4g5", 212),
         ]
     }
 }
