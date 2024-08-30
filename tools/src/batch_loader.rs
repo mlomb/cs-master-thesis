@@ -125,9 +125,6 @@ pub fn batch_loader(cmd: BatchLoaderCommand) -> Result<(), Box<dyn Error>> {
 
     drop(batch_sender);
 
-    println!("All threads finished");
-    eprintln!("All threads finished");
-
     // loop to write batches
     loop {
         // receive a batch from another thread
