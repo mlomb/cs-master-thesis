@@ -4,7 +4,7 @@ use shakmaty::{Move, Role, Square};
 pub type Value = i32;
 
 /// Infinity for a Value
-pub const INFINITE: Value = 50_000;
+pub const INFINITY: Value = 50_000;
 
 /// Maximum number of plies the engine supports
 pub const MAX_PLY: usize = 64;

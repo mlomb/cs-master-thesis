@@ -23,7 +23,7 @@ pub struct TTable {
 }
 
 impl TTable {
-    pub fn new(size: usize) -> Self {
+    pub fn new(size_mb: usize) -> Self {
         TTable {
             entries: vec![
                 TEntry {
@@ -33,7 +33,7 @@ impl TTable {
                     score: 0,
                     move_: None,
                 };
-                size
+                size_mb * 1024 * 1024 / std::mem::size_of::<TEntry>()
             ],
         }
     }

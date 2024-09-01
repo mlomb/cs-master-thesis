@@ -56,7 +56,7 @@ impl PositionStack {
         self.index = 0;
         self.stack[0].pos = pos.clone();
         self.stack[0].hash_key = pos.zobrist_hash(EnPassantMode::Legal);
-        self.stack[0].rule50 = 0;
+        self.stack[0].rule50 = 0; // TODO: check!
         self.stack[0].nnue_accum.refresh(pos, Color::White);
         self.stack[0].nnue_accum.refresh(pos, Color::Black);
     }

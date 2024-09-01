@@ -1,5 +1,5 @@
 use crate::{
-    defs::{Value, INFINITE, INVALID_MOVE, MAX_PLY},
+    defs::{Value, INFINITY, INVALID_MOVE, MAX_PLY},
     position_stack::{HashKey, PositionStack},
     pv::PVTable,
     tt::{TFlag, TTable},
@@ -50,7 +50,7 @@ impl Search {
             nodes: 0,
             evals: 0,
             pv: PVTable::new(),
-            tt: TTable::new(1_000_000 * 20), // ~480MB
+            tt: TTable::new(128), // 128 MB
             killer_moves: std::array::from_fn(|_| [INVALID_MOVE, INVALID_MOVE]),
             history_moves: [[0; 8 * 8]; 12],
             repetition_index: 0,
@@ -91,7 +91,7 @@ impl Search {
         let mut best_line = None;
 
         for depth in 1..=max_depth.unwrap_or(MAX_PLY as i32 - 1) {
-            let score = self.negamax(-INFINITE, INFINITE, depth, false);
+            let score = self.negamax(-INFINITY, INFINITY, depth, false);
 
             if self.aborted {
                 // time limit
@@ -190,7 +190,7 @@ impl Search {
         mut depth: i32,
         allow_null: bool,
     ) -> Value {
-        assert!(-INFINITE <= alpha && alpha < beta && beta <= INFINITE);
+        assert!(-INFINITY <= alpha && alpha < beta && beta <= INFINITY);
         assert!(depth >= 0);
 
         // time control
@@ -274,7 +274,7 @@ impl Search {
         self.sort_moves(&mut moves, pv_move);
 
         let mut best_move = None;
-        let mut best_score = -INFINITE;
+        let mut best_score = -INFINITY;
         let mut tt_alpha_flag = TFlag::Alpha;
         let mut moves_searched = 0;
 

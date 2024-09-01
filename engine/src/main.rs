@@ -19,8 +19,8 @@ use vampirc_uci::{parse_one, UciMessage, UciTimeControl};
 
 #[derive(Parser)]
 struct Cli {
-    /// The neural network file to use
-    #[arg(long, value_name = "model.nn file")]
+    /// The neural network file to use (NNUE)
+    #[arg(long, value_name = ".nn file")]
     nn: Option<String>,
 }
 
@@ -55,7 +55,7 @@ fn main() {
                 println!(
                     "{}",
                     UciMessage::Id {
-                        name: Some("thesisbot".to_string()),
+                        name: Some("LimboBot".to_string()),
                         author: Some("mlomb".to_string())
                     }
                 );
