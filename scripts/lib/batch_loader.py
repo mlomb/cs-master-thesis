@@ -51,11 +51,11 @@ class BatchLoader:
         x_size = math.prod(x_shape) * 8  # 8 bytes per int64
         y_size = math.prod(y_shape) * 4  # 4 bytes per float32
 
-        # Create the shared memory file.
+        # create the shared memory file
         self.shmem = SharedMemory(create=True, size=x_size + y_size)
 
-        # Start the program subprocess.
-        args = [
+        # build args for tools binary
+        self.args = [
             TOOLS_BIN,
             "batch-loader",
             "--method=" + method,
@@ -68,18 +68,36 @@ class BatchLoader:
             "--threads=" + str(batch_threads),
         ]
         if input_loop:
-            args.append("--input-loop")
+            self.args.append("--input-loop")
 
-        self.program = subprocess.Popen(
-            args, stdout=subprocess.PIPE, stdin=subprocess.PIPE
-        )
-
-        # Initialize the numpy array using the shared memory as buffer.
+        # initialize the numpy array using the shared memory as buffer
         self.data = np.frombuffer(buffer=self.shmem.buf, dtype=np.int8)
         r = np.split(self.data, np.array([x_size, x_size + y_size]))
 
         self.x = r[0].view(dtype=np.int64).reshape(x_shape)
         self.y = r[1].view(dtype=np.float32).reshape(y_shape)
+
+        # start process for the first iteration
+        self.program = None
+        self.start_process()
+
+    def start_process(self):
+        """
+        Starts the batch loader subprocess.
+        """
+        assert self.program is None or self.program.poll() is not None
+
+        if self.program is not None:
+            self.program.kill()
+            self.program.wait()
+
+        # start the subprocess
+        self.program = subprocess.Popen(
+            self.args,
+            stdout=subprocess.PIPE,
+            stdin=subprocess.PIPE,
+            bufsize=0 # unbuffered
+        )
 
         # allow the generator to write the first batch
         self.notify_ready_for_next()
@@ -88,9 +106,9 @@ class BatchLoader:
         """
         Waits until the generator has written the next batch of samples into the shared memory.
         """
+        assert self.program.stdout.readable()
         read = self.program.stdout.read(1)
-        if len(read) == 0:
-            raise Exception("Generator process has terminated")
+        assert len(read) == 1
 
     def notify_ready_for_next(self):
         """
@@ -107,23 +125,26 @@ class BatchLoader:
         Returns:
             A Pytorch tensor containing the next batch of samples.
         """
-        # Wait until batch is ready
-        try:
-            self.wait_until_ready()
-        except Exception as e:
-            print("process terminated1")
+        if self.program is not None and (self.program.poll() is not None or not self.program.stdout.readable()):
+            # start process again
+            self.start_process()
+
+            # return None to signal that the last iteration has finished
             return None
+
+        # Wait until batch is ready
+        self.wait_until_ready()
 
         # Create PyTorch tensors using the numpy arrays.
         # This will copy the data into the device, so after this line we don't care about self.data/x/y
-        x_tensor = torch.tensor(self.x, dtype=torch.int64)
-        y_tensor = torch.tensor(self.y, dtype=torch.float32)
+        x_tensor = torch.tensor(self.x, dtype=torch.int64, device="cuda")
+        y_tensor = torch.tensor(self.y, dtype=torch.float32, device="cuda")
 
         # Release the shared memory for the generator to use.
         try:
             self.notify_ready_for_next()
-        except:
-            print("process terminated2")
+        except (BrokenPipeError, EOFError):
+            # the process may have finished at this point
             pass
 
         return x_tensor, y_tensor
@@ -157,8 +178,6 @@ class BatchLoader:
 
 if __name__ == "__main__":
     # Performance test
-
-    import torch.utils
     from tqdm import tqdm
 
     off = 0
@@ -168,12 +187,12 @@ if __name__ == "__main__":
             batch_size=16384,
             feature_set="hv",
             method="eval",
-            input="/mnt/c/datasets/raw/all.plain",
+            input="/mnt/d/compact.plain",
             input_loop=True,
             input_offset=off,
             batch_threads=threads
         )
-        off += 100 * 1024 * 1024 # 100 GB
+        off += 30 * 1024 * 1024 # 30 GB
 
         for i in tqdm(range(1_000), desc=f"batch_threads={threads}"):
             X, y = bl.next_batch()

@@ -15,21 +15,24 @@ from lib.losses import EvalLoss, PQRLoss
 
 
 def train(config, use_wandb: bool):
-    DATA_INPUT = "/mnt/c/datasets/raw/all.plain"
+    DATA_INPUT = "/mnt/d/compact.plain"
     TEST_BYTES = 10_000_000
 
     # datasets
-    test_samples = BatchLoader(
+    train_samples = BatchLoader(
         batch_size=config.batch_size,
+        batch_threads=12,
         input=DATA_INPUT,
-        input_length=TEST_BYTES,
+        input_offset=TEST_BYTES,
+        input_loop=True, # loop infinitely
         feature_set=config.feature_set,
         method=config.method
     )
-    train_samples = BatchLoader(
+    test_samples = BatchLoader(
         batch_size=config.batch_size,
+        batch_threads=12,
         input=DATA_INPUT,
-        input_offset=TEST_BYTES,
+        input_length=TEST_BYTES,
         feature_set=config.feature_set,
         method=config.method
     )
@@ -95,7 +98,7 @@ def train(config, use_wandb: bool):
 
     @torch.compile
     def test_step(X, y):
-        # Make sure we are not tracking gradients
+        # Make sure we are not tracking gradients (it's faster)
         chessmodel.eval()
         
         # Compute loss
@@ -109,7 +112,6 @@ def train(config, use_wandb: bool):
 
         for _ in tqdm(range(batches_per_epoch), desc=f'Epoch {epoch}/{config.epochs}'):
             X, y = train_samples.next_batch()
-            X, y = X.cuda(), y.cuda()
             
             loss_sum += train_step(X, y)
 
@@ -123,11 +125,11 @@ def train(config, use_wandb: bool):
         count = 0
 
         while True:
-            X, y = test_samples.next_batch()
-            X, y = X.cuda(), y.cuda()
-
-            if X is None:
+            batch = test_samples.next_batch()
+            if batch is None:
                 break
+
+            X, y = batch
 
             loss_sum += test_step(X, y)
             count += 1
@@ -149,7 +151,8 @@ def train(config, use_wandb: bool):
 
         # log metrics to W&B
         metrics = {
-            "Train/loss": test_loss,
+            "Train/train_loss": train_loss,
+            "Train/test_loss": test_loss,
             "Train/lr": scheduler._last_lr[0], # get_last_lr()
             "Train/samples": config.batch_size * batches_per_epoch * (epoch + 1),
 
@@ -161,7 +164,7 @@ def train(config, use_wandb: bool):
         if use_wandb:
             wandb.log(step=epoch, data=metrics)
         else:
-            print(f"Step {epoch} - Loss: {test_loss}, LR: {scheduler._last_lr[0]}")
+            print(f"Step {epoch} - Train loss: {train_loss}, Test loss: {test_loss}, LR: {scheduler._last_lr[0]}")
 
         with tempfile.NamedTemporaryFile() as tmp:
             tmp.write(NnueWriter(chessmodel, config.feature_set).buf)

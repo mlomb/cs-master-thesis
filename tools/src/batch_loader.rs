@@ -154,8 +154,14 @@ pub fn batch_loader(cmd: BatchLoaderCommand) -> Result<(), Box<dyn Error>> {
                 io::stdout().write_all(&[64])?;
                 io::stdout().flush()?;
             }
+        } else {
+            break;
         }
     }
+
+    bar.finish();
+
+    Ok(())
 }
 
 fn build_samples_thread(
