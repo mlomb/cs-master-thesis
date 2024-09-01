@@ -228,7 +228,7 @@ fn build_samples_thread(
 }
 
 fn filter(sample: &Sample, cmd: &BatchLoaderCommand) -> bool {
-    sample.bestmove.is_capture() || // skip captures
+    sample.bestmove.is_capture() || // skip capture moves
     sample.position.is_check() || // skip check positions
     (cmd.random_skipping > 0.0 && rand::random::<f32>() < cmd.random_skipping) // random fen skipping
 }
