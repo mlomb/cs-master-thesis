@@ -10,12 +10,12 @@ from lib.batch_loader import BatchLoader, get_feature_set_size
 from lib.model import NnueModel
 from lib.model import decode_int64_bitset
 from lib.serialize import NnueWriter
-from lib.puzzles import PuzzleAccuracy
+from scripts.lib.puzzle_metrics import PuzzleMetrics
 from lib.losses import EvalLoss, PQRLoss
 
 
 def train(config, use_wandb: bool):
-    DATA_INPUT = "/mnt/d/compact.plain"
+    DATA_INPUT = "/mnt/c/datasets/raw/T60T70wIsRightFarseerT60T74T75T76.plain"
     VALIDATION_BYTES = 100_000_000 # ~ 4.5M samples
 
     # datasets
@@ -27,7 +27,7 @@ def train(config, use_wandb: bool):
         input_loop=True, # loop infinitely
         feature_set=config.feature_set,
         method=config.method,
-        random_skipping=0.3
+        random_skipping=0.6
     )
     val_samples = BatchLoader(
         batch_size=config.batch_size,
@@ -44,7 +44,7 @@ def train(config, use_wandb: bool):
         loss_fn = EvalLoss()
 
     # puzzles
-    puzzles = PuzzleAccuracy('./data/puzzles.csv')
+    puzzles = PuzzleMetrics('./data/puzzles.csv')
 
     # model
     chessmodel = NnueModel(
@@ -123,7 +123,7 @@ def train(config, use_wandb: bool):
                 break
 
             X, y = batch
-            loss_sum = forward_loss(X, y).item()
+            loss_sum += forward_loss(X, y).item()
             count += 1
 
         return loss_sum / count
