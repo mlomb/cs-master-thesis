@@ -1,10 +1,12 @@
 use crate::method::pqr::PQREncoding;
+use crate::method::Sample;
 use crate::method::{eval::EvalEncoding, SampleEncoder};
 use crate::plain_format::PlainReader;
 use clap::{Args, ValueEnum};
 use crossbeam::channel::{bounded, Sender};
 use indicatif::{ProgressBar, ProgressStyle};
 use nn::feature_set::build::build_feature_set;
+use shakmaty::Position;
 use shared_memory::ShmemConf;
 use std::fs::metadata;
 use std::thread;
@@ -186,9 +188,11 @@ fn build_samples_thread(
 
         while let Ok(Some(samples)) = reader.read_samples_line() {
             for sample in samples {
-                method.write_sample(&sample, &mut x_cursor, &mut y_cursor, &feature_set);
+                if filter(&sample) {
+                    continue;
+                }
 
-                // TODO: filtering
+                method.write_sample(&sample, &mut x_cursor, &mut y_cursor, &feature_set);
 
                 // is batch full?
                 if x_cursor.position() >= x_batch_size as u64 {
@@ -214,6 +218,12 @@ fn build_samples_thread(
             break;
         }
     }
+}
+
+fn filter(sample: &Sample) -> bool {
+    sample.bestmove.is_capture() || // skip captures
+    sample.position.is_check() || // skip check positions
+    rand::random::<f64>() < 0.3 // random fen skipping
 }
 
 fn build_method(cmd: &BatchLoaderCommand) -> Box<dyn SampleEncoder> {
