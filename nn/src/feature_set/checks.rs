@@ -28,6 +28,8 @@ pub(super) fn fs_correctness_checks(feature_set: &dyn FeatureSet) {
         "r2q1rk1/1b1nbpp1/p1pp1n1p/Pp2p3/1P1PP3/1BP1BN1P/3N1PP1/R2QK2R b KQ - 0 13",
     ];
 
+    check_mirror(feature_set);
+
     for fen in FENS {
         let fen: Fen = fen.parse().unwrap();
         let pos: Chess = fen.into_position(shakmaty::CastlingMode::Standard).unwrap();
@@ -36,6 +38,31 @@ pub(super) fn fs_correctness_checks(feature_set: &dyn FeatureSet) {
         check_changed(&pos, Color::White, feature_set);
         check_changed(&pos, Color::Black, feature_set);
     }
+}
+
+/// Check that the features match in the initial position
+fn check_mirror(feature_set: &dyn FeatureSet) {
+    let pos = Chess::default();
+    let board = pos.board();
+
+    let mut feat_white_white = vec![];
+    let mut feat_white_black = vec![];
+    let mut feat_black_white = vec![];
+    let mut feat_black_black = vec![];
+
+    feature_set.active_features(&board, Color::White, Color::White, &mut feat_white_white);
+    feature_set.active_features(&board, Color::White, Color::Black, &mut feat_white_black);
+    feature_set.active_features(&board, Color::Black, Color::White, &mut feat_black_white);
+    feature_set.active_features(&board, Color::Black, Color::Black, &mut feat_black_black);
+
+    feat_white_white.sort();
+    feat_white_black.sort();
+    feat_black_white.sort();
+    feat_black_black.sort();
+
+    assert_eq!(feat_white_white, feat_white_black);
+    assert_eq!(feat_white_black, feat_black_white);
+    assert_eq!(feat_black_white, feat_black_black);
 }
 
 /// Check that features are exactly the same when board if flipped

@@ -141,3 +141,51 @@ impl NnueAccumulator {
         self.features[1].copy_from_slice(&other.features[1]);
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use shakmaty::uci::UciMove;
+
+    #[test]
+    fn test_update_refresh() {
+        let model =
+            NnueModel::from_memory(&include_bytes!("../../../models/best.nn").to_vec()).unwrap();
+        let mut acc = NnueAccumulator::new(Rc::new(RefCell::new(model)));
+
+        let mut pos = Chess::default();
+        let line = vec![
+            "e2e4", "c7c5", "c2c3", "d7d5", "d2d4", "c5d4", "c3d4", "g8f6", "b1c3",
+        ];
+
+        acc.refresh(&pos, Color::White);
+        acc.refresh(&pos, Color::Black);
+
+        for mov in line.iter() {
+            let mov = UciMove::from_ascii(mov.as_bytes())
+                .unwrap()
+                .to_move(&pos)
+                .unwrap();
+
+            let next_pos = pos.clone().play(&mov).unwrap();
+
+            for &persp in &[Color::White, Color::Black] {
+                // apply move to the accumulator
+                acc.update(&pos, &mov, persp);
+
+                // check score after update
+                let update_score = acc.forward(persp);
+
+                // refresh the accumulator with the moved position
+                acc.refresh(&next_pos, persp);
+
+                // check score after refresh
+                let refresh_score = acc.forward(persp);
+
+                assert_eq!(update_score, refresh_score);
+            }
+
+            pos = next_pos;
+        }
+    }
+}

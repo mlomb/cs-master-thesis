@@ -86,40 +86,4 @@ impl TTable {
 
         None
     }
-
-    /*
-
-    pub fn probe_pv_line(&self, position: &Chess, mut max_depth: i32) -> Vec<Move> {
-        let mut line = vec![];
-        let mut position = position.clone();
-
-        while let Some(move_) = self.probe_pv_move(&position) {
-            if max_depth == 0 {
-                break;
-            }
-            max_depth -= 1;
-
-            if position.is_legal(&move_) {
-                position.play_unchecked(&move_);
-                line.push(move_);
-            } else {
-                break;
-            }
-        }
-
-        line
-    }
-
-    pub fn probe_pv_move(&self, position: &Chess) -> Option<Move> {
-        let key = self.hash(position);
-        let entry = &self.entries[key.0 as usize % self.entries.len()];
-
-        if entry.key == key {
-            return entry.move_.clone();
-        }
-
-        None
-    }
-
-    */
 }
