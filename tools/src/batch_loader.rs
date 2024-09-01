@@ -73,6 +73,10 @@ pub struct BatchLoaderCommand {
     /// Number of batch threads to use
     #[arg(long, default_value = "4")]
     threads: usize,
+
+    /// Random skipping. Probability of skipping a sample.
+    #[arg(long, default_value = "0.0")]
+    random_skipping: f32,
 }
 
 pub fn batch_loader(cmd: BatchLoaderCommand) -> Result<(), Box<dyn Error>> {
@@ -157,6 +161,9 @@ pub fn batch_loader(cmd: BatchLoaderCommand) -> Result<(), Box<dyn Error>> {
                 io::stdout().flush()?;
             }
         } else {
+            // wait for the last signal
+            io::stdin().read_exact(&mut [0])?;
+
             break;
         }
     }
@@ -188,7 +195,7 @@ fn build_samples_thread(
 
         while let Ok(Some(samples)) = reader.read_samples_line() {
             for sample in samples {
-                if filter(&sample) {
+                if filter(&sample, &cmd) {
                     continue;
                 }
 
@@ -220,10 +227,10 @@ fn build_samples_thread(
     }
 }
 
-fn filter(sample: &Sample) -> bool {
+fn filter(sample: &Sample, cmd: &BatchLoaderCommand) -> bool {
     sample.bestmove.is_capture() || // skip captures
     sample.position.is_check() || // skip check positions
-    rand::random::<f64>() < 0.3 // random fen skipping
+    (cmd.random_skipping > 0.0 && rand::random::<f32>() < cmd.random_skipping) // random fen skipping
 }
 
 fn build_method(cmd: &BatchLoaderCommand) -> Box<dyn SampleEncoder> {

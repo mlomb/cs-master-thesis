@@ -16,7 +16,7 @@ from lib.losses import EvalLoss, PQRLoss
 
 def train(config, use_wandb: bool):
     DATA_INPUT = "/mnt/d/compact.plain"
-    TEST_BYTES = 10_000_000
+    TEST_BYTES = 100_000_000 # ~ 4.5M samples
 
     # datasets
     train_samples = BatchLoader(
@@ -26,7 +26,8 @@ def train(config, use_wandb: bool):
         input_offset=TEST_BYTES,
         input_loop=True, # loop infinitely
         feature_set=config.feature_set,
-        method=config.method
+        method=config.method,
+        random_skipping=0.3
     )
     test_samples = BatchLoader(
         batch_size=config.batch_size,
@@ -130,7 +131,6 @@ def train(config, use_wandb: bool):
                 break
 
             X, y = batch
-
             loss_sum += test_step(X, y)
             count += 1
 
@@ -247,7 +247,8 @@ def main():
             name=f"{config.method}_{config.batch_size}_{config.feature_set}[{config.num_features}]->{config.l1_size}x2->{config.l2_size}->1",
             config=config
         )
-        wandb.define_metric("Train/loss", summary="min")
+        wandb.define_metric("Train/train_loss", summary="min")
+        wandb.define_metric("Train/test_loss", summary="min")
         wandb.define_metric("Puzzles/moveAccuracy", summary="max")
 
     train(config, use_wandb)

@@ -38,6 +38,7 @@ class BatchLoader:
         input_length: int = 0,
         input_loop: bool = False,
         batch_threads: int = 1,
+        random_skipping: float = 0.0,
     ):
         num_features = get_feature_set_size(feature_set)
 
@@ -66,6 +67,7 @@ class BatchLoader:
             "--batch-size=" + str(batch_size),
             "--feature-set=" + feature_set,
             "--threads=" + str(batch_threads),
+            "--random-skipping=" + str(random_skipping),
         ]
         if input_loop:
             self.args.append("--input-loop")
@@ -85,8 +87,6 @@ class BatchLoader:
         """
         Starts the batch loader subprocess.
         """
-        assert self.program is None or self.program.poll() is not None
-
         if self.program is not None:
             self.program.kill()
             self.program.wait()
@@ -96,7 +96,6 @@ class BatchLoader:
             self.args,
             stdout=subprocess.PIPE,
             stdin=subprocess.PIPE,
-            bufsize=0 # unbuffered
         )
 
         # allow the generator to write the first batch
@@ -106,9 +105,9 @@ class BatchLoader:
         """
         Waits until the generator has written the next batch of samples into the shared memory.
         """
-        assert self.program.stdout.readable()
         read = self.program.stdout.read(1)
         assert len(read) == 1
+        assert read[0] == 64
 
     def notify_ready_for_next(self):
         """
@@ -125,26 +124,28 @@ class BatchLoader:
         Returns:
             A Pytorch tensor containing the next batch of samples.
         """
-        if self.program is not None and (self.program.poll() is not None or not self.program.stdout.readable()):
+        # wait until batch is ready
+        try:
+            self.wait_until_ready()
+        except:
             # start process again
             self.start_process()
 
             # return None to signal that the last iteration has finished
             return None
 
-        # Wait until batch is ready
-        self.wait_until_ready()
 
-        # Create PyTorch tensors using the numpy arrays.
-        # This will copy the data into the device, so after this line we don't care about self.data/x/y
+        # create PyTorch tensors using the numpy arrays.
+        # this will copy the data into the device, so after this line we don't care about self.data/x/y
         x_tensor = torch.tensor(self.x, dtype=torch.int64, device="cuda")
         y_tensor = torch.tensor(self.y, dtype=torch.float32, device="cuda")
 
-        # Release the shared memory for the generator to use.
+        # release the shared memory for the generator to use.
         try:
             self.notify_ready_for_next()
-        except (BrokenPipeError, EOFError):
+        except:
             # the process may have finished at this point
+            # we don't care, it will be restarted if needed
             pass
 
         return x_tensor, y_tensor
