@@ -16,24 +16,24 @@ from lib.losses import EvalLoss, PQRLoss
 
 def train(config, use_wandb: bool):
     DATA_INPUT = "/mnt/d/compact.plain"
-    TEST_BYTES = 100_000_000 # ~ 4.5M samples
+    VALIDATION_BYTES = 100_000_000 # ~ 4.5M samples
 
     # datasets
     train_samples = BatchLoader(
         batch_size=config.batch_size,
         batch_threads=12,
         input=DATA_INPUT,
-        input_offset=TEST_BYTES,
+        input_offset=VALIDATION_BYTES,
         input_loop=True, # loop infinitely
         feature_set=config.feature_set,
         method=config.method,
         random_skipping=0.3
     )
-    test_samples = BatchLoader(
+    val_samples = BatchLoader(
         batch_size=config.batch_size,
         batch_threads=12,
         input=DATA_INPUT,
-        input_length=TEST_BYTES,
+        input_length=VALIDATION_BYTES,
         feature_set=config.feature_set,
         method=config.method
     )
@@ -79,9 +79,6 @@ def train(config, use_wandb: bool):
 
     @torch.compile
     def train_step(X, y):
-        # Make sure gradient tracking is on
-        chessmodel.train()
-
         # Clear the gradients
         optimizer.zero_grad()
 
@@ -97,18 +94,10 @@ def train(config, use_wandb: bool):
 
         return loss.item()
 
-    @torch.compile
-    def test_step(X, y):
-        # Make sure we are not tracking gradients (it's faster)
-        chessmodel.eval()
-        
-        # Compute loss
-        loss = forward_loss(X, y)
-
-        return loss.item()
-
-
     def train_iter():
+        # Make sure gradient tracking is on
+        chessmodel.train()
+
         loss_sum = 0.0
 
         for _ in tqdm(range(batches_per_epoch), desc=f'Epoch {epoch}/{config.epochs}'):
@@ -121,17 +110,20 @@ def train(config, use_wandb: bool):
 
         return loss_sum / batches_per_epoch
 
-    def test_iter():
+    def val_iter():
+        # Make sure we are not tracking gradients (it's faster)
+        chessmodel.eval()
+        
         loss_sum = 0.0
         count = 0
 
         while True:
-            batch = test_samples.next_batch()
+            batch = val_samples.next_batch()
             if batch is None:
                 break
 
             X, y = batch
-            loss_sum += test_step(X, y)
+            loss_sum = forward_loss(X, y).item()
             count += 1
 
         return loss_sum / count
@@ -144,15 +136,15 @@ def train(config, use_wandb: bool):
 
     for epoch in range(1, config.epochs+1):
         train_loss = train_iter()
-        test_loss = test_iter()
+        val_loss = val_iter()
         
-        checkpoint_is_best = checkpoint_is_best or test_loss < best_loss
-        best_loss = min(best_loss, test_loss)
+        checkpoint_is_best = checkpoint_is_best or val_loss < best_loss
+        best_loss = min(best_loss, val_loss)
 
         # log metrics to W&B
         metrics = {
             "Train/train_loss": train_loss,
-            "Train/test_loss": test_loss,
+            "Train/val_loss": val_loss,
             "Train/lr": scheduler._last_lr[0], # get_last_lr()
             "Train/samples": config.batch_size * batches_per_epoch * (epoch + 1),
 
@@ -164,7 +156,7 @@ def train(config, use_wandb: bool):
         if use_wandb:
             wandb.log(step=epoch, data=metrics)
         else:
-            print(f"Step {epoch} - Train loss: {train_loss}, Test loss: {test_loss}, LR: {scheduler._last_lr[0]}")
+            print(f"Epoch {epoch} - loss: {train_loss}, val_loss: {val_loss}, lr: {scheduler._last_lr[0]}")
 
         with tempfile.NamedTemporaryFile() as tmp:
             tmp.write(NnueWriter(chessmodel, config.feature_set).buf)
@@ -248,7 +240,7 @@ def main():
             config=config
         )
         wandb.define_metric("Train/train_loss", summary="min")
-        wandb.define_metric("Train/test_loss", summary="min")
+        wandb.define_metric("Train/val_loss", summary="min")
         wandb.define_metric("Puzzles/moveAccuracy", summary="max")
 
     train(config, use_wandb)
