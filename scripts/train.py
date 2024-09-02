@@ -10,13 +10,13 @@ from lib.batch_loader import BatchLoader, get_feature_set_size
 from lib.model import NnueModel
 from lib.model import decode_int64_bitset
 from lib.serialize import NnueWriter
-from scripts.lib.puzzle_metrics import PuzzleMetrics
+from lib.metrics_puzzles import PuzzleMetrics
 from lib.losses import EvalLoss, PQRLoss
 
 
 def train(config, use_wandb: bool):
     DATA_INPUT = "/mnt/c/datasets/raw/T60T70wIsRightFarseerT60T74T75T76.plain"
-    VALIDATION_BYTES = 100_000_000 # ~ 4.5M samples
+    VALIDATION_BYTES = 100_000_000  # ~ 4.5M samples
 
     # datasets
     train_samples = BatchLoader(
@@ -24,10 +24,10 @@ def train(config, use_wandb: bool):
         batch_threads=12,
         input=DATA_INPUT,
         input_offset=VALIDATION_BYTES,
-        input_loop=True, # loop infinitely
+        input_loop=True,  # loop infinitely
         feature_set=config.feature_set,
         method=config.method,
-        random_skipping=0.6
+        random_skipping=0.3,
     )
     val_samples = BatchLoader(
         batch_size=config.batch_size,
@@ -35,7 +35,7 @@ def train(config, use_wandb: bool):
         input=DATA_INPUT,
         input_length=VALIDATION_BYTES,
         feature_set=config.feature_set,
-        method=config.method
+        method=config.method,
     )
 
     if config.method == "pqr":
@@ -44,7 +44,7 @@ def train(config, use_wandb: bool):
         loss_fn = EvalLoss()
 
     # puzzles
-    puzzles = PuzzleMetrics('./data/puzzles.csv')
+    puzzles = PuzzleMetrics()
 
     # model
     chessmodel = NnueModel(
@@ -56,8 +56,8 @@ def train(config, use_wandb: bool):
 
     optimizer = torch.optim.Adam(chessmodel.parameters(), lr=config.learning_rate)
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=1, gamma=config.gamma)
-    #scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', threshold=0.0001, factor=0.7, patience=30)
-    #scheduler = torch.optim.lr_scheduler.CyclicLR(optimizer, base_lr=0.000001, max_lr=0.0002, step_size_up=128)
+    # scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', threshold=0.0001, factor=0.7, patience=30)
+    # scheduler = torch.optim.lr_scheduler.CyclicLR(optimizer, base_lr=0.000001, max_lr=0.0002, step_size_up=128)
 
     def forward_loss(X, y):
         # expand bitset
@@ -102,7 +102,7 @@ def train(config, use_wandb: bool):
 
         for _ in tqdm(range(batches_per_epoch), desc=f'Epoch {epoch}/{config.epochs}'):
             X, y = train_samples.next_batch()
-            
+
             loss_sum += train_step(X, y)
 
         # Step the scheduler
@@ -113,7 +113,7 @@ def train(config, use_wandb: bool):
     def val_iter():
         # Make sure we are not tracking gradients (it's faster)
         chessmodel.eval()
-        
+
         loss_sum = 0.0
         count = 0
 
@@ -128,7 +128,6 @@ def train(config, use_wandb: bool):
 
         return loss_sum / count
 
-
     batches_per_epoch = config.epoch_size // config.batch_size
 
     best_loss = float("inf")
@@ -137,7 +136,7 @@ def train(config, use_wandb: bool):
     for epoch in range(1, config.epochs+1):
         train_loss = train_iter()
         val_loss = val_iter()
-        
+
         checkpoint_is_best = checkpoint_is_best or val_loss < best_loss
         best_loss = min(best_loss, val_loss)
 
@@ -188,17 +187,18 @@ def train(config, use_wandb: bool):
                     pass
 
                 # build ratings bar chart
-                #wandb.log(step=step, data={
+                # wandb.log(step=step, data={
                 #    "Puzzles/ratings": wandb.plot.bar(
                 #        wandb.Table(
-                #            data=sorted([[cat, acc] for cat, acc in puzzles_results if cat.startswith("rating")], 
+                #            data=sorted([[cat, acc] for cat, acc in puzzles_results if cat.startswith("rating")],
                 #                        key=lambda x: int(x[0].split("rating")[1].split("to")[0])),
                 #            columns=["rating", "accuracy"]
                 #        ),
                 #        label="rating",
                 #        value="accuracy",
                 #        title="Puzzle accuracy by rating")
-                #})
+                # })
+
 
 def main():
     parser = argparse.ArgumentParser(description="Train the network")
@@ -219,7 +219,7 @@ def main():
     # misc
     parser.add_argument("--checkpoint_interval", default=16, type=int)
     parser.add_argument("--puzzle_interval", default=8, type=int)
-    parser.add_argument("--wandb_project", default=None, type=str)
+    parser.add_argument("--wandb", default=None, type=str, help="wandb project name")
 
     config = parser.parse_args()
 
@@ -230,11 +230,11 @@ def main():
 
     # torch.set_float32_matmul_precision("high")
 
-    use_wandb = config.wandb_project is not None
+    use_wandb = config.wandb is not None
 
     if use_wandb:
         wandb.init(
-            project=config.wandb_project,
+            project=config.wandb,
             job_type="train",
             name=f"{config.method}_{config.batch_size}_{config.feature_set}[{config.num_features}]->{config.l1_size}x2->{config.l2_size}->1",
             config=config

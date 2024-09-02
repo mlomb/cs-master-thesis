@@ -3,6 +3,10 @@ import chess
 import chess.engine
 from tqdm import tqdm
 import random
+import os
+
+PUZZLES_DATA = os.path.join(os.path.dirname(__file__), "../data/puzzles.csv")
+
 
 def solve_puzzle(engine_cmd: str, board: chess.Board, solution: list[chess.Move]) -> tuple[int, int]:
     board = board.copy()
@@ -20,7 +24,7 @@ def solve_puzzle(engine_cmd: str, board: chess.Board, solution: list[chess.Move]
         board.push(opp_move)
 
         # ask engine for best move
-        res = engine.play(board, chess.engine.Limit(nodes=20_000))
+        res = engine.play(board, chess.engine.Limit(nodes=30_000))
 
         # play expected move
         board.push(expected_move)
@@ -36,7 +40,7 @@ def solve_puzzle(engine_cmd: str, board: chess.Board, solution: list[chess.Move]
 
 
 class PuzzleMetrics:
-    def __init__(self, puzzles_csv: str, elo_bucket_size=200):
+    def __init__(self, puzzles_csv: str = PUZZLES_DATA, elo_bucket_size=200):
         self.elo_bucket_size = elo_bucket_size
         self.puzzles = []
 
@@ -126,7 +130,8 @@ if __name__ == '__main__':
     import os
     ENGINE_BIN = os.path.join(os.path.dirname(__file__), "../../engine/target/release/engine")
 
-    puzzle_acc = PuzzleMetrics('../data/puzzles.csv')
-    a, b = puzzle_acc.measure('/mnt/c/datasets/stockfish-ubuntu-x86-64-avx2')
-    #a, b = puzzle_acc.measure(ENGINE_BIN)
+    puzzle_acc = PuzzleMetrics()
+    #a, b = puzzle_acc.measure('/mnt/c/datasets/stockfish-ubuntu-x86-64-avx2')
+    # a, b = puzzle_acc.measure([ENGINE_BIN, "--nn=/mnt/c/Users/Lombi/Desktop/tesis/cs-master-thesis/models/model.nn"])
+    a, b = puzzle_acc.measure([ENGINE_BIN])
     print(a, b)

@@ -6,6 +6,7 @@ use clap::{Args, ValueEnum};
 use crossbeam::channel::{bounded, Sender};
 use indicatif::{ProgressBar, ProgressStyle};
 use nn::feature_set::build::build_feature_set;
+use rand::Rng;
 use shakmaty::Position;
 use shared_memory::ShmemConf;
 use std::fs::metadata;
@@ -179,6 +180,7 @@ fn build_samples_thread(
     length: u64,
     batch_sender: Sender<BatchData>,
 ) {
+    let mut rng = rand::thread_rng();
     let feature_set = build_feature_set(&cmd.feature_set);
     let method = build_method(&cmd);
 
@@ -195,7 +197,13 @@ fn build_samples_thread(
 
         while let Ok(Some(samples)) = reader.read_samples_line() {
             for sample in samples {
-                if filter(&sample, &cmd) {
+                // smart fen skipping
+                if smart_filter(&sample) {
+                    continue;
+                }
+
+                // random fen skipping
+                if cmd.random_skipping > 0.0 && rng.gen::<f32>() < cmd.random_skipping {
                     continue;
                 }
 
@@ -227,10 +235,9 @@ fn build_samples_thread(
     }
 }
 
-fn filter(sample: &Sample, cmd: &BatchLoaderCommand) -> bool {
+fn smart_filter(sample: &Sample) -> bool {
     sample.bestmove.is_capture() || // skip capture moves
-    sample.position.is_check() || // skip check positions
-    (cmd.random_skipping > 0.0 && rand::random::<f32>() < cmd.random_skipping) // random fen skipping
+    sample.position.is_check() // skip check positions
 }
 
 fn build_method(cmd: &BatchLoaderCommand) -> Box<dyn SampleEncoder> {
