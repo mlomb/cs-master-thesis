@@ -15,7 +15,7 @@ from lib.losses import EvalLoss, PQRLoss
 
 
 def train(config, use_wandb: bool):
-    DATA_INPUT = "/mnt/c/datasets/raw/T60T70wIsRightFarseerT60T74T75T76.plain"
+    DATA_INPUT = "/mnt/c/datasets/raw/compact.plain"
     VALIDATION_BYTES = 100_000_000  # ~ 4.5M samples
 
     # datasets
@@ -213,7 +213,7 @@ def main():
     parser.add_argument("--epoch_size", default=6104 * 16384, type=int, help="Number of samples in one epoch") # 100M
     parser.add_argument("--epochs", default=1024, type=int, help="Number of epochs to train")
     parser.add_argument("--learning_rate", default=8.75e-4, type=float, help="Initial learning rate")
-    parser.add_argument("--gamma", default=0.992, type=float, help="Multiplier for learning rate decay")
+    parser.add_argument("--gamma", default=0.994, type=float, help="Multiplier for learning rate decay")
     parser.add_argument("--method", default="eval", type=str)
 
     # misc
