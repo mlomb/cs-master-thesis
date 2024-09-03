@@ -146,6 +146,9 @@ fn main() {
                     max_nodes,
                 );
 
+                // TODO: we should investigate why this happens, tho it is very very rare
+                let best_move = best_move.or(position.legal_moves().first().cloned());
+
                 println!(
                     "bestmove {}",
                     best_move.unwrap().to_uci(CastlingMode::Standard)

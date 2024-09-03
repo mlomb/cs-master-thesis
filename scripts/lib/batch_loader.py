@@ -3,10 +3,7 @@ import torch
 import numpy as np
 import subprocess
 from multiprocessing.shared_memory import SharedMemory
-import os
-
-TOOLS_BIN = os.path.join(os.path.dirname(__file__), "../../tools/target/release/tools")
-
+from paths import TOOLS_BIN
 
 def get_feature_set_size(name: str):
     """
@@ -178,22 +175,26 @@ class BatchLoader:
         self.cleanup()
 
 if __name__ == "__main__":
-    # Performance test
+    print("Running performance test...")
+    
     from tqdm import tqdm
+    from paths import DEFAULT_DATASET
 
-    off = 0
+    off = 0 # offseting avoids caches
+    len = 50 * 1024 * 1024 # 50 GB
 
-    for threads in [2, 4, 6, 8, 10, 12, 14, 16]:
+    for threads in [1, 2, 4, 6, 8, 10, 12, 14, 16]:
         bl = BatchLoader(
             batch_size=16384,
             feature_set="hv",
             method="eval",
-            input="/mnt/d/compact.plain",
+            input=DEFAULT_DATASET,
             input_loop=True,
             input_offset=off,
+            input_length=len,
             batch_threads=threads
         )
-        off += 30 * 1024 * 1024 # 30 GB
+        off += len # 30 GB
 
         for i in tqdm(range(1_000), desc=f"batch_threads={threads}"):
             X, y = bl.next_batch()

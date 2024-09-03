@@ -12,17 +12,18 @@ from lib.model import decode_int64_bitset
 from lib.serialize import NnueWriter
 from lib.metrics_puzzles import PuzzleMetrics
 from lib.losses import EvalLoss, PQRLoss
+from lib.paths import DEFAULT_DATASET
+from lib.games import measure_perf_diff
 
 
 def train(config, use_wandb: bool):
-    DATA_INPUT = "/mnt/c/datasets/raw/compact.plain"
     VALIDATION_BYTES = 100_000_000  # ~ 4.5M samples
 
     # datasets
     train_samples = BatchLoader(
         batch_size=config.batch_size,
         batch_threads=12,
-        input=DATA_INPUT,
+        input=config.dataset,
         input_offset=VALIDATION_BYTES,
         input_loop=True,  # loop infinitely
         feature_set=config.feature_set,
@@ -32,7 +33,7 @@ def train(config, use_wandb: bool):
     val_samples = BatchLoader(
         batch_size=config.batch_size,
         batch_threads=12,
-        input=DATA_INPUT,
+        input=config.dataset,
         input_length=VALIDATION_BYTES,
         feature_set=config.feature_set,
         method=config.method,
@@ -159,11 +160,12 @@ def train(config, use_wandb: bool):
 
         with tempfile.NamedTemporaryFile() as tmp:
             tmp.write(NnueWriter(chessmodel, config.feature_set).buf)
+            cmd = ["../engine/target/release/engine", f"--nn={tmp.name}"]
 
             if epoch % config.puzzle_interval == 0 or epoch == 1:
                 # run puzzles
                 print("tmp.name", tmp.name)
-                puzzles_results, puzzles_move_accuracy = puzzles.measure(["../engine/target/release/engine", f"--nn={tmp.name}"])
+                puzzles_results, puzzles_move_accuracy = puzzles.measure(cmd)
 
                 # log puzzle metrics
                 if use_wandb:
@@ -209,17 +211,23 @@ def main():
     parser.add_argument("--l2_size", default=32, type=int)
 
     # training
+    parser.add_argument("--method", default="eval", type=str)
+    parser.add_argument("--dataset", default=DEFAULT_DATASET, type=str, help="Path to the .plain dataset. The first 100MB are used as validation set")
+
+    # hyperparams
     parser.add_argument("--batch_size", default=16384, type=int, help="Number of samples per minibatch") # 16K
     parser.add_argument("--epoch_size", default=6104 * 16384, type=int, help="Number of samples in one epoch") # 100M
     parser.add_argument("--epochs", default=1024, type=int, help="Number of epochs to train")
     parser.add_argument("--learning_rate", default=8.75e-4, type=float, help="Initial learning rate")
     parser.add_argument("--gamma", default=0.994, type=float, help="Multiplier for learning rate decay")
-    parser.add_argument("--method", default="eval", type=str)
 
     # misc
     parser.add_argument("--checkpoint_interval", default=16, type=int)
     parser.add_argument("--puzzle_interval", default=8, type=int)
+
+    # wandb
     parser.add_argument("--wandb", default=None, type=str, help="wandb project name")
+    parser.add_argument("--notes", default=None, type=str, help="wandb run notes, a short description of the run")
 
     config = parser.parse_args()
 
@@ -237,6 +245,7 @@ def main():
             project=config.wandb,
             job_type="train",
             name=f"{config.method}_{config.batch_size}_{config.feature_set}[{config.num_features}]->{config.l1_size}x2->{config.l2_size}->1",
+            notes=config.notes,
             config=config
         )
         wandb.define_metric("Train/train_loss", summary="min")

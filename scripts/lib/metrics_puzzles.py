@@ -2,11 +2,7 @@ from concurrent.futures import ThreadPoolExecutor
 import chess
 import chess.engine
 from tqdm import tqdm
-import random
-import os
-
-PUZZLES_DATA = os.path.join(os.path.dirname(__file__), "../data/puzzles.csv")
-
+from paths import PUZZLES_DATA, ENGINE_BIN
 
 def solve_puzzle(engine_cmd: str, board: chess.Board, solution: list[chess.Move]) -> tuple[int, int]:
     board = board.copy()
@@ -61,7 +57,6 @@ class PuzzleMetrics:
 
                 self.puzzles.append((board, moves, themes))
 
-        random.Random(42).shuffle(self.puzzles) # puzzles should be already sorted but just in case...
         #self.puzzles = self.puzzles[:100]
     
     def measure(self, engine_cmd: str | list[str]):
@@ -127,11 +122,8 @@ class PuzzleMetrics:
         return any(theme in SKIP_THEMES for theme in themes)
 
 if __name__ == '__main__':
-    import os
-    ENGINE_BIN = os.path.join(os.path.dirname(__file__), "../../engine/target/release/engine")
-
     puzzle_acc = PuzzleMetrics()
     #a, b = puzzle_acc.measure('/mnt/c/datasets/stockfish-ubuntu-x86-64-avx2')
-    # a, b = puzzle_acc.measure([ENGINE_BIN, "--nn=/mnt/c/Users/Lombi/Desktop/tesis/cs-master-thesis/models/model.nn"])
-    a, b = puzzle_acc.measure([ENGINE_BIN])
+    a, b = puzzle_acc.measure([ENGINE_BIN, "--nn=/mnt/c/Users/Lombi/Desktop/tesis/cs-master-thesis/models/pink.nn"])
+    #a, b = puzzle_acc.measure([ENGINE_BIN])
     print(a, b)
