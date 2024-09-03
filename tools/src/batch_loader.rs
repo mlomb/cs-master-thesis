@@ -6,6 +6,7 @@ use clap::{Args, ValueEnum};
 use crossbeam::channel::{bounded, Sender};
 use indicatif::{ProgressBar, ProgressStyle};
 use nn::feature_set::build::build_feature_set;
+use rand::seq::SliceRandom;
 use rand::Rng;
 use shakmaty::Position;
 use shared_memory::ShmemConf;
@@ -184,29 +185,56 @@ fn build_samples_thread(
     let feature_set = build_feature_set(&cmd.feature_set);
     let method = build_method(&cmd);
 
+    let mut samples_buffer = Vec::<Sample>::with_capacity(256 * 256 * 16); // 1 M
+
     let x_batch_size = cmd.batch_size * method.x_size(&feature_set);
     let y_batch_size = cmd.batch_size * method.y_size();
 
     let mut x_cursor = Cursor::new(vec![0u8; x_batch_size]);
     let mut y_cursor = Cursor::new(vec![0u8; y_batch_size]);
 
-    // loop to write batches
+    // loop input file
     loop {
         let mut reader = PlainReader::open_with_limits(&cmd.input, offset, length)
             .expect("can't open input file");
 
-        while let Ok(Some(samples)) = reader.read_samples_line() {
-            for sample in samples {
-                // smart fen skipping
-                if smart_filter(&sample) {
-                    continue;
+        // loop file once
+        loop {
+            // loop to read samples
+            while let Ok(Some(samples)) = reader.read_samples_line() {
+                for sample in samples {
+                    // smart fen skipping
+                    if smart_filter(&sample) {
+                        continue;
+                    }
+
+                    // random fen skipping
+                    if cmd.random_skipping > 0.0 && rng.gen::<f32>() < cmd.random_skipping {
+                        continue;
+                    }
+
+                    // worst case we discard a line, no biggie
+                    if samples_buffer.len() < samples_buffer.capacity() {
+                        samples_buffer.push(sample);
+                    }
                 }
 
-                // random fen skipping
-                if cmd.random_skipping > 0.0 && rng.gen::<f32>() < cmd.random_skipping {
-                    continue;
+                // break out
+                if samples_buffer.len() >= samples_buffer.capacity() - 100 {
+                    break;
                 }
+            }
 
+            if samples_buffer.is_empty() {
+                // EOF
+                break;
+            }
+
+            // shuffle!
+            samples_buffer.shuffle(&mut rng);
+
+            // loop to write batches
+            while let Some(sample) = samples_buffer.pop() {
                 method.write_sample(&sample, &mut x_cursor, &mut y_cursor, &feature_set);
 
                 // is batch full?
@@ -227,6 +255,8 @@ fn build_samples_thread(
                     y_cursor.rewind().unwrap();
                 }
             }
+
+            // Note: unused samples are kept in the buffer
         }
 
         if !cmd.input_loop {
@@ -236,6 +266,7 @@ fn build_samples_thread(
 }
 
 fn smart_filter(sample: &Sample) -> bool {
+    sample.score.abs() > 5000 || // skip very extreme scores
     sample.bestmove.is_capture() || // skip capture moves
     sample.position.is_check() // skip check positions
 }

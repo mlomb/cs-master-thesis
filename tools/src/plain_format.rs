@@ -176,7 +176,6 @@ impl<'a> PlainWriter<BufWriter<File>> {
             last_pos: None,
             last_bestmove: None,
         })
-        // TODO: are we leaking the file?
     }
 }
 
