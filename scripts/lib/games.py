@@ -10,7 +10,7 @@ from paths import CUTECHESS_CLI_BIN, OPENING_BOOK, ENGINE_BIN, ORDO_BIN, STOCKFI
 class Engine:
     name: str
     cmd: str
-    movetime: float | None = 0.1
+    movetime: float | None = 0.05
     nodes: int | None = None
     depth: int | None = None
     elo: int | None = None # only works in Stockfish
@@ -50,6 +50,7 @@ def run_games(
             command += [f'depth={engine.depth}']
         if engine.elo:
             command += [
+                'option.Threads=1',
                 'option.UCI_LimitStrength=true',
                 'option.UCI_Elo=' + str(engine.elo),
             ]
@@ -113,7 +114,7 @@ def run_ordo(pgn_file: str):
 
 def measure_perf_diff(
     engine1: Engine = Engine(name="engine", cmd=ENGINE_BIN),
-    engine2: Engine = Engine(name="stockfish-20k-d6", cmd=STOCKFISH_BIN, elo=2600), # reference engine
+    engine2: Engine = Engine(name="stockfish-elo2650", cmd=STOCKFISH_BIN, elo=2650), # reference engine
     n: int = 100,
     concurrency: int = 16,
 ) -> tuple[int, int, int]:

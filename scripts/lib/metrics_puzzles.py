@@ -124,6 +124,6 @@ class PuzzleMetrics:
 if __name__ == '__main__':
     puzzle_acc = PuzzleMetrics()
     #a, b = puzzle_acc.measure('/mnt/c/datasets/stockfish-ubuntu-x86-64-avx2')
-    a, b = puzzle_acc.measure([ENGINE_BIN, "--nn=/mnt/c/Users/Lombi/Desktop/tesis/cs-master-thesis/models/pink.nn"])
+    a, b = puzzle_acc.measure([ENGINE_BIN])
     #a, b = puzzle_acc.measure([ENGINE_BIN])
     print(a, b)

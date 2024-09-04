@@ -1,6 +1,7 @@
+import sys
+sys.path.append("lib")
+
 import argparse
-import math
-from glob import glob
 from tqdm import tqdm
 import torch
 import wandb
@@ -13,7 +14,7 @@ from lib.serialize import NnueWriter
 from lib.metrics_puzzles import PuzzleMetrics
 from lib.losses import EvalLoss, PQRLoss
 from lib.paths import DEFAULT_DATASET
-from lib.games import measure_perf_diff
+from lib.games import Engine, measure_perf_diff
 
 
 def train(config, use_wandb: bool):
@@ -174,6 +175,17 @@ def train(config, use_wandb: bool):
                 else:
                     print(f"Epoch {epoch} - Puzzles move accuracy: {puzzles_move_accuracy}")
 
+            if epoch % config.perf_interval == 0 or epoch == 1:
+                elo_diff, error, points = measure_perf_diff(
+                    engine1=Engine(name="engine", cmd=" ".join(cmd)),
+                    n=200,
+                )
+
+                if use_wandb:
+                    wandb.log(step=epoch, data={"Perf/elo_diff": elo_diff, "Perf/elo_err": error, "Perf/points": points})
+                else:
+                    print(f"Epoch {epoch} - ELO: {elo_diff} ± {error} Points: {points}")
+
             if epoch % config.checkpoint_interval == 0 or epoch == 1:
 
                 if use_wandb:
@@ -223,6 +235,7 @@ def main():
 
     # misc
     parser.add_argument("--checkpoint_interval", default=16, type=int)
+    parser.add_argument("--perf_interval", default=32, type=int)
     parser.add_argument("--puzzle_interval", default=8, type=int)
 
     # wandb
@@ -250,6 +263,8 @@ def main():
         )
         wandb.define_metric("Train/train_loss", summary="min")
         wandb.define_metric("Train/val_loss", summary="min")
+        wandb.define_metric("Perf/elo_diff", summary="max")
+        wandb.define_metric("Perf/points", summary="max")
         wandb.define_metric("Puzzles/moveAccuracy", summary="max")
 
     train(config, use_wandb)
