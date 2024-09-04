@@ -35,7 +35,7 @@ def solve_puzzle(engine_cmd: str, board: chess.Board, solution: list[chess.Move]
     return (correct_moves, total_moves)
 
 
-class PuzzleMetrics:
+class Puzzles:
     def __init__(self, puzzles_csv: str = PUZZLES_DATA, elo_bucket_size=200):
         self.elo_bucket_size = elo_bucket_size
         self.puzzles = []
@@ -122,8 +122,7 @@ class PuzzleMetrics:
         return any(theme in SKIP_THEMES for theme in themes)
 
 if __name__ == '__main__':
-    puzzle_acc = PuzzleMetrics()
-    #a, b = puzzle_acc.measure('/mnt/c/datasets/stockfish-ubuntu-x86-64-avx2')
-    a, b = puzzle_acc.measure([ENGINE_BIN])
-    #a, b = puzzle_acc.measure([ENGINE_BIN])
+    p = Puzzles()
+    #a, b = p.measure('/mnt/c/datasets/stockfish-ubuntu-x86-64-avx2')
+    a, b = p.measure([ENGINE_BIN])
     print(a, b)

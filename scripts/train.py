@@ -11,7 +11,7 @@ from lib.batch_loader import BatchLoader, get_feature_set_size
 from lib.model import NnueModel
 from lib.model import decode_int64_bitset
 from lib.serialize import NnueWriter
-from lib.puzzles import PuzzleMetrics
+from lib.puzzles import Puzzles
 from lib.losses import EvalLoss, PQRLoss
 from lib.paths import DEFAULT_DATASET, ENGINE_BIN
 from lib.games import Engine, measure_perf_diff
@@ -44,9 +44,6 @@ def train(config, use_wandb: bool):
         loss_fn = PQRLoss()
     elif config.method == "eval":
         loss_fn = EvalLoss()
-
-    # puzzles
-    puzzles = PuzzleMetrics()
 
     # model
     chessmodel = NnueModel(
@@ -164,7 +161,7 @@ def train(config, use_wandb: bool):
 
             if epoch % config.puzzle_interval == 0 or epoch == 1:
                 # run puzzles
-                puzzles_results, puzzles_move_accuracy = puzzles.measure([ENGINE_BIN, f"--nn={tmp.name}"])
+                puzzles_results, puzzles_move_accuracy = Puzzles().measure([ENGINE_BIN, f"--nn={tmp.name}"])
 
                 # log puzzle metrics
                 if use_wandb:
