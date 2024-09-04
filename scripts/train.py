@@ -11,7 +11,7 @@ from lib.batch_loader import BatchLoader, get_feature_set_size
 from lib.model import NnueModel
 from lib.model import decode_int64_bitset
 from lib.serialize import NnueWriter
-from lib.metrics_puzzles import PuzzleMetrics
+from lib.puzzles import PuzzleMetrics
 from lib.losses import EvalLoss, PQRLoss
 from lib.paths import DEFAULT_DATASET, ENGINE_BIN
 from lib.games import Engine, measure_perf_diff
