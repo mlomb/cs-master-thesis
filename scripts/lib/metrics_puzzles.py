@@ -71,7 +71,7 @@ class PuzzleMetrics:
         themes_total = {}
 
         with ThreadPoolExecutor(max_workers=None) as executor:
-            results = list(tqdm(executor.map(f, self.puzzles), total=len(self.puzzles)))
+            results = list(tqdm(executor.map(f, self.puzzles), total=len(self.puzzles), desc="Running puzzles"))
 
             for (_, _, themes), (pz_correct_moves, pz_total_moves) in zip(self.puzzles, results):
                 solved = (pz_correct_moves == pz_total_moves)

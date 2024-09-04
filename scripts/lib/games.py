@@ -10,6 +10,7 @@ from paths import CUTECHESS_CLI_BIN, OPENING_BOOK, ENGINE_BIN, ORDO_BIN, STOCKFI
 class Engine:
     name: str
     cmd: str
+    args: list[str] | None = None
     movetime: float | None = 0.05
     nodes: int | None = None
     depth: int | None = None
@@ -28,6 +29,7 @@ def run_games(
     """
     command = []
     command += [
+        # https://manpages.ubuntu.com/manpages/trusty/en/man6/cutechess-cli.6.html
         CUTECHESS_CLI_BIN,
         '-rounds', str(n),
         '-concurrency', str(concurrency),
@@ -36,12 +38,15 @@ def run_games(
         '-games', '2', # due repeat
         '-repeat',
         '-pgnout', f'{pgn_file}',
+        '-recover', # recover from crashes
         '-each', 'timemargin=2000'
     ]
 
     # add engines
     for engine in engines:
-        command += ['-engine', f'name={engine.name}', f'cmd={engine.cmd}', 'proto=uci']
+        command += ['-engine', f'name={engine.name}', f'cmd={engine.cmd}', 'proto=uci', 'restart=on']
+        if engine.args:
+            command += [f'arg={" ".join(engine.args)}']
         if engine.movetime:
             command += [f'st={engine.movetime}']
         if engine.nodes:
@@ -62,9 +67,10 @@ def run_games(
         program = subprocess.Popen(command, stdout=subprocess.PIPE)
 
         for line in program.stdout:
+            # print(line.decode("utf-8").strip())
             if b"Finished game" in line:
                 pbar.update(1)
-        
+
         program.wait()
         pbar.close()
 

@@ -13,7 +13,7 @@ from lib.model import decode_int64_bitset
 from lib.serialize import NnueWriter
 from lib.metrics_puzzles import PuzzleMetrics
 from lib.losses import EvalLoss, PQRLoss
-from lib.paths import DEFAULT_DATASET
+from lib.paths import DEFAULT_DATASET, ENGINE_BIN
 from lib.games import Engine, measure_perf_diff
 
 
@@ -161,12 +161,10 @@ def train(config, use_wandb: bool):
 
         with tempfile.NamedTemporaryFile() as tmp:
             tmp.write(NnueWriter(chessmodel, config.feature_set).buf)
-            cmd = ["../engine/target/release/engine", f"--nn={tmp.name}"]
 
             if epoch % config.puzzle_interval == 0 or epoch == 1:
                 # run puzzles
-                print("tmp.name", tmp.name)
-                puzzles_results, puzzles_move_accuracy = puzzles.measure(cmd)
+                puzzles_results, puzzles_move_accuracy = puzzles.measure([ENGINE_BIN, f"--nn={tmp.name}"])
 
                 # log puzzle metrics
                 if use_wandb:
@@ -177,7 +175,7 @@ def train(config, use_wandb: bool):
 
             if epoch % config.perf_interval == 0 or epoch == 1:
                 elo_diff, error, points = measure_perf_diff(
-                    engine1=Engine(name="engine", cmd=" ".join(cmd)),
+                    engine1=Engine(name="engine", cmd=ENGINE_BIN, args=[f"--nn={tmp.name}"]),
                     n=200,
                 )
 
