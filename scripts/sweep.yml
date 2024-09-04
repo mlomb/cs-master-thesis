@@ -5,10 +5,6 @@ metric:
   goal: minimize
   name: Train/loss.min
 parameters:
-  learning_rate:
-    values: [0.0015]
-#    min: 0.00001
-#    max: 0.01
   feature_set:
     values: ["hv","h+v","hv+h+v","d1d2","d1+d2","hv+d1d2","h+v+d1+d2","hv+h+v+d1+d2","hd1+vd2","vd1+hd2"]
   ft_size:

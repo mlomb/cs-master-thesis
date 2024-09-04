@@ -8,7 +8,7 @@ import wandb
 import tempfile
 
 from lib.batch_loader import BatchLoader, get_feature_set_size
-from lib.model import NnueModel
+from lib.model import NnueModel, expand_batch
 from lib.model import decode_int64_bitset
 from lib.serialize import NnueWriter
 from lib.puzzles import Puzzles
@@ -17,13 +17,13 @@ from lib.paths import DEFAULT_DATASET, ENGINE_BIN
 from lib.games import Engine, measure_perf_diff
 
 
-def train(config, use_wandb: bool):
+def train(config: dict, use_wandb: bool):
     VALIDATION_BYTES = 100_000_000  # ~ 4.5M samples
 
     # datasets
     train_samples = BatchLoader(
         batch_size=config.batch_size,
-        batch_threads=12,
+        batch_threads=8,
         input=config.dataset,
         input_offset=VALIDATION_BYTES,
         input_loop=True,  # loop infinitely
@@ -33,7 +33,7 @@ def train(config, use_wandb: bool):
     )
     val_samples = BatchLoader(
         batch_size=config.batch_size,
-        batch_threads=12,
+        batch_threads=8,
         input=config.dataset,
         input_length=VALIDATION_BYTES,
         feature_set=config.feature_set,
@@ -58,15 +58,14 @@ def train(config, use_wandb: bool):
     # scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', threshold=0.0001, factor=0.7, patience=30)
     # scheduler = torch.optim.lr_scheduler.CyclicLR(optimizer, base_lr=0.000001, max_lr=0.0002, step_size_up=128)
 
-    def forward_loss(X, y):
-        # expand bitset
-        # X.shape = [4096, 2, 43]
-        X = decode_int64_bitset(X) 
-        # X.shape = [4096, 2, 43, 64]
-        X = X.reshape(-1, 2, X.shape[-2] * 64)
-        # X.shape = [4096, 2, 2752]
-        X = X[:, :, :config.num_features] # truncate to the actual number of features
-        # X.shape = [4096, 2, 2700]
+    batches_per_epoch = config.epoch_size // config.batch_size
+    
+    def forward_loss(X: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
+        """
+        Takes a compressed batch and computes the loss
+        """
+        # Expand into floats
+        X = expand_batch(X, config.num_features)
 
         # Forward pass
         outputs = chessmodel(X)
@@ -77,7 +76,11 @@ def train(config, use_wandb: bool):
         return loss
 
     @torch.compile
-    def train_step(X, y):
+    def train_pass(X: torch.Tensor, y: torch.Tensor) -> float:
+        """
+        Train a single batch
+        Returns the loss for the batch
+        """
         # Clear the gradients
         optimizer.zero_grad()
 
@@ -93,28 +96,34 @@ def train(config, use_wandb: bool):
 
         return loss.item()
 
-    def train_iter():
+    def run_epoch():
+        """
+        Trains for one epoch.
+        Returns train and validation loss
+        """
+        train_sum = 0.0
+        val_sum = 0.0
+        val_count = 0
+
+        # ======================================
+        #                 TRAIN
+        # ======================================
         # Make sure gradient tracking is on
         chessmodel.train()
-
-        loss_sum = 0.0
 
         for _ in tqdm(range(batches_per_epoch), desc=f'Epoch {epoch}/{config.epochs}'):
             X, y = train_samples.next_batch()
 
-            loss_sum += train_step(X, y)
+            train_sum += train_pass(X, y)
 
         # Step the scheduler
         scheduler.step()
 
-        return loss_sum / batches_per_epoch
-
-    def val_iter():
+        # ======================================
+        #              VALIDATION
+        # ======================================
         # Make sure we are not tracking gradients (it's faster)
         chessmodel.eval()
-
-        loss_sum = 0.0
-        count = 0
 
         while True:
             batch = val_samples.next_batch()
@@ -122,19 +131,19 @@ def train(config, use_wandb: bool):
                 break
 
             X, y = batch
-            loss_sum += forward_loss(X, y).item()
-            count += 1
+            val_sum += forward_loss(X, y).item()
+            val_count += 1
 
-        return loss_sum / count
-
-    batches_per_epoch = config.epoch_size // config.batch_size
+        return (
+            train_sum / batches_per_epoch,
+            val_sum / val_count
+        )
 
     best_loss = float("inf")
     checkpoint_is_best = True
 
     for epoch in range(1, config.epochs+1):
-        train_loss = train_iter()
-        val_loss = val_iter()
+        train_loss, val_loss = run_epoch()
 
         checkpoint_is_best = checkpoint_is_best or val_loss < best_loss
         best_loss = min(best_loss, val_loss)
@@ -159,6 +168,9 @@ def train(config, use_wandb: bool):
         with tempfile.NamedTemporaryFile() as tmp:
             tmp.write(NnueWriter(chessmodel, config.feature_set).buf)
 
+            # ======================================
+            #                PUZZLES
+            # ======================================
             if epoch % config.puzzle_interval == 0 or epoch == 1:
                 # run puzzles
                 puzzles_results, puzzles_move_accuracy = Puzzles().measure([ENGINE_BIN, f"--nn={tmp.name}"])
@@ -170,6 +182,9 @@ def train(config, use_wandb: bool):
                 else:
                     print(f"Epoch {epoch} - Puzzles move accuracy: {puzzles_move_accuracy}")
 
+            # ======================================
+            #                  PERF
+            # ======================================
             if epoch % config.perf_interval == 0 or epoch == 1:
                 elo_diff, error, points = measure_perf_diff(
                     engine1=Engine(name="engine", cmd=ENGINE_BIN, args=[f"--nn={tmp.name}"]),
@@ -181,6 +196,9 @@ def train(config, use_wandb: bool):
                 else:
                     print(f"Epoch {epoch} - ELO: {elo_diff} ± {error} Points: {points}")
 
+            # ======================================
+            #              CHECKPOINTS
+            # ======================================
             if epoch % config.checkpoint_interval == 0 or epoch == 1:
 
                 if use_wandb:
@@ -194,19 +212,6 @@ def train(config, use_wandb: bool):
                 else:
                     # TODO: make local checkpoint
                     pass
-
-                # build ratings bar chart
-                # wandb.log(step=step, data={
-                #    "Puzzles/ratings": wandb.plot.bar(
-                #        wandb.Table(
-                #            data=sorted([[cat, acc] for cat, acc in puzzles_results if cat.startswith("rating")],
-                #                        key=lambda x: int(x[0].split("rating")[1].split("to")[0])),
-                #            columns=["rating", "accuracy"]
-                #        ),
-                #        label="rating",
-                #        value="accuracy",
-                #        title="Puzzle accuracy by rating")
-                # })
 
 
 def main():
@@ -244,7 +249,8 @@ def main():
 
     print(config)
 
-    # torch.set_float32_matmul_precision("high")
+    # TensorFloat32 tensor cores for float32 matrix multiplication available but not enabled.
+    torch.set_float32_matmul_precision("high")
 
     use_wandb = config.wandb is not None
 

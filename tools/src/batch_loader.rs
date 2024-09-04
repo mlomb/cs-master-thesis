@@ -121,7 +121,13 @@ pub fn batch_loader(cmd: BatchLoaderCommand) -> Result<(), Box<dyn Error>> {
         ProgressBar::hidden()
     };
 
-    let (batch_sender, batch_receiver) = bounded(8192); // keep up to X batches ready in memory
+    // keep up to 8GB worth of batches ready in memory (this is WAY too much, but I have too much memory)
+    let batch_buffer = if let Some(shmem) = &shmem {
+        8 * 1024 * 1024 * 1024 / (shmem.len() as usize)
+    } else {
+        256
+    };
+    let (batch_sender, batch_receiver) = bounded(batch_buffer);
 
     // start batch threads
     for i in 0..cmd.threads {

@@ -10,6 +10,21 @@ def decode_int64_bitset(x: torch.Tensor):
     expanded = torch.bitwise_and(x.unsqueeze(-1), masks).ne(0).to(torch.float32)
     return expanded
 
+@torch.compile
+def expand_batch(X: torch.Tensor, num_features: int):
+    """
+    Expand the raw input batch (int64) into a tensor with the actual number of features
+    """
+    # X.shape = [BATCH_SIZE, 2, 43]
+    X = decode_int64_bitset(X) 
+    # X.shape = [BATCH_SIZE, 2, 43, 64]
+    X = X.reshape(-1, 2, X.shape[-2] * 64)
+    # X.shape = [BATCH_SIZE, 2, 2752]
+    X = X[:, :, :num_features] # truncate to the actual number of features
+    # X.shape = [BATCH_SIZE, 2, 2700]
+
+    return X
+
 class NnueModel(nn.Module):
     def __init__(self, num_features: int = 768, l1_size: int = 256, l2_size: int = 32):
         super(NnueModel, self).__init__()

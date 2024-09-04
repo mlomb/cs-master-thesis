@@ -52,8 +52,8 @@ class BatchLoader:
         # create the shared memory file
         self.shmem = SharedMemory(create=True, size=x_size + y_size)
 
-        # build args for tools binary
-        self.args = [
+        # build cmd for tools binary
+        self.cmd = [
             TOOLS_BIN,
             "batch-loader",
             "--method=" + method,
@@ -67,7 +67,7 @@ class BatchLoader:
             "--random-skipping=" + str(random_skipping),
         ]
         if input_loop:
-            self.args.append("--input-loop")
+            self.cmd.append("--input-loop")
 
         # initialize the numpy array using the shared memory as buffer
         self.data = np.frombuffer(buffer=self.shmem.buf, dtype=np.int8)
@@ -90,7 +90,7 @@ class BatchLoader:
 
         # start the subprocess
         self.program = subprocess.Popen(
-            self.args,
+            self.cmd,
             stdout=subprocess.PIPE,
             stdin=subprocess.PIPE,
         )
@@ -180,8 +180,8 @@ if __name__ == "__main__":
     from tqdm import tqdm
     from paths import DEFAULT_DATASET
 
-    off = 0 # offseting avoids caches
-    len = 50 * 1024 * 1024 # 50 GB
+    offset = 0 # offseting avoids caches
+    length = 50 * 1024 * 1024 # 50 GB
 
     for threads in [1, 2, 4, 6, 8, 10, 12, 14, 16]:
         bl = BatchLoader(
@@ -190,11 +190,11 @@ if __name__ == "__main__":
             method="eval",
             input=DEFAULT_DATASET,
             input_loop=True,
-            input_offset=off,
-            input_length=len,
+            input_offset=offset,
+            input_length=length,
             batch_threads=threads
         )
-        off += len # 30 GB
+        offset += length # 30 GB
 
         for i in tqdm(range(1_000), desc=f"batch_threads={threads}"):
             X, y = bl.next_batch()
