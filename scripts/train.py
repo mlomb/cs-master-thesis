@@ -9,7 +9,6 @@ import tempfile
 
 from lib.batch_loader import BatchLoader, get_feature_set_size
 from lib.model import NnueModel, expand_batch
-from lib.model import decode_int64_bitset
 from lib.serialize import NnueWriter
 from lib.puzzles import Puzzles
 from lib.losses import EvalLoss, PQRLoss
@@ -210,8 +209,8 @@ def train(config: dict, use_wandb: bool):
                     # reset tag
                     checkpoint_is_best = False
                 else:
-                    # TODO: make local checkpoint
-                    pass
+                    # make local checkpoint
+                    # torch.save(chessmodel.state_dict(), f"checkpoints/{epoch}.pth")
 
 
 def main():

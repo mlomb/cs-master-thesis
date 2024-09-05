@@ -41,6 +41,10 @@ fn main() {
     };
 
     let model = NnueModel::from_memory(&nn_file).unwrap();
+
+    println!("info string NNUE net: {}", model.arch);
+    println!("info string NNUE size: {} params", model.params);
+
     let mut search = Search::new(Rc::new(RefCell::new(model)));
 
     let mut position: Chess = Chess::default();

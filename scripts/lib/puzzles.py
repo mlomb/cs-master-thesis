@@ -3,7 +3,6 @@ import chess
 import chess.engine
 from tqdm import tqdm
 from paths import PUZZLES_DATA
-from engine import Engine
 
 # default puzzle solving constraint
 LIMIT = chess.engine.Limit(nodes=30_000)

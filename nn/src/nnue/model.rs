@@ -56,6 +56,9 @@ impl LinearLayer<i8, i32> {
 pub struct NnueModel {
     feature_set: Box<dyn FeatureSet>,
 
+    pub arch: String,
+    pub params: usize,
+
     linear1: LinearLayer<i16, i16>,
     linear2: LinearLayer<i8, i32>,
     linear_out: LinearLayer<i8, i32>,
@@ -91,25 +94,20 @@ impl NnueModel {
         let feature_set = build_feature_set(feature_set_str);
         assert_eq!(num_features as usize, feature_set.num_features());
 
-        println!(
-            "info string NNUE net: {}[{}]->{}x2->{}->1",
-            feature_set_str, num_features, num_l1, num_l2
-        );
-        println!(
-            "info string NNUE size: {} params",
-            // l1
-            num_features * num_l1 + num_l1 +
-            // l2
-            (2 * num_l1) * num_l2 + num_l2 +
-            // out
-            num_out * num_l2 + num_l2 + num_out
-        );
-
         Ok(Self {
             feature_set,
             linear1: LinearLayer::new(&mut cursor, num_features, num_l1),
             linear2: LinearLayer::new(&mut cursor, 2 * num_l1, num_l2),
             linear_out: LinearLayer::new(&mut cursor, num_l2, num_out),
+
+            arch: format!("{}[{}]->{}x2->{}->1", feature_set_str, num_features, num_l1, num_l2),
+            params: 
+                // l1
+                num_features * num_l1 + num_l1 +
+                // l2
+                (2 * num_l1) * num_l2 + num_l2 +
+                // out
+                num_out * num_l2 + num_l2 + num_out,
         })
     }
 

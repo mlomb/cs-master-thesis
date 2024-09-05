@@ -13,7 +13,7 @@ def get_feature_set_size(name: str):
         subprocess.check_output(
             [
                 TOOLS_BIN,
-                "feature-set-size",
+                "info",
                 "--feature-set=" + name,
             ]
         )
