@@ -2,9 +2,16 @@ from concurrent.futures import ThreadPoolExecutor
 import chess
 import chess.engine
 from tqdm import tqdm
-from paths import PUZZLES_DATA, ENGINE_BIN
+from paths import PUZZLES_DATA
+from engine import Engine
 
-def solve_puzzle(engine_cmd: str, board: chess.Board, solution: list[chess.Move]) -> tuple[int, int]:
+# default puzzle solving constraint
+LIMIT = chess.engine.Limit(nodes=30_000)
+
+def solve_puzzle(engine_cmd: str | list[str], board: chess.Board, solution: list[chess.Move]) -> tuple[int, int]:
+    """
+    Counts how many correct moves an engine makes on a puzzle.
+    """
     board = board.copy()
     solution = solution.copy() # clone
     engine = chess.engine.SimpleEngine.popen_uci(engine_cmd)
@@ -20,7 +27,7 @@ def solve_puzzle(engine_cmd: str, board: chess.Board, solution: list[chess.Move]
         board.push(opp_move)
 
         # ask engine for best move
-        res = engine.play(board, chess.engine.Limit(nodes=30_000))
+        res = engine.play(board, LIMIT)
 
         # play expected move
         board.push(expected_move)
@@ -60,6 +67,9 @@ class Puzzles:
         #self.puzzles = self.puzzles[:100]
     
     def measure(self, engine_cmd: str | list[str]):
+        """
+        Measure the accuracy of the engine on the loaded puzzles.
+        """
         def f(puzzle):
             board, moves, _ = puzzle
             return solve_puzzle(engine_cmd, board, moves)
@@ -90,6 +100,9 @@ class Puzzles:
         return result, (correct_moves / total_moves)
     
     def should_skip(self, board: chess.Board, solution: list[chess.Move], themes: list[str], rating: int) -> bool:
+        """
+        Whether to skip a puzzle based on its rating, themes and outcome.
+        """
         if rating >= 3000: # rating too high
             return True
         if rating < 1000: # rating too low
@@ -121,8 +134,11 @@ class Puzzles:
         ]
         return any(theme in SKIP_THEMES for theme in themes)
 
+
 if __name__ == '__main__':
+    from paths import ENGINE_BIN, STOCKFISH_BIN
+
     p = Puzzles()
-    #a, b = p.measure('/mnt/c/datasets/stockfish-ubuntu-x86-64-avx2')
-    a, b = p.measure([ENGINE_BIN])
+    #a, b = p.measure(STOCKFISH_BIN)
+    a, b = p.measure(ENGINE_BIN)
     print(a, b)

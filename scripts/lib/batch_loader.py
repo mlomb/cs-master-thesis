@@ -117,9 +117,7 @@ class BatchLoader:
     def next_batch(self):
         """
         Gets the next batch of samples.
-
-        Returns:
-            A Pytorch tensor containing the next batch of samples.
+        Returns a Pytorch tensor containing the next batch of samples.
         """
         # wait until batch is ready
         try:

@@ -8,6 +8,9 @@ from paths import CUTECHESS_CLI_BIN, OPENING_BOOK, ENGINE_BIN, ORDO_BIN, STOCKFI
 
 @dataclass
 class Engine:
+    """
+    Runnable engine description with corresponding limits.
+    """
     name: str
     cmd: str
     args: list[str] | None = None
@@ -15,6 +18,7 @@ class Engine:
     nodes: int | None = None
     depth: int | None = None
     elo: int | None = None # only works in Stockfish
+
 
 def run_games(
     engines: list[Engine],
