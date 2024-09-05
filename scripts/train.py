@@ -211,6 +211,7 @@ def train(config: dict, use_wandb: bool):
                 else:
                     # make local checkpoint
                     # torch.save(chessmodel.state_dict(), f"checkpoints/{epoch}.pth")
+                    pass
 
 
 def main():
