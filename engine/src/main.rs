@@ -1,7 +1,7 @@
 mod defs;
 mod limits;
 mod position_stack;
-mod pv;
+mod pv_table;
 mod search;
 mod transposition;
 

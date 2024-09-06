@@ -24,6 +24,7 @@ pub struct State {
 }
 
 pub struct PositionStack {
+    // no Vec here because NnueAccumulator creates tensors which are expensive
     index: usize,
     stack: [State; MAX_PLY],
 
@@ -46,9 +47,9 @@ impl PositionStack {
             index: 0,
             stack: std::array::from_fn(|_| State {
                 pos: Chess::default(),
-                hash_key: Chess::default().zobrist_hash(EnPassantMode::Legal),
+                hash_key: Zobrist32(0),
                 rule50: 0,
-                nnue_accum: NnueAccumulator::new(nnue_model.clone()),
+                nnue_accum: NnueAccumulator::new(nnue_model.clone()), // Tensors are created here
             }),
             repetitions: Vec::with_capacity(128),
         }
@@ -90,19 +91,6 @@ impl PositionStack {
         self.stack[0].nnue_accum.refresh(&position, Color::Black);
     }
 
-    /// Get current chess position
-    pub fn get(&self) -> &Chess {
-        &self.stack[self.index].pos
-    }
-
-    pub fn hash_key(&self) -> Zobrist32 {
-        self.stack[self.index].hash_key
-    }
-
-    pub fn rule50(&self) -> u32 {
-        self.stack[self.index].rule50
-    }
-
     /// Makes a move, or a null move if None.
     /// The move is assumed to be legal.
     pub fn do_move(&mut self, mov: Option<Move>) {
@@ -130,9 +118,7 @@ impl PositionStack {
             // make a regular move
             next_state.pos.play_unchecked(&mov);
 
-            // reset rule50 counter on
-            // - pawn moves
-            // - captures
+            // update rule50 counter
             if should_reset_50_rule(&mov) {
                 next_state.rule50 = 0;
             }
@@ -184,6 +170,19 @@ impl PositionStack {
             }
         }
         count >= 2
+    }
+
+    /// Get shakmaty's chess structure
+    pub fn get(&self) -> &Chess {
+        &self.stack[self.index].pos
+    }
+
+    pub fn hash_key(&self) -> Zobrist32 {
+        self.stack[self.index].hash_key
+    }
+
+    pub fn rule50(&self) -> u32 {
+        self.stack[self.index].rule50
     }
 }
 

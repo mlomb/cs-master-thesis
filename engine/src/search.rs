@@ -2,7 +2,7 @@ use crate::{
     defs::{Value, INFINITY, INVALID_MOVE, MAX_PLY},
     limits::SearchLimits,
     position_stack::PositionStack,
-    pv::PVTable,
+    pv_table::PVTable,
     transposition::{TFlag, TranspositionTable},
 };
 use nn::nnue::model::NnueModel;
