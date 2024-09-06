@@ -1,20 +1,19 @@
 mod defs;
-mod limit;
+mod limits;
 mod position_stack;
 mod pv;
 mod search;
-mod tt;
+mod transposition;
 
 use clap::Parser;
-use limit::Limit;
+use limits::SearchLimits;
 use nn::nnue::model::NnueModel;
 use search::Search;
 use shakmaty::fen::Fen;
 use shakmaty::uci::UciMove;
-use shakmaty::{CastlingMode, Chess, Position};
+use shakmaty::{CastlingMode, Chess, Color, Position};
 use std::cell::RefCell;
-use std::fs::File;
-use std::io::{self, BufRead, Read};
+use std::io::{self, BufRead};
 use std::rc::Rc;
 use vampirc_uci::{parse_one, UciMessage};
 
@@ -28,27 +27,21 @@ struct Cli {
 fn main() {
     let args = Cli::parse();
 
-    let nn_file = if let Some(path) = args.nn {
+    let model = if let Some(path) = args.nn {
         println!("info string Loading NNUE from {}", path);
-
-        let mut file = File::open(path).unwrap();
-        let mut buffer = Vec::new();
-        file.read_to_end(&mut buffer).unwrap();
-        buffer
+        NnueModel::load(&path)
     } else {
         println!("info string Using embedded NNUE");
-
-        include_bytes!("../../models/best.nn").to_vec()
-    };
-
-    let model = NnueModel::from_memory(&nn_file).unwrap();
+        NnueModel::from_memory(&include_bytes!("../../models/best.nn").to_vec())
+    }
+    .expect("Failed to load NNUE model");
 
     println!("info string NNUE net: {}", model.arch);
     println!("info string NNUE size: {} params", model.params);
 
-    let mut search = Search::new(Rc::new(RefCell::new(model)));
-
-    let mut position: Chess = Chess::default();
+    let model = Rc::new(RefCell::new(model));
+    let mut search = Search::new(model.clone());
+    let mut turn = Color::White;
 
     for line in io::stdin().lock().lines() {
         let msg: UciMessage = parse_one(&line.unwrap().trim());
@@ -66,44 +59,48 @@ fn main() {
                 );
                 println!("{}", UciMessage::UciOk);
             }
+            UciMessage::UciNewGame => {
+                // reset the search completely
+                // this may be expensive and the object should be reused
+                // but this way I'm sure I'm not leaking anything from the previous game
+                search = Search::new(model.clone());
+            }
             UciMessage::Position {
                 startpos,
                 fen,
                 moves,
             } => {
-                if startpos {
-                    position = Chess::default();
+                let position = if startpos {
+                    Chess::default()
                 } else {
-                    let fen: Fen = fen.unwrap().0.parse().unwrap();
-                    position = fen.into_position(shakmaty::CastlingMode::Standard).unwrap();
-                }
+                    fen.unwrap()
+                        .0
+                        .parse::<Fen>()
+                        .expect("a valid fen")
+                        .into_position(CastlingMode::Standard)
+                        .unwrap()
+                };
 
-                search.reset_repetition();
-                search.record_repetition(&position);
+                let moves = moves
+                    .iter()
+                    .map(|m| m.to_string().parse().expect("a valid uci move"))
+                    .collect::<Vec<UciMove>>();
 
-                for m in moves {
-                    let uci: UciMove = m.to_string().parse().unwrap();
-                    let m = uci.to_move(&position).unwrap();
-                    position = position.play(&m).unwrap();
-
-                    search.record_repetition(&position);
-                }
+                turn = position.turn();
+                search.set_position(position, moves);
             }
             UciMessage::Go {
                 time_control,
                 search_control,
             } => {
-                let best_move = search.go(
-                    position.clone(),
-                    Limit::from_uci(time_control, search_control, position.turn()),
-                );
-
-                // TODO: we should investigate why this happens, tho it is very very rare
-                let best_move = best_move.or(position.legal_moves().first().cloned());
+                let best_move =
+                    search.go(SearchLimits::from_uci(time_control, search_control, turn));
 
                 println!(
                     "bestmove {}",
-                    best_move.unwrap().to_uci(CastlingMode::Standard)
+                    best_move
+                        .expect("a best move")
+                        .to_uci(CastlingMode::Standard)
                 );
             }
             _ => {}

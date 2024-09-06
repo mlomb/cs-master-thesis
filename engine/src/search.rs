@@ -1,15 +1,16 @@
 use crate::{
     defs::{Value, INFINITY, INVALID_MOVE, MAX_PLY},
-    limit::Limit,
-    position_stack::{HashKey, PositionStack},
+    limits::SearchLimits,
+    position_stack::PositionStack,
     pv::PVTable,
-    tt::{TFlag, TTable},
+    transposition::{TFlag, TranspositionTable},
 };
 use nn::nnue::model::NnueModel;
-use shakmaty::{zobrist::ZobristHash, CastlingMode, Chess, Move, MoveList, Position};
+use shakmaty::{uci::UciMove, CastlingMode, Chess, Move, MoveList, Position};
 use std::time::Instant;
 use std::{cell::RefCell, rc::Rc};
 
+/// Chess search engine
 pub struct Search {
     /// Current position
     pub pos: PositionStack,
@@ -24,61 +25,50 @@ pub struct Search {
     /// Principal variation table
     pub pv: PVTable,
     /// Transposition table
-    pub tt: TTable,
-    /// Killer moves
+    pub tt: TranspositionTable,
+
     pub killer_moves: [[Move; 2]; MAX_PLY],
-    /// History moves
     pub history_moves: [[Value; 8 * 8]; 12],
-    /// Repetition table
-    pub repetition_index: usize,
-    pub repetition_table: [HashKey; 1024],
 
     /// Start search time
     pub start_time: Instant,
     /// Whether the search was aborted
     pub aborted: bool,
     /// Limits
-    pub limits: Limit,
+    pub limits: SearchLimits,
 }
 
 impl Search {
     pub fn new(nnue_model: Rc<RefCell<NnueModel>>) -> Self {
-        Search {
+        let mut search = Search {
             pos: PositionStack::new(nnue_model.clone()),
             ply: 0,
             nodes: 0,
             evals: 0,
             pv: PVTable::new(),
-            tt: TTable::new(128), // 128 MB
+            tt: TranspositionTable::new(128), // 128 MB by default
             killer_moves: std::array::from_fn(|_| [INVALID_MOVE, INVALID_MOVE]),
             history_moves: [[0; 8 * 8]; 12],
-            repetition_index: 0,
-            repetition_table: [HashKey::default(); 1024],
             start_time: Instant::now(),
             aborted: false,
-            limits: Limit {
-                depth: None,
-                time: None,
-                nodes: None,
-            },
-        }
+            limits: SearchLimits::none(),
+        };
+        search.set_position(Chess::default(), vec![]);
+        search
     }
 
-    pub fn go(&mut self, position: Chess, limits: Limit) -> Option<Move> {
-        // init position
-        self.pos.reset(&position);
-        self.ply = 0;
-        assert!(
-            !self.pos.get().legal_moves().is_empty(),
-            "No moves available"
-        );
+    /// Set the position to search from
+    /// Effectively resets the position except the transposition table
+    pub fn set_position(&mut self, position: Chess, moves: Vec<UciMove>) {
+        self.pos.reset(position, moves);
+    }
 
-        // reset stats
+    pub fn go(&mut self, limits: SearchLimits) -> Option<Move> {
+        // reset
+        self.ply = 0;
         self.nodes = 0;
         self.evals = 0;
         self.limits = limits;
-
-        // time control
         self.start_time = Instant::now();
         self.aborted = false;
 
@@ -91,7 +81,7 @@ impl Search {
             let score = self.negamax(-INFINITY, INFINITY, depth, false);
 
             if self.aborted {
-                // time limit
+                // limit reached
                 // do not replace best line since the search is incomplete
                 break;
             }
@@ -99,11 +89,11 @@ impl Search {
             best_line = Some(self.pv.get_mainline());
 
             print!(
-                "info depth {} nodes {} evals {} time {} score cp {} pv ",
+                "info depth {} time {} nodes {} evals {} score cp {} pv ",
                 depth,
+                self.start_time.elapsed().as_millis(),
                 self.nodes,
                 self.evals,
-                self.start_time.elapsed().as_millis(),
                 score
             );
             for mv in best_line.as_ref().unwrap() {
@@ -125,7 +115,7 @@ impl Search {
         // increment the number of nodes searched
         self.nodes += 1;
 
-        if self.is_draw() {
+        if self.pos.is_draw() {
             // draw
             return 0;
         }
@@ -201,7 +191,7 @@ impl Search {
         self.pv.reset(self.ply);
 
         // check three fold repetition & 50-move rule
-        if self.is_draw() {
+        if self.pos.is_draw() {
             // draw
             return 0;
         }
@@ -281,7 +271,6 @@ impl Search {
 
             // make move
             self.ply += 1;
-            self.push_repetition_key(self.pos.hash_key());
             self.pos.do_move(Some(move_.clone()));
 
             if moves_searched == 0 {
@@ -320,7 +309,6 @@ impl Search {
 
             // undo move
             self.pos.undo_move();
-            self.pop_repetition_key();
             self.ply -= 1;
 
             // replace best
@@ -435,21 +423,6 @@ impl Search {
         });
     }
 
-    fn is_draw(&self) -> bool {
-        // insufficient material
-        if self.pos.get().is_insufficient_material() {
-            return true;
-        }
-
-        // 50-move rule
-        if self.pos.rule50() >= 100 {
-            return true;
-        }
-
-        // threefold repetition
-        return self.ply > 0 && self.is_repetition(self.pos.hash_key());
-    }
-
     fn checkup(&mut self) {
         if self.nodes & 2047 == 0 {
             // make sure we are not exceeding the limits
@@ -465,40 +438,5 @@ impl Search {
                 }
             }
         }
-    }
-}
-
-/// ==============================
-///       Repetition table
-/// ==============================
-impl Search {
-    /// Clears the repetition table
-    /// Most likely called at the start of a new game
-    pub fn reset_repetition(&mut self) {
-        self.repetition_index = 0;
-    }
-
-    /// Record a position in the repetition table
-    /// Called after Uci commands
-    pub fn record_repetition(&mut self, position: &Chess) {
-        let key = position.zobrist_hash(shakmaty::EnPassantMode::Legal);
-        self.push_repetition_key(key);
-    }
-
-    /// Push a key in the repetition table
-    /// Called when making a move
-    fn push_repetition_key(&mut self, key: HashKey) {
-        self.repetition_table[self.repetition_index] = key;
-        self.repetition_index += 1;
-    }
-
-    /// Pop a key from the repetition table
-    /// Called when undoing a move
-    fn pop_repetition_key(&mut self) {
-        self.repetition_index -= 1;
-    }
-
-    fn is_repetition(&self, key: HashKey) -> bool {
-        self.repetition_table[..self.repetition_index].contains(&key)
     }
 }

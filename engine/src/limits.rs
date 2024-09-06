@@ -4,16 +4,25 @@ use shakmaty::Color;
 use vampirc_uci::{UciSearchControl, UciTimeControl};
 
 /// Search termination conditions
-pub struct Limit {
+pub struct SearchLimits {
     /// Depth limit, do not exceed this depth
     pub depth: Option<i32>,
     /// Nodes limit, do not visit more nodes than this
     pub nodes: Option<usize>,
-    /// Time limit, do not exceed this time
+    /// Time limit, do not search for longer than this
     pub time: Option<Duration>,
 }
 
-impl Limit {
+impl SearchLimits {
+    /// Empty limits, no restrictions
+    pub fn none() -> Self {
+        SearchLimits {
+            depth: None,
+            nodes: None,
+            time: None,
+        }
+    }
+
     /// Builds the Limit structure from the UCI library
     pub fn from_uci(
         time_control: Option<UciTimeControl>,
@@ -65,7 +74,7 @@ impl Limit {
             }
         }
 
-        Limit {
+        SearchLimits {
             depth: max_depth,
             nodes: max_nodes,
             time: time_limit.map(|t| {

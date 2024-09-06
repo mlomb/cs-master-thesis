@@ -1,4 +1,4 @@
-use crate::position_stack::HashKey;
+use crate::defs::HashKey;
 use shakmaty::Move;
 
 #[derive(Clone)]
@@ -18,13 +18,13 @@ pub struct TEntry {
 }
 
 /// Transposition table
-pub struct TTable {
+pub struct TranspositionTable {
     entries: Vec<TEntry>,
 }
 
-impl TTable {
+impl TranspositionTable {
     pub fn new(size_mb: usize) -> Self {
-        TTable {
+        TranspositionTable {
             entries: vec![
                 TEntry {
                     key: HashKey::default(),

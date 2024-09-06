@@ -1,12 +1,11 @@
-use crate::defs::MAX_PLY;
+use crate::defs::{HashKey, MAX_PLY};
 use nn::nnue::{accumulator::NnueAccumulator, model::NnueModel};
 use shakmaty::{
+    uci::UciMove,
     zobrist::{Zobrist32, ZobristHash},
     Chess, Color, EnPassantMode, Move, Position, Role,
 };
-use std::{cell::RefCell, rc::Rc};
-
-pub type HashKey = shakmaty::zobrist::Zobrist32;
+use std::{cell::RefCell, os::linux::raw::stat, rc::Rc};
 
 pub struct State {
     /// The current position
@@ -27,6 +26,9 @@ pub struct State {
 pub struct PositionStack {
     index: usize,
     stack: [State; MAX_PLY],
+
+    /// Repetition list (previous to stack[0])
+    repetitions: Vec<HashKey>,
 }
 
 impl State {
@@ -48,17 +50,44 @@ impl PositionStack {
                 rule50: 0,
                 nnue_accum: NnueAccumulator::new(nnue_model.clone()),
             }),
+            repetitions: Vec::with_capacity(128),
         }
     }
 
     /// Clears the stack and sets the position
-    pub fn reset(&mut self, pos: &Chess) {
+    pub fn reset(&mut self, mut position: Chess, moves: Vec<UciMove>) {
+        assert!(!position.legal_moves().is_empty(), "No moves available");
+
         self.index = 0;
-        self.stack[0].pos = pos.clone();
-        self.stack[0].hash_key = pos.zobrist_hash(EnPassantMode::Legal);
-        self.stack[0].rule50 = 0; // TODO: check!
-        self.stack[0].nnue_accum.refresh(pos, Color::White);
-        self.stack[0].nnue_accum.refresh(pos, Color::Black);
+        self.repetitions.clear();
+
+        let mut rule50 = 0;
+
+        // compute final position and state
+        for mov in moves {
+            let mov = mov.to_move(&position).unwrap();
+
+            // increment rule 50
+            if should_reset_50_rule(&mov) {
+                rule50 = 0;
+            } else {
+                rule50 += 1;
+            }
+
+            // add previous move to repetition list
+            self.repetitions
+                .push(position.zobrist_hash(EnPassantMode::Legal));
+
+            // advance position
+            position = position.play(&mov).unwrap();
+        }
+
+        // fill first state
+        self.stack[0].pos = position.clone();
+        self.stack[0].hash_key = position.zobrist_hash(EnPassantMode::Legal);
+        self.stack[0].rule50 = rule50;
+        self.stack[0].nnue_accum.refresh(&position, Color::White);
+        self.stack[0].nnue_accum.refresh(&position, Color::Black);
     }
 
     /// Get current chess position
@@ -104,10 +133,8 @@ impl PositionStack {
             // reset rule50 counter on
             // - pawn moves
             // - captures
-            if let Move::Normal { role, .. } = mov {
-                if role == Role::Pawn || mov.is_capture() {
-                    next_state.rule50 = 0;
-                }
+            if should_reset_50_rule(&mov) {
+                next_state.rule50 = 0;
             }
         } else {
             // make a null move
@@ -130,4 +157,40 @@ impl PositionStack {
 
         self.stack[self.index].nnue_accum.forward(side_to_move)
     }
+
+    /// Returns true if the current position is a draw
+    pub fn is_draw(&self) -> bool {
+        let state = &self.stack[self.index];
+
+        // insufficient material
+        if state.pos.is_insufficient_material() {
+            return true;
+        }
+
+        // 50-move rule
+        if state.rule50 >= 100 {
+            return true;
+        }
+
+        // threefold repetition
+        let mut count = self
+            .repetitions
+            .iter()
+            .filter(|&&x| x == state.hash_key)
+            .count();
+        for i in 0..self.index {
+            if self.stack[i].hash_key == state.hash_key {
+                count += 1;
+            }
+        }
+        count >= 2
+    }
+}
+
+/// Whether the 50-move rule should be reset after the move
+fn should_reset_50_rule(mov: &Move) -> bool {
+    // reset rule50 counter on
+    // - captures
+    // - pawn moves
+    mov.is_capture() || mov.role() == Role::Pawn
 }
