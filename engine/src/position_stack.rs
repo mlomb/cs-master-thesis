@@ -5,12 +5,12 @@ use shakmaty::{
     zobrist::{Zobrist32, ZobristHash},
     Chess, Color, EnPassantMode, Move, Position, Role,
 };
-use std::{cell::RefCell, os::linux::raw::stat, rc::Rc};
+use std::{cell::RefCell, rc::Rc};
 
 pub struct State {
     /// The current position
     /// We use the shakmaty library that is copy-make
-    /// This could be replaced by make-unmake
+    /// This could be replaced by make-unmake, but it is fast enough (perf dominated by NNUE)
     pos: Chess,
 
     /// The Zobrist hash key for the position

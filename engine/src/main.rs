@@ -64,6 +64,7 @@ fn main() {
                 // this may be expensive and the object should be reused
                 // but this way I'm sure I'm not leaking anything from the previous game
                 search = Search::new(model.clone());
+                turn = Color::White;
             }
             UciMessage::Position {
                 startpos,
