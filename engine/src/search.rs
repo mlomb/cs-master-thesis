@@ -1,12 +1,13 @@
 use crate::{
     defs::{Value, INFINITY, INVALID_MOVE, MAX_PLY},
+    limit::Limit,
     position_stack::{HashKey, PositionStack},
     pv::PVTable,
     tt::{TFlag, TTable},
 };
 use nn::nnue::model::NnueModel;
 use shakmaty::{zobrist::ZobristHash, CastlingMode, Chess, Move, MoveList, Position};
-use std::time::{Duration, Instant};
+use std::time::Instant;
 use std::{cell::RefCell, rc::Rc};
 
 pub struct Search {
@@ -34,12 +35,10 @@ pub struct Search {
 
     /// Start search time
     pub start_time: Instant,
-    /// Time limit, do not exceed this time
-    pub time_limit: Option<Duration>,
-    /// Nodes limit, do not visit more nodes than this
-    pub node_limit: Option<usize>,
     /// Whether the search was aborted
     pub aborted: bool,
+    /// Limits
+    pub limits: Limit,
 }
 
 impl Search {
@@ -56,19 +55,16 @@ impl Search {
             repetition_index: 0,
             repetition_table: [HashKey::default(); 1024],
             start_time: Instant::now(),
-            time_limit: None,
-            node_limit: None,
             aborted: false,
+            limits: Limit {
+                depth: None,
+                time: None,
+                nodes: None,
+            },
         }
     }
 
-    pub fn go(
-        &mut self,
-        position: Chess,
-        max_depth: Option<i32>,
-        time_limit: Option<Duration>,
-        node_limit: Option<usize>,
-    ) -> Option<Move> {
+    pub fn go(&mut self, position: Chess, limits: Limit) -> Option<Move> {
         // init position
         self.pos.reset(&position);
         self.ply = 0;
@@ -80,17 +76,18 @@ impl Search {
         // reset stats
         self.nodes = 0;
         self.evals = 0;
+        self.limits = limits;
 
         // time control
         self.start_time = Instant::now();
-        self.time_limit = time_limit;
-        self.node_limit = node_limit;
         self.aborted = false;
 
         // best line found so far
         let mut best_line = None;
 
-        for depth in 1..=max_depth.unwrap_or(MAX_PLY as i32 - 1) {
+        let max_depth = self.limits.depth.unwrap_or(MAX_PLY as i32 - 1);
+
+        for depth in 1..=max_depth {
             let score = self.negamax(-INFINITY, INFINITY, depth, false);
 
             if self.aborted {
@@ -456,14 +453,14 @@ impl Search {
     fn checkup(&mut self) {
         if self.nodes & 2047 == 0 {
             // make sure we are not exceeding the limits
-            if let Some(time_limit) = self.time_limit {
+            if let Some(time_limit) = self.limits.time {
                 if self.start_time.elapsed() >= time_limit {
                     self.aborted = true;
                 }
             }
 
-            if let Some(node_limit) = self.node_limit {
-                if self.nodes >= node_limit {
+            if let Some(nodes_limit) = self.limits.nodes {
+                if self.nodes >= nodes_limit {
                     self.aborted = true;
                 }
             }

@@ -1,21 +1,22 @@
 mod defs;
+mod limit;
 mod position_stack;
 mod pv;
 mod search;
 mod tt;
 
 use clap::Parser;
+use limit::Limit;
 use nn::nnue::model::NnueModel;
 use search::Search;
 use shakmaty::fen::Fen;
 use shakmaty::uci::UciMove;
-use shakmaty::{CastlingMode, Chess, Color, Position};
+use shakmaty::{CastlingMode, Chess, Position};
 use std::cell::RefCell;
 use std::fs::File;
 use std::io::{self, BufRead, Read};
 use std::rc::Rc;
-use std::time::Duration;
-use vampirc_uci::{parse_one, UciMessage, UciTimeControl};
+use vampirc_uci::{parse_one, UciMessage};
 
 #[derive(Parser)]
 struct Cli {
@@ -92,62 +93,9 @@ fn main() {
                 time_control,
                 search_control,
             } => {
-                let available_time = match time_control {
-                    None => None, // infinite
-                    Some(UciTimeControl::Infinite) => None,
-                    Some(UciTimeControl::Ponder) => unimplemented!(""),
-                    Some(UciTimeControl::MoveTime(fixed_time)) => fixed_time.to_std().ok(), // movetime X (ms)
-                    Some(UciTimeControl::TimeLeft {
-                        white_time,
-                        black_time,
-                        white_increment,
-                        black_increment,
-                        moves_to_go: _,
-                    }) => {
-                        let white_time = white_time.map(|x| x.num_milliseconds()).unwrap_or(0);
-                        let black_time = black_time.map(|x| x.num_milliseconds()).unwrap_or(0);
-                        let white_incr = white_increment.map(|x| x.num_milliseconds()).unwrap_or(0);
-                        let black_incr = black_increment.map(|x| x.num_milliseconds()).unwrap_or(0);
-
-                        let (my_time, my_incr) = if position.turn() == Color::White {
-                            (white_time, white_incr)
-                        } else {
-                            (black_time, black_incr)
-                        };
-
-                        let ms = my_incr as f32 + 0.02 * my_time as f32;
-                        Some(Duration::from_millis(ms as u64))
-                    }
-                };
-
-                let mut max_depth = None;
-                if let Some(ref search_control) = search_control {
-                    if let Some(opt_depth) = search_control.depth {
-                        assert!(opt_depth >= 1);
-                        max_depth = Some(opt_depth as i32);
-                    }
-                }
-
-                let mut max_nodes = None;
-                if let Some(ref search_control) = search_control {
-                    if let Some(opt_nodes) = search_control.nodes {
-                        assert!(opt_nodes >= 1);
-                        max_nodes = Some(opt_nodes as usize);
-                    }
-                }
-
                 let best_move = search.go(
                     position.clone(),
-                    max_depth,
-                    available_time.map(|t| {
-                        // wiggle room to not time out
-                        if t < Duration::from_millis(500) {
-                            (t - Duration::from_millis(10)).max(Duration::from_millis(10))
-                        } else {
-                            t - Duration::from_millis(100)
-                        }
-                    }),
-                    max_nodes,
+                    Limit::from_uci(time_control, search_control, position.turn()),
                 );
 
                 // TODO: we should investigate why this happens, tho it is very very rare
