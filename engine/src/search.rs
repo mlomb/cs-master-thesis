@@ -3,7 +3,7 @@ use crate::{
     limits::SearchLimits,
     position_stack::PositionStack,
     pv_table::PVTable,
-    transposition::{TFlag, TranspositionTable},
+    transposition_table::{TFlag, TranspositionTable},
 };
 use nn::nnue::model::NnueModel;
 use shakmaty::{uci::UciMove, CastlingMode, Chess, Move, MoveList, Position};
@@ -63,6 +63,8 @@ impl Search {
         self.pos.reset(position, moves);
     }
 
+    /// Runs the search with the given limits
+    /// Returns the best move found
     pub fn go(&mut self, limits: SearchLimits) -> Option<Move> {
         // reset
         self.ply = 0;
@@ -200,10 +202,14 @@ impl Search {
         let mut pv_move = None;
 
         if !is_pv && self.pos.rule50() < 90 {
-            if let Some(score) =
-                self.tt
-                    .probe(self.pos.hash_key(), alpha, beta, depth, &mut pv_move)
-            {
+            if let Some(score) = self.tt.read_entry(
+                self.pos.get(),
+                self.pos.hash_key(),
+                alpha,
+                beta,
+                depth,
+                &mut pv_move,
+            ) {
                 // hit!
                 return score;
             }
@@ -327,7 +333,7 @@ impl Search {
 
                 // store TT entry
                 self.tt
-                    .record(self.pos.hash_key(), move_, beta, depth, TFlag::Beta);
+                    .write_entry(self.pos.hash_key(), move_, beta, depth, TFlag::Beta);
 
                 // fails high
                 return beta;
@@ -364,7 +370,7 @@ impl Search {
             }
         }
 
-        self.tt.record(
+        self.tt.write_entry(
             self.pos.hash_key(),
             best_move.unwrap(),
             alpha,

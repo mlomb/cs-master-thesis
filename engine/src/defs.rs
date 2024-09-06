@@ -1,4 +1,4 @@
-use shakmaty::{zobrist::Zobrist32, Move, Role, Square};
+use shakmaty::{zobrist::Zobrist64, Move, Role, Square};
 
 /// Engine's score units
 pub type Value = i32;
@@ -19,4 +19,4 @@ pub const INVALID_MOVE: Move = Move::Normal {
 };
 
 /// Hash key type
-pub type HashKey = Zobrist32;
+pub type HashKey = Zobrist64;

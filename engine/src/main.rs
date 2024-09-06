@@ -3,7 +3,7 @@ mod limits;
 mod position_stack;
 mod pv_table;
 mod search;
-mod transposition;
+mod transposition_table;
 
 use clap::Parser;
 use limits::SearchLimits;

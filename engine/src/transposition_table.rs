@@ -1,5 +1,5 @@
 use crate::defs::HashKey;
-use shakmaty::Move;
+use shakmaty::{Chess, Move, Position};
 
 #[derive(Clone)]
 pub enum TFlag {
@@ -38,7 +38,7 @@ impl TranspositionTable {
         }
     }
 
-    pub fn record(&mut self, key: HashKey, move_: Move, score: i32, depth: i32, flag: TFlag) {
+    pub fn write_entry(&mut self, key: HashKey, move_: Move, score: i32, depth: i32, flag: TFlag) {
         let len = self.entries.len();
         let entry = &mut self.entries[key.0 as usize % len];
 
@@ -53,8 +53,9 @@ impl TranspositionTable {
         };
     }
 
-    pub fn probe(
+    pub fn read_entry(
         &self,
+        pos: &Chess,
         key: HashKey,
         alpha: i32,
         beta: i32,
@@ -65,23 +66,29 @@ impl TranspositionTable {
 
         // make sure the position is the same (note that there can still be collisions)
         if entry.key == key {
-            if entry.depth as i32 >= depth {
-                match entry.flag {
-                    TFlag::Exact => return Some(entry.score),
-                    TFlag::Alpha => {
-                        if entry.score <= alpha {
-                            return Some(alpha);
+            if let Some(ref mov) = entry.move_ {
+                // check legality
+                if pos.is_legal(&mov) {
+                    // make sure depth is the same or higher (otherwise information may be incorrect)
+                    if entry.depth as i32 >= depth {
+                        match entry.flag {
+                            TFlag::Exact => return Some(entry.score),
+                            TFlag::Alpha => {
+                                if entry.score <= alpha {
+                                    return Some(alpha);
+                                }
+                            }
+                            TFlag::Beta => {
+                                if entry.score >= beta {
+                                    return Some(beta);
+                                }
+                            }
                         }
                     }
-                    TFlag::Beta => {
-                        if entry.score >= beta {
-                            return Some(beta);
-                        }
-                    }
+
+                    *pv_move = entry.move_.clone();
                 }
             }
-
-            *pv_move = entry.move_.clone();
         }
 
         None

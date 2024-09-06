@@ -2,7 +2,7 @@ use crate::defs::{HashKey, MAX_PLY};
 use nn::nnue::{accumulator::NnueAccumulator, model::NnueModel};
 use shakmaty::{
     uci::UciMove,
-    zobrist::{Zobrist32, ZobristHash},
+    zobrist::{Zobrist64, ZobristHash},
     Chess, Color, EnPassantMode, Move, Position, Role,
 };
 use std::{cell::RefCell, rc::Rc};
@@ -47,7 +47,7 @@ impl PositionStack {
             index: 0,
             stack: std::array::from_fn(|_| State {
                 pos: Chess::default(),
-                hash_key: Zobrist32(0),
+                hash_key: Zobrist64(0),
                 rule50: 0,
                 nnue_accum: NnueAccumulator::new(nnue_model.clone()), // Tensors are created here
             }),
@@ -177,7 +177,7 @@ impl PositionStack {
         &self.stack[self.index].pos
     }
 
-    pub fn hash_key(&self) -> Zobrist32 {
+    pub fn hash_key(&self) -> HashKey {
         self.stack[self.index].hash_key
     }
 

@@ -160,6 +160,12 @@ def measure_perf_diff(
 
 
 if __name__ == '__main__':
+    # elo, error, points = measure_perf_diff(
+    #     engine2=Engine(name="aaa", cmd="aaa"),
+    #     n=100,
+    # )
+    # print(f"ELO: {elo} ± {error} Points: {points}")
+
     with open("elo.csv", "w") as f:
         f.write("n,elo_diff,error,points\n")
         f.flush()
