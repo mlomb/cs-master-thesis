@@ -43,12 +43,13 @@ def run_games(
         '-repeat',
         '-pgnout', f'{pgn_file}',
         '-recover', # recover from crashes
-        '-each', 'timemargin=2000'
+        '-draw', 'movenumber=40', 'movecount=8', 'score=10', # adjudicate draws
+        '-each', 'timemargin=2000',
     ]
 
     # add engines
     for engine in engines:
-        command += ['-engine', f'name={engine.name}', f'cmd={engine.cmd}', 'proto=uci', 'restart=on']
+        command += ['-engine', f'name={engine.name}', f'cmd={engine.cmd}', 'proto=uci', 'restart=off']
         if engine.args:
             command += [f'arg={" ".join(engine.args)}']
         if engine.movetime:
