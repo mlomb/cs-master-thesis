@@ -81,7 +81,7 @@ def run_games(
 
         assert program.returncode == 0, "Error running games"
 
-def run_ordo(pgn_file: str):
+def run_ordo(pgn_file: str, sims: int = 100):
     """
     Runs Ordo on the given PGN file
     Returns a dictionary with the results, where the key is the engine name and the value is
@@ -98,7 +98,11 @@ def run_ordo(pgn_file: str):
     ]
 
     # print("Running:", " ".join(command))
-    output = subprocess.check_output(command).decode("utf-8")
+    try:
+        output = subprocess.check_output(command, timeout=10).decode("utf-8")
+    except subprocess.TimeoutExpired:
+        print(f"Ordo timeout, retrying with sims={sims // 2}")
+        return run_ordo(pgn_file, sims=sims // 2)
 
     results = dict()
 
@@ -136,7 +140,7 @@ def measure_perf_diff(
     with tempfile.NamedTemporaryFile(suffix=".pgn") as tmp:
         pgn_file = tmp.name
 
-        print(pgn_file)
+        print("PGN:", pgn_file)
 
         run_games(
             engines=[engine1, engine2],
