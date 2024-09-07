@@ -7,6 +7,7 @@ use crate::{
 };
 use nn::nnue::model::NnueModel;
 use shakmaty::{uci::UciMove, CastlingMode, Chess, Move, MoveList, Position};
+use std::io::Write;
 use std::time::Instant;
 use std::{cell::RefCell, rc::Rc};
 
@@ -16,6 +17,8 @@ pub struct Search {
     pub pos: PositionStack,
     /// Current ply
     pub ply: usize,
+    /// Depth reached in current search
+    pub depth_reached: i32,
 
     /// Number of nodes searched
     pub nodes: usize,
@@ -43,6 +46,7 @@ impl Search {
         let mut search = Search {
             pos: PositionStack::new(nnue_model.clone()),
             ply: 0,
+            depth_reached: 0,
             nodes: 0,
             evals: 0,
             pv: PVTable::new(),
@@ -61,6 +65,10 @@ impl Search {
     /// Effectively resets the position except the transposition table and killer/history moves
     pub fn set_position(&mut self, position: Chess, moves: Vec<UciMove>) {
         self.pos.reset(position, moves);
+
+        // reset hints
+        self.killer_moves = std::array::from_fn(|_| [INVALID_MOVE, INVALID_MOVE]);
+        self.history_moves = [[0; 8 * 8]; 12];
     }
 
     /// Runs the search with the given limits
@@ -68,6 +76,7 @@ impl Search {
     pub fn go(&mut self, limits: SearchLimits) -> Option<Move> {
         // reset
         self.ply = 0;
+        self.depth_reached = 0;
         self.nodes = 0;
         self.evals = 0;
         self.limits = limits;
@@ -88,6 +97,9 @@ impl Search {
                 break;
             }
 
+            self.depth_reached = depth;
+
+            // save best line for this depth
             best_line = Some(self.pv.get_mainline());
 
             print!(
@@ -113,7 +125,15 @@ impl Search {
         best_line.expect("No PV line found").first().cloned()
     }
 
-    fn quiescence(&mut self, mut alpha: Value, beta: Value) -> Value {
+    fn quiescence(&mut self, mut alpha: Value, beta: Value, checks: i32) -> Value {
+        // time control
+        self.checkup();
+
+        if self.aborted {
+            // abort search (time limit)
+            return 0;
+        }
+
         // increment the number of nodes searched
         self.nodes += 1;
 
@@ -140,6 +160,11 @@ impl Search {
             alpha = score;
         }
 
+        if checks < 0 {
+            // checks exhausted, early exit
+            return alpha;
+        }
+
         // generate legal moves
         let mut moves = self.pos.get().capture_moves();
 
@@ -151,7 +176,11 @@ impl Search {
 
             self.pos.do_move(Some(move_.clone()));
             self.ply += 1;
-            let score = -self.quiescence(-beta, -alpha);
+            let score = -self.quiescence(
+                -beta,
+                -alpha,
+                checks - if self.pos.get().is_check() { 1 } else { 0 }, // allow one less check
+            );
             self.ply -= 1;
             self.pos.undo_move();
 
@@ -218,7 +247,7 @@ impl Search {
         if depth == 0 {
             // escape from recursion
             // run quiescence search
-            return self.quiescence(alpha, beta);
+            return self.quiescence(alpha, beta, 3); // allow up to three checks
         }
 
         let in_check = self.pos.get().is_check();
@@ -430,7 +459,7 @@ impl Search {
     }
 
     fn checkup(&mut self) {
-        if self.nodes & 2047 == 0 {
+        if self.nodes & 2047 == 0 && self.depth_reached > 0 {
             // make sure we are not exceeding the limits
             if let Some(time_limit) = self.limits.time {
                 if self.start_time.elapsed() >= time_limit {
