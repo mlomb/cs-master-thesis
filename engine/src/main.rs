@@ -11,7 +11,7 @@ use nn::nnue::model::NnueModel;
 use search::Search;
 use shakmaty::fen::Fen;
 use shakmaty::uci::UciMove;
-use shakmaty::{CastlingMode, Chess, Color, Position};
+use shakmaty::{CastlingMode, Chess, Position};
 use std::cell::RefCell;
 use std::io::{self, BufRead};
 use std::rc::Rc;

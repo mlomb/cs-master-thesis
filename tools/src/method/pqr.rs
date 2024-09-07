@@ -29,6 +29,11 @@ impl SampleEncoder for PQREncoding {
         let p_position = &sample.position;
         let moves = p_position.legal_moves();
 
+        if moves.len() <= 2 {
+            // not enough moves to choose from
+            return;
+        }
+
         // Q: best
         let q_move = &sample.bestmove;
         let q_position = p_position.clone().play(q_move).unwrap();

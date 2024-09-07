@@ -58,7 +58,7 @@ impl Search {
     }
 
     /// Set the position to search from
-    /// Effectively resets the position except the transposition table
+    /// Effectively resets the position except the transposition table and killer/history moves
     pub fn set_position(&mut self, position: Chess, moves: Vec<UciMove>) {
         self.pos.reset(position, moves);
     }
