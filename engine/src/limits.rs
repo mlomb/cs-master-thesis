@@ -29,7 +29,7 @@ impl SearchLimits {
         search_control: Option<UciSearchControl>,
         turn: Color,
     ) -> Self {
-        let time_limit = match time_control {
+        let available_time = match time_control {
             None => None, // infinite
             Some(UciTimeControl::Infinite) => None,
             Some(UciTimeControl::Ponder) => unimplemented!(""),
@@ -77,9 +77,13 @@ impl SearchLimits {
         SearchLimits {
             depth: max_depth,
             nodes: max_nodes,
-            time: time_limit.map(|t| {
+            time: available_time.map(|t| {
                 // wiggle room to not time out
-                (t - Duration::from_millis(2)).max(Duration::from_millis(2))
+                if t < Duration::from_millis(500) {
+                    (t - Duration::from_millis(2)).max(Duration::from_millis(2))
+                } else {
+                    t - Duration::from_millis(10)
+                }
             }),
         }
     }

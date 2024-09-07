@@ -41,7 +41,6 @@ fn main() {
 
     let model = Rc::new(RefCell::new(model));
     let mut search = Search::new(model.clone());
-    let mut turn = Color::White;
 
     for line in io::stdin().lock().lines() {
         let msg: UciMessage = parse_one(&line.unwrap().trim());
@@ -64,7 +63,6 @@ fn main() {
                 // this may be expensive and the object should be reused
                 // but this way I'm sure I'm not leaking anything from the previous game
                 search = Search::new(model.clone());
-                turn = Color::White;
             }
             UciMessage::Position {
                 startpos,
@@ -87,15 +85,17 @@ fn main() {
                     .map(|m| m.to_string().parse().expect("a valid uci move"))
                     .collect::<Vec<UciMove>>();
 
-                turn = position.turn();
                 search.set_position(position, moves);
             }
             UciMessage::Go {
                 time_control,
                 search_control,
             } => {
-                let best_move =
-                    search.go(SearchLimits::from_uci(time_control, search_control, turn));
+                let best_move = search.go(SearchLimits::from_uci(
+                    time_control,
+                    search_control,
+                    search.pos.get().turn(),
+                ));
 
                 println!(
                     "bestmove {}",
