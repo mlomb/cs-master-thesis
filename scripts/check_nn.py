@@ -11,10 +11,12 @@ from lib.serialize import NnueWriter
 from lib.model import NnueModel
 from lib.paths import TOOLS_BIN, DEFAULT_DATASET
 
+N = 100_000
+
 with open(DEFAULT_DATASET) as f:
     FENS = [
         next(f).split(",")[0]
-        for _ in tqdm(range(100), desc="Reading FENS")
+        for _ in tqdm(range(N), desc="Reading FENS")
     ]
 
 
@@ -45,7 +47,7 @@ def compute_error(fen: str, nn: str):
 
     expected_output = model(input).item()
 
-    return abs(output - expected_output)
+    return output, expected_output
     
 
 
@@ -54,12 +56,13 @@ model.load_state_dict(torch.load('./data/80.pth'))
 model.clip_weights()
 
 writer = NnueWriter(model, "hv")
-with tempfile.NamedTemporaryFile() as f:
-    f.write(writer.buf)
+with tempfile.NamedTemporaryFile() as nn:
+    nn.write(writer.buf)
 
-    errors = []
+    with open("errors.csv", "w+") as f:
+        f.write("output,expected_output\n")
 
-    for fen in tqdm(FENS, desc="Computing errors"):
-        errors.append(compute_error(fen, f.name))
+        for fen in tqdm(FENS, desc="Computing errors"):
+            output, expected_output = compute_error(fen, nn.name)
+            f.write(f"{output},{expected_output}\n")
 
-    print(errors)
