@@ -100,7 +100,7 @@ impl NnueModel {
             linear2: LinearLayer::new(&mut cursor, 2 * num_l1, num_l2),
             linear_out: LinearLayer::new(&mut cursor, num_l2, num_out),
 
-            arch: format!("{}[{}]->{}x2->{}->1", feature_set_str, num_features, num_l1, num_l2),
+            arch: format!("({}[{}]->{})x2->{}->1", feature_set_str, num_features, num_l1, num_l2),
             params: 
                 // l1
                 num_features * num_l1 + num_l1 +

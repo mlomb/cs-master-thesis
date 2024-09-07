@@ -6,6 +6,7 @@ from tqdm import tqdm
 import torch
 import wandb
 import tempfile
+import math
 
 from lib.batch_loader import BatchLoader, get_feature_set_size
 from lib.model import NnueModel, expand_batch
@@ -115,6 +116,9 @@ def train(config: dict, use_wandb: bool):
 
             train_sum += train_pass(X, y)
 
+            if math.isnan(train_sum):
+                raise ValueError("NaN detected in training loss")
+
         # Step the scheduler
         scheduler.step()
 
@@ -168,34 +172,6 @@ def train(config: dict, use_wandb: bool):
             tmp.write(NnueWriter(chessmodel, config.feature_set).buf)
 
             # ======================================
-            #                PUZZLES
-            # ======================================
-            if epoch % config.puzzle_interval == 0 or epoch == 1:
-                # run puzzles
-                puzzles_results, puzzles_move_accuracy = Puzzles().measure([ENGINE_BIN, f"--nn={tmp.name}"])
-
-                # log puzzle metrics
-                if use_wandb:
-                    wandb.log(step=epoch, data={"Puzzles/moveAccuracy": puzzles_move_accuracy})
-                    wandb.log(step=epoch, data={f"Puzzles/{category}": accuracy for category, accuracy in puzzles_results})
-                else:
-                    print(f"Epoch {epoch} - Puzzles move accuracy: {puzzles_move_accuracy}")
-
-            # ======================================
-            #                  PERF
-            # ======================================
-            if epoch % config.perf_interval == 0 or epoch == 1:
-                elo_diff, error, points = measure_perf_diff(
-                    engine1=Engine(name="engine", cmd=ENGINE_BIN, args=[f"--nn={tmp.name}"]),
-                    n=200,
-                )
-
-                if use_wandb:
-                    wandb.log(step=epoch, data={"Perf/elo_diff": elo_diff, "Perf/elo_err": error, "Perf/points": points})
-                else:
-                    print(f"Epoch {epoch} - ELO: {elo_diff} ± {error} Points: {points}")
-
-            # ======================================
             #              CHECKPOINTS
             # ======================================
             if epoch % config.checkpoint_interval == 0 or epoch == 1:
@@ -212,6 +188,34 @@ def train(config: dict, use_wandb: bool):
                     # make local checkpoint
                     # torch.save(chessmodel.state_dict(), f"checkpoints/{epoch}.pth")
                     pass
+
+            # ======================================
+            #                PUZZLES
+            # ======================================
+            if epoch % config.puzzle_interval == 0 or epoch == 1:
+                # run puzzles
+                puzzles_results, puzzles_move_accuracy = Puzzles().measure([ENGINE_BIN, f"--nn={tmp.name}"])
+
+                # log puzzle metrics
+                if use_wandb:
+                    wandb.log(step=epoch, data={"Puzzles/moveAccuracy": puzzles_move_accuracy})
+                    wandb.log(step=epoch, data={f"Puzzles/{category}": accuracy for category, accuracy in puzzles_results})
+                else:
+                    print(f"Epoch {epoch} - Puzzles move accuracy: {puzzles_move_accuracy}")
+
+            # ======================================
+            #                  PERF
+            # ======================================
+            if config.perf_interval > 0 and (epoch % config.perf_interval == 0 or epoch == 1):
+                elo_diff, error, points = measure_perf_diff(
+                    engine1=Engine(name="engine", cmd=ENGINE_BIN, args=[f"--nn={tmp.name}"]),
+                    n=200,
+                )
+
+                if use_wandb:
+                    wandb.log(step=epoch, data={"Perf/elo_diff": elo_diff, "Perf/elo_err": error, "Perf/points": points})
+                else:
+                    print(f"Epoch {epoch} - ELO: {elo_diff} ± {error} Points: {points}")
 
 
 def main():
@@ -235,8 +239,8 @@ def main():
 
     # misc
     parser.add_argument("--checkpoint_interval", default=16, type=int)
-    parser.add_argument("--perf_interval", default=32, type=int)
     parser.add_argument("--puzzle_interval", default=8, type=int)
+    parser.add_argument("--perf_interval", default=0, type=int)
 
     # wandb
     parser.add_argument("--wandb", default=None, type=str, help="wandb project name")
@@ -258,7 +262,7 @@ def main():
         wandb.init(
             project=config.wandb,
             job_type="train",
-            name=f"{config.method}_{config.batch_size}_{config.feature_set}[{config.num_features}]->{config.l1_size}x2->{config.l2_size}->1",
+            name=f"{config.method}_{config.batch_size}_({config.feature_set}[{config.num_features}]->{config.l1_size})x2->{config.l2_size}->1",
             notes=config.notes,
             config=config
         )
