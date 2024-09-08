@@ -1,11 +1,11 @@
 import sys
 sys.path.append("lib")
 
+import os
 import argparse
 from tqdm import tqdm
 import torch
 import wandb
-import tempfile
 import math
 
 from lib.batch_loader import BatchLoader, get_feature_set_size
@@ -18,9 +18,18 @@ from lib.games import Engine, measure_perf_diff
 
 
 def train(config: dict, use_wandb: bool):
-    VALIDATION_BYTES = 100_000_000  # ~ 4.5M samples
+    batches_per_epoch = config.epoch_size // config.batch_size
+    
+    # model
+    chessmodel = NnueModel(
+        num_features=config.num_features,
+        l1_size=config.l1_size,
+        l2_size=config.l2_size
+    )
+    chessmodel.cuda()
 
     # datasets
+    VALIDATION_BYTES = 100_000_000  # ~ 4.5M samples
     train_samples = BatchLoader(
         batch_size=config.batch_size,
         batch_threads=8,
@@ -40,26 +49,18 @@ def train(config: dict, use_wandb: bool):
         method=config.method,
     )
 
+    # loss function
     if config.method == "pqr":
         loss_fn = PQRLoss()
     elif config.method == "eval":
         loss_fn = EvalLoss()
-
-    # model
-    chessmodel = NnueModel(
-        num_features=config.num_features,
-        l1_size=config.l1_size,
-        l2_size=config.l2_size
-    )
-    chessmodel.cuda()
 
     optimizer = torch.optim.Adam(chessmodel.parameters(), lr=config.learning_rate)
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=1, gamma=config.gamma)
     # scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', threshold=0.0001, factor=0.7, patience=30)
     # scheduler = torch.optim.lr_scheduler.CyclicLR(optimizer, base_lr=0.000001, max_lr=0.0002, step_size_up=128)
 
-    batches_per_epoch = config.epoch_size // config.batch_size
-    
+
     def forward_loss(X: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
         """
         Takes a compressed batch and computes the loss
@@ -142,14 +143,8 @@ def train(config: dict, use_wandb: bool):
             val_sum / val_count
         )
 
-    best_loss = float("inf")
-    checkpoint_is_best = True
-
     for epoch in range(1, config.epochs+1):
         train_loss, val_loss = run_epoch()
-
-        checkpoint_is_best = checkpoint_is_best or val_loss < best_loss
-        best_loss = min(best_loss, val_loss)
 
         # log metrics to W&B
         metrics = {
@@ -168,55 +163,37 @@ def train(config: dict, use_wandb: bool):
         else:
             print(f"Epoch {epoch} - loss: {train_loss}, val_loss: {val_loss}, lr: {scheduler._last_lr[0]}")
 
-        with tempfile.NamedTemporaryFile() as tmp:
-            tmp.write(NnueWriter(chessmodel, config.feature_set).buf)
+        # write NN file
+        nn_file = f"checkpoints/{config.arch}/{epoch}-{config.arch}.nn"
+        with open(nn_file, "w+") as f:
+            f.write(NnueWriter(chessmodel, config.feature_set).buf)
 
-            # ======================================
-            #              CHECKPOINTS
-            # ======================================
-            if epoch % config.checkpoint_interval == 0 or epoch == 1:
+        # run puzzles
+        if config.puzzle_interval > 0 and (epoch % config.puzzle_interval == 0 or epoch == 1):
+            puzzles_results, puzzles_move_accuracy = Puzzles().measure([ENGINE_BIN, f"--nn={nn_file}"])
 
-                if use_wandb:
-                    # store artifact in W&B
-                    artifact = wandb.Artifact(f"model_{wandb.run.id}", type="model")
-                    artifact.add_file(local_path=tmp.name, name=f"model.nn", policy="mutable")
-                    wandb.log_artifact(artifact, aliases=["latest", "best"] if checkpoint_is_best else ["latest"])
+            if use_wandb:
+                wandb.log(step=epoch, data={"Puzzles/moveAccuracy": puzzles_move_accuracy})
+                wandb.log(step=epoch, data={f"Puzzles/{category}": accuracy for category, accuracy in puzzles_results})
+            else:
+                print(f"Epoch {epoch} - Puzzles move accuracy: {puzzles_move_accuracy}")
 
-                    # reset tag
-                    checkpoint_is_best = False
-                else:
-                    # make local checkpoint
-                    # torch.save(chessmodel.state_dict(), f"checkpoints/{epoch}.pth")
-                    pass
 
-            # ======================================
-            #                PUZZLES
-            # ======================================
-            if epoch % config.puzzle_interval == 0 or epoch == 1:
-                # run puzzles
-                puzzles_results, puzzles_move_accuracy = Puzzles().measure([ENGINE_BIN, f"--nn={tmp.name}"])
+        # run perf
+        if config.perf_interval > 0 and (epoch % config.perf_interval == 0 or epoch == 1):
+            elo_diff, error, points = measure_perf_diff(
+                engine1=Engine(name="engine", cmd=ENGINE_BIN, args=[f"--nn={nn_file}"]),
+                n=200,
+            )
 
-                # log puzzle metrics
-                if use_wandb:
-                    wandb.log(step=epoch, data={"Puzzles/moveAccuracy": puzzles_move_accuracy})
-                    wandb.log(step=epoch, data={f"Puzzles/{category}": accuracy for category, accuracy in puzzles_results})
-                else:
-                    print(f"Epoch {epoch} - Puzzles move accuracy: {puzzles_move_accuracy}")
+            if use_wandb:
+                wandb.log(step=epoch, data={"Perf/elo_diff": elo_diff, "Perf/elo_err": error, "Perf/points": points})
+            else:
+                print(f"Epoch {epoch} - ELO: {elo_diff} ± {error} Points: {points}")
 
-            # ======================================
-            #                  PERF
-            # ======================================
-            if config.perf_interval > 0 and (epoch % config.perf_interval == 0 or epoch == 1):
-                elo_diff, error, points = measure_perf_diff(
-                    engine1=Engine(name="engine", cmd=ENGINE_BIN, args=[f"--nn={tmp.name}"]),
-                    n=200,
-                )
-
-                if use_wandb:
-                    wandb.log(step=epoch, data={"Perf/elo_diff": elo_diff, "Perf/elo_err": error, "Perf/points": points})
-                else:
-                    print(f"Epoch {epoch} - ELO: {elo_diff} ± {error} Points: {points}")
-
+        # remove nn file if not checkpoint
+        if epoch % config.checkpoint_interval != 0:
+            os.remove(nn_file)
 
 def main():
     parser = argparse.ArgumentParser(description="Train the network")
@@ -238,8 +215,8 @@ def main():
     parser.add_argument("--gamma", default=0.994, type=float, help="Multiplier for learning rate decay")
 
     # misc
-    parser.add_argument("--checkpoint_interval", default=16, type=int)
-    parser.add_argument("--puzzle_interval", default=8, type=int)
+    parser.add_argument("--checkpoint_interval", default=16, type=int, help="Save a checkpoint every N epochs. Will be saved in checkpoints/{arch}/")
+    parser.add_argument("--puzzle_interval", default=1, type=int)
     parser.add_argument("--perf_interval", default=0, type=int)
 
     # wandb
@@ -250,6 +227,7 @@ def main():
 
     # compute feature size from feature set
     config.num_features = get_feature_set_size(config.feature_set)
+    config.arch = f"{config.method}_{config.batch_size}_({config.feature_set}[{config.num_features}]->{config.l1_size})x2->{config.l2_size}->1"
 
     print(config)
 
@@ -262,7 +240,7 @@ def main():
         wandb.init(
             project=config.wandb,
             job_type="train",
-            name=f"{config.method}_{config.batch_size}_({config.feature_set}[{config.num_features}]->{config.l1_size})x2->{config.l2_size}->1",
+            name=config.arch,
             notes=config.notes,
             config=config
         )
