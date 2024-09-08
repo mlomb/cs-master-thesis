@@ -1,20 +1,24 @@
 program: train.py
-name: sweep-2
+name: sweep-sizes
 method: grid
 metric:
   goal: minimize
-  name: Train/loss.min
+  name: Train/val_loss.min
 parameters:
   feature_set:
-    values: ["hv","h+v","hv+h+v","d1d2","d1+d2","hv+d1d2","h+v+d1+d2","hv+h+v+d1+d2","hd1+vd2","vd1+hd2"]
-  ft_size:
-    values: [256, 512, 1024, 2048]
+    values: ["hv"] # ,"h+v","hv+h+v","d1d2","d1+d2","hv+d1d2","h+v+d1+d2","hv+h+v+d1+d2","hd1+vd2","vd1+hd2"
   batch_size:
-    values: [4096, 8192, 16384]
-  l1_size:
-    values: [32]
+    values: [16384]
   l2_size:
-    values: [32]
+    values: [32, 64, 128, 256]
+  l1_size:
+    values: [256, 512, 1024, 2048]
+#  learning_rate:
+#    values: [0.002, 0.001, 0.0005, 0.00025]
+#  gamma:
+#    values: [0.990, 0.992, 0.994, 0.996]
+  epochs:
+    values: [256]
   wandb_project:
     values: ["cs-master-thesis"]
 

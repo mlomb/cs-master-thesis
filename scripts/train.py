@@ -165,8 +165,16 @@ def train(config: dict, use_wandb: bool):
         else:
             print(f"Epoch {epoch} - loss: {train_loss}, val_loss: {val_loss}, lr: {scheduler._last_lr[0]}")
 
+
+        base = f"checkpoints/{start_time}_{config.arch}/{epoch}-{config.arch}"
+        
+        # write checkpoint
+        pth_file = Path(base + ".pth")
+        pth_file.parent.mkdir(parents=True, exist_ok=True)
+        torch.save(chessmodel.state_dict(), pth_file)
+
         # write NN file
-        nn_file = Path(f"checkpoints/{start_time}_{config.arch}/{epoch}-{config.arch}.nn")
+        nn_file = Path(base + ".nn")
         nn_file.parent.mkdir(parents=True, exist_ok=True)
         nn_file.write_bytes(NnueWriter(chessmodel, config.feature_set).buf)
 
@@ -195,6 +203,7 @@ def train(config: dict, use_wandb: bool):
 
         # remove nn file if not checkpoint
         if epoch != 1 and epoch % config.checkpoint_interval != 0:
+            pth_file.unlink()
             nn_file.unlink()
 
 def main():
@@ -213,16 +222,16 @@ def main():
     parser.add_argument("--batch_size", default=16384, type=int, help="Number of samples per minibatch") # 16K
     parser.add_argument("--epoch_size", default=6104 * 16384, type=int, help="Number of samples in one epoch") # 100M
     parser.add_argument("--epochs", default=1024, type=int, help="Number of epochs to train")
-    parser.add_argument("--learning_rate", default=8.75e-4, type=float, help="Initial learning rate")
-    parser.add_argument("--gamma", default=0.994, type=float, help="Multiplier for learning rate decay")
+    parser.add_argument("--learning_rate", default=0.0005, type=float, help="Initial learning rate")
+    parser.add_argument("--gamma", default=0.99, type=float, help="Multiplier for learning rate decay")
 
     # misc
-    parser.add_argument("--checkpoint_interval", default=16, type=int, help="Save a checkpoint every N epochs. Will be saved in checkpoints/{arch}/")
+    parser.add_argument("--checkpoint_interval", default=32, type=int, help="Save a checkpoint every N epochs. Will be saved in checkpoints/{arch}/")
     parser.add_argument("--puzzle_interval", default=8, type=int)
     parser.add_argument("--perf_interval", default=0, type=int)
 
     # wandb
-    parser.add_argument("--wandb", default=None, type=str, help="wandb project name")
+    parser.add_argument("--wandb_project", default=None, type=str, help="wandb project name")
     parser.add_argument("--notes", default=None, type=str, help="wandb run notes, a short description of the run")
 
     config = parser.parse_args()
@@ -236,11 +245,11 @@ def main():
     # TensorFloat32 tensor cores for float32 matrix multiplication available but not enabled.
     torch.set_float32_matmul_precision("high")
 
-    use_wandb = config.wandb is not None
+    use_wandb = config.wandb_project is not None
 
     if use_wandb:
         wandb.init(
-            project=config.wandb,
+            project=config.wandb_project,
             job_type="train",
             name=config.arch,
             notes=config.notes,

@@ -5,7 +5,7 @@ from tqdm import tqdm
 from paths import PUZZLES_DATA
 
 # default puzzle solving constraint
-LIMIT = chess.engine.Limit(nodes=30_000)
+LIMIT = chess.engine.Limit(time=100.0 / 1000.0) # 100 ms per turn
 
 def solve_puzzle(engine_cmd: str | list[str], board: chess.Board, solution: list[chess.Move]) -> tuple[int, int]:
     """
