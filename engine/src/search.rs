@@ -7,7 +7,6 @@ use crate::{
 };
 use nn::nnue::model::NnueModel;
 use shakmaty::{uci::UciMove, CastlingMode, Chess, Move, MoveList, Position};
-use std::io::Write;
 use std::time::Instant;
 use std::{cell::RefCell, rc::Rc};
 

@@ -11,7 +11,7 @@ from lib.serialize import NnueWriter
 from lib.model import NnueModel
 from lib.paths import TOOLS_BIN, DEFAULT_DATASET
 
-N = 100_000
+N = 1_000_000
 
 with open(DEFAULT_DATASET) as f:
     FENS = [

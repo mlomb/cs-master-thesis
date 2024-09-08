@@ -1,12 +1,13 @@
 import sys
 sys.path.append("lib")
 
-import os
+import time
 import argparse
 from tqdm import tqdm
 import torch
 import wandb
 import math
+from pathlib import Path
 
 from lib.batch_loader import BatchLoader, get_feature_set_size
 from lib.model import NnueModel, expand_batch
@@ -19,7 +20,8 @@ from lib.games import Engine, measure_perf_diff
 
 def train(config: dict, use_wandb: bool):
     batches_per_epoch = config.epoch_size // config.batch_size
-    
+    start_time = time.time()
+
     # model
     chessmodel = NnueModel(
         num_features=config.num_features,
@@ -164,13 +166,13 @@ def train(config: dict, use_wandb: bool):
             print(f"Epoch {epoch} - loss: {train_loss}, val_loss: {val_loss}, lr: {scheduler._last_lr[0]}")
 
         # write NN file
-        nn_file = f"checkpoints/{config.arch}/{epoch}-{config.arch}.nn"
-        with open(nn_file, "w+") as f:
-            f.write(NnueWriter(chessmodel, config.feature_set).buf)
+        nn_file = Path(f"checkpoints/{start_time}_{config.arch}/{epoch}-{config.arch}.nn")
+        nn_file.parent.mkdir(parents=True, exist_ok=True)
+        nn_file.write_bytes(NnueWriter(chessmodel, config.feature_set).buf)
 
         # run puzzles
         if config.puzzle_interval > 0 and (epoch % config.puzzle_interval == 0 or epoch == 1):
-            puzzles_results, puzzles_move_accuracy = Puzzles().measure([ENGINE_BIN, f"--nn={nn_file}"])
+            puzzles_results, puzzles_move_accuracy = Puzzles().measure([ENGINE_BIN, f"--nn={nn_file.absolute()}"])
 
             if use_wandb:
                 wandb.log(step=epoch, data={"Puzzles/moveAccuracy": puzzles_move_accuracy})
@@ -182,7 +184,7 @@ def train(config: dict, use_wandb: bool):
         # run perf
         if config.perf_interval > 0 and (epoch % config.perf_interval == 0 or epoch == 1):
             elo_diff, error, points = measure_perf_diff(
-                engine1=Engine(name="engine", cmd=ENGINE_BIN, args=[f"--nn={nn_file}"]),
+                engine1=Engine(name="engine", cmd=ENGINE_BIN, args=[f"--nn={nn_file.absolute()}"]),
                 n=200,
             )
 
@@ -192,8 +194,8 @@ def train(config: dict, use_wandb: bool):
                 print(f"Epoch {epoch} - ELO: {elo_diff} ± {error} Points: {points}")
 
         # remove nn file if not checkpoint
-        if epoch % config.checkpoint_interval != 0:
-            os.remove(nn_file)
+        if epoch != 1 and epoch % config.checkpoint_interval != 0:
+            nn_file.unlink()
 
 def main():
     parser = argparse.ArgumentParser(description="Train the network")
@@ -216,7 +218,7 @@ def main():
 
     # misc
     parser.add_argument("--checkpoint_interval", default=16, type=int, help="Save a checkpoint every N epochs. Will be saved in checkpoints/{arch}/")
-    parser.add_argument("--puzzle_interval", default=1, type=int)
+    parser.add_argument("--puzzle_interval", default=8, type=int)
     parser.add_argument("--perf_interval", default=0, type=int)
 
     # wandb
@@ -227,7 +229,7 @@ def main():
 
     # compute feature size from feature set
     config.num_features = get_feature_set_size(config.feature_set)
-    config.arch = f"{config.method}_{config.batch_size}_({config.feature_set}[{config.num_features}]->{config.l1_size})x2->{config.l2_size}->1"
+    config.arch = f"{config.method}_{config.batch_size}_({config.feature_set}[{config.num_features}]→{config.l1_size})x2→{config.l2_size}→1"
 
     print(config)
 
