@@ -12,7 +12,8 @@ STOCKFISH_BIN = rel_to_abs("../bin/stockfish-ubuntu-x86-64-avx2")
 
 # data
 DEFAULT_DATASET = "/mnt/c/datasets/compact.plain"
-PUZZLES_DATA = rel_to_abs("../data/puzzles.csv")
+PUZZLES_DATA_100 = rel_to_abs("../data/puzzles-100.csv")
+PUZZLES_DATA_1000 = rel_to_abs("../data/puzzles-1000.csv")
 OPENING_BOOK = rel_to_abs("../data/noob_3moves.epd")
 
 # tools
@@ -24,7 +25,8 @@ if __name__ == '__main__':
     print("ENGINE_BIN", ENGINE_BIN)
     print("STOCKFISH_BIN", STOCKFISH_BIN)
     print("DEFAULT_DATASET", DEFAULT_DATASET)
-    print("PUZZLES_DATA", PUZZLES_DATA)
+    print("PUZZLES_DATA_100", PUZZLES_DATA_100)
+    print("PUZZLES_DATA_1000", PUZZLES_DATA_1000)
     print("OPENING_BOOK", OPENING_BOOK)
     print("TOOLS_BIN", TOOLS_BIN)
     print("CUTECHESS_CLI_BIN", CUTECHESS_CLI_BIN)

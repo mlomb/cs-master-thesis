@@ -2,7 +2,7 @@ from concurrent.futures import ThreadPoolExecutor
 import chess
 import chess.engine
 from tqdm import tqdm
-from paths import PUZZLES_DATA
+from paths import PUZZLES_DATA_100
 
 # default puzzle solving constraint
 LIMIT = chess.engine.Limit(time=100.0 / 1000.0) # 100 ms per turn
@@ -42,7 +42,7 @@ def solve_puzzle(engine_cmd: str | list[str], board: chess.Board, solution: list
 
 
 class Puzzles:
-    def __init__(self, puzzles_csv: str = PUZZLES_DATA, elo_bucket_size=200):
+    def __init__(self, puzzles_csv: str = PUZZLES_DATA_100, elo_bucket_size=200):
         self.elo_bucket_size = elo_bucket_size
         self.puzzles = []
 
@@ -65,7 +65,7 @@ class Puzzles:
 
         #self.puzzles = self.puzzles[:100]
     
-    def measure(self, engine_cmd: str | list[str]):
+    def measure(self, engine_cmd: str | list[str], concurrency=None):
         """
         Measure the accuracy of the engine on the loaded puzzles.
         """
@@ -79,7 +79,7 @@ class Puzzles:
         themes_solved = {}
         themes_total = {}
 
-        with ThreadPoolExecutor(max_workers=None) as executor:
+        with ThreadPoolExecutor(max_workers=concurrency) as executor:
             results = list(tqdm(executor.map(f, self.puzzles), total=len(self.puzzles), desc="Running puzzles"))
 
             for (_, _, themes), (pz_correct_moves, pz_total_moves) in zip(self.puzzles, results):
