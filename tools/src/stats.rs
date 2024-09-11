@@ -116,7 +116,7 @@ pub fn stats(cmd: StatsCommand) {
         for sample in samples {
             stats.add(sample);
 
-            if bar.position() % 100_000 == 0 {
+            if bar.position() % 1_000_000 == 0 {
                 stats.save().expect("can't save stats");
 
                 bar.set_message(format!(
