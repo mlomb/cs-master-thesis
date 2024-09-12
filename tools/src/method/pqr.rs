@@ -8,7 +8,7 @@ use std::io::Write;
 pub struct PQREncoding;
 
 impl SampleEncoder for PQREncoding {
-    fn x_size(&self, feature_set: &Box<dyn FeatureSet>) -> usize {
+    fn x_size(&self, feature_set: &FeatureSet) -> usize {
         3 * encoded_size(feature_set)
     }
 
@@ -21,7 +21,7 @@ impl SampleEncoder for PQREncoding {
         sample: &Sample,
         write_x: &mut dyn Write,
         _write_y: &mut dyn Write,
-        feature_set: &Box<dyn FeatureSet>,
+        feature_set: &FeatureSet,
     ) {
         let mut rng = rand::thread_rng();
 

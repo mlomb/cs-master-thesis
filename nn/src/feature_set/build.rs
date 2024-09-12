@@ -2,6 +2,7 @@ use crate::feature_set::blocks::{pairwise::PairwiseBlock, FeatureBlocks};
 
 use super::FeatureSet;
 
+/// Build a feature set from its name
 pub fn build_feature_set(name: &str) -> FeatureSet {
     use crate::feature_set::axis::Axis;
     use crate::feature_set::blocks::axes::*;

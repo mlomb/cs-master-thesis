@@ -6,6 +6,7 @@ use crate::feature_set::blocks::pairwise::PairwiseBlock;
 use enum_dispatch::enum_dispatch;
 use shakmaty::{Board, Color, Move, Role, Square};
 
+/// A block of features
 #[enum_dispatch]
 #[derive(Debug)]
 pub enum FeatureBlocks {

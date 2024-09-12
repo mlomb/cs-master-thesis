@@ -1,7 +1,9 @@
 use super::FeatureBlock;
 use crate::feature_set::axis::Axis;
-use shakmaty::{board, Bitboard, Board, Color, Move, Piece, Role, Square};
+use shakmaty::{Board, Color, Piece, Role, Square};
 
+/// A feature block where the features are the pairs of pieces on a given axis
+/// (based on the order [not position] in the axis, the role and color)
 #[derive(Debug)]
 pub struct PairwiseBlock {
     axis: Axis,
@@ -65,10 +67,6 @@ impl PairwiseBlock {
 impl FeatureBlock for PairwiseBlock {
     fn size(&self) -> u16 {
         self.axis.size() * (6 * 2) * (6 * 2)
-    }
-
-    fn requires_refresh(&self, board: &Board, mov: &Move, turn: Color, perspective: Color) -> bool {
-        false
     }
 
     fn active_features(

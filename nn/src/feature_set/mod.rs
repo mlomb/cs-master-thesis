@@ -6,14 +6,15 @@ mod checks;
 use blocks::{FeatureBlock, FeatureBlocks};
 use shakmaty::{Board, Color, File, Move, Piece, Role, Square};
 
-#[derive(Debug)]
 /// A set of features for a neural network
+#[derive(Debug)]
 pub struct FeatureSet {
     /// Blocks of features that are added/concatenated together
     blocks: Vec<FeatureBlocks>,
 }
 
 impl FeatureSet {
+    /// Create a feature set from the sum of feature blocks
     pub fn sum_of(blocks: Vec<FeatureBlocks>) -> Self {
         Self { blocks }
     }
@@ -173,6 +174,7 @@ impl FeatureSet {
         // }
     }
 
+    /// Add a piece to the board and update the features
     #[inline(always)]
     fn add_piece(
         &self,
@@ -209,6 +211,7 @@ impl FeatureSet {
         );
     }
 
+    /// Remove a piece from the board and update the features
     #[inline(always)]
     fn remove_piece(
         &self,

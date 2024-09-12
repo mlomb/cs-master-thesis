@@ -2,6 +2,8 @@ use super::FeatureBlock;
 use crate::feature_set::axis::Axis;
 use shakmaty::{Board, Color, Role, Square};
 
+/// A block of features that computes the index of a piece based on the position, role and color.
+/// When built as `product(Horizontal, Vertical)`, the block is the classic 768 feature set
 #[derive(Debug)]
 pub struct AxesBlock {
     first: Axis,
@@ -23,7 +25,7 @@ impl AxesBlock {
         }
     }
 
-    /// Computes the index for a given piece. This can be done since the block is independent from anything else
+    /// Computes the index for a given piece. This can be done since the block is piece-independent
     #[inline(always)]
     fn compute_indexes(
         &self,

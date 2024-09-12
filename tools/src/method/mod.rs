@@ -18,7 +18,7 @@ pub struct Sample {
 
 pub trait SampleEncoder {
     /// Size of the input tensor
-    fn x_size(&self, feature_set: &Box<dyn FeatureSet>) -> usize;
+    fn x_size(&self, feature_set: &FeatureSet) -> usize;
 
     /// Size of the target tensor
     fn y_size(&self) -> usize;
@@ -30,6 +30,6 @@ pub trait SampleEncoder {
         sample: &Sample,
         write_x: &mut dyn Write,
         write_y: &mut dyn Write,
-        feature_set: &Box<dyn FeatureSet>,
+        feature_set: &FeatureSet,
     );
 }
