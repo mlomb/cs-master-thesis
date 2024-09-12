@@ -23,7 +23,7 @@ impl NnueAccumulator {
     /// Creates an accumulator for the given NNUE model
     pub fn new(nnue_model: Rc<RefCell<NnueModel>>) -> Self {
         let num_l1 = nnue_model.borrow().get_num_features();
-        let num_features = nnue_model.borrow().get_feature_set().num_features();
+        let num_features = nnue_model.borrow().get_feature_set().num_features() as usize;
 
         NnueAccumulator {
             nnue_model,

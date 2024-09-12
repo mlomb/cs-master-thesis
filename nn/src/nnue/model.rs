@@ -54,7 +54,7 @@ impl LinearLayer<i8, i32> {
 /// Neural Network Update Efficient (NNUE)
 /// https://github.com/official-stockfish/nnue-pytorch/blob/master/docs/nnue.md
 pub struct NnueModel {
-    feature_set: Box<dyn FeatureSet>,
+    feature_set: FeatureSet,
 
     pub arch: String,
     pub params: usize,
@@ -92,7 +92,7 @@ impl NnueModel {
         let num_out = 1;
 
         let feature_set = build_feature_set(feature_set_str);
-        assert_eq!(num_features as usize, feature_set.num_features());
+        assert_eq!(num_features, feature_set.num_features() as usize);
 
         Ok(Self {
             feature_set,
@@ -180,8 +180,8 @@ impl NnueModel {
         }
     }
 
-    pub fn get_feature_set(&self) -> &dyn FeatureSet {
-        self.feature_set.as_ref()
+    pub fn get_feature_set(&self) -> &FeatureSet {
+        &self.feature_set
     }
 
     pub fn get_num_features(&self) -> usize {

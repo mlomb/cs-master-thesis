@@ -4,8 +4,8 @@ use shakmaty::{fen::Fen, Chess, Color, Position};
 /// Runs some correctness checks on the feature set
 /// Well crafted feature sets should be able to pass these checks
 #[allow(dead_code)]
-pub(super) fn fs_correctness_checks(feature_set: &dyn FeatureSet) {
-    const FENS: [&str; 20] = [
+pub(super) fn fs_correctness_checks(feature_set: &FeatureSet) {
+    const FENS: [&str; 21] = [
         "4nrk1/3q1pp1/2n1p1p1/8/1P2Q3/7P/PB1N1PP1/2R3K1 w - - 5 26",
         "5r2/1p2ppkp/p2p1nP1/qn6/4P3/2r2B2/1PPQ1PP1/2KR3R w - - 0 21",
         "2r2rk1/p2nqp2/1p1p1p1B/1bp5/3N4/8/PPPK1PPP/R2Q3R b - - 1 17",
@@ -26,6 +26,7 @@ pub(super) fn fs_correctness_checks(feature_set: &dyn FeatureSet) {
         "8/p5Rp/8/4k3/8/4P2P/P1P5/2K5 w - - 1 31",
         "rn2k2r/pp2npp1/2pp3p/1P2p3/2BbP2q/P1NQ1P2/1BP2P1P/2KR3R b kq - 2 15",
         "r2q1rk1/1b1nbpp1/p1pp1n1p/Pp2p3/1P1PP3/1BP1BN1P/3N1PP1/R2QK2R b KQ - 0 13",
+        "2r3k1/1q1nbppp/r3p3/3pP3/pPpP4/P1Q2N2/2RN1PPP/2R4K b - b3 0 23", // en passant
     ];
 
     check_mirror(feature_set);
@@ -41,7 +42,7 @@ pub(super) fn fs_correctness_checks(feature_set: &dyn FeatureSet) {
 }
 
 /// Check that the features match in the initial position
-fn check_mirror(feature_set: &dyn FeatureSet) {
+fn check_mirror(feature_set: &FeatureSet) {
     let pos = Chess::default();
     let board = pos.board();
 
@@ -66,7 +67,7 @@ fn check_mirror(feature_set: &dyn FeatureSet) {
 }
 
 /// Check that features are exactly the same when board if flipped
-fn check_flipped(pos: &Chess, feature_set: &dyn FeatureSet) {
+fn check_flipped(pos: &Chess, feature_set: &FeatureSet) {
     let board_orig = pos.board().clone();
 
     let mut board_flip = board_orig.clone();
@@ -93,10 +94,10 @@ fn check_flipped(pos: &Chess, feature_set: &dyn FeatureSet) {
     feat_flip_black.sort();
 
     for &x in &feat_orig_white {
-        assert!((x as usize) < feature_set.num_features());
+        assert!(x < feature_set.num_features());
     }
     for &x in &feat_orig_black {
-        assert!((x as usize) < feature_set.num_features());
+        assert!(x < feature_set.num_features());
     }
 
     assert_eq!(feat_orig_white, feat_flip_black);
@@ -104,7 +105,7 @@ fn check_flipped(pos: &Chess, feature_set: &dyn FeatureSet) {
 }
 
 /// Check changed_features assuming that active_features is right
-fn check_changed(pos: &Chess, perspective: Color, feature_set: &dyn FeatureSet) {
+fn check_changed(pos: &Chess, perspective: Color, feature_set: &FeatureSet) {
     // expected features before making any moves
     let mut pos_features = vec![];
     feature_set.active_features(pos.board(), pos.turn(), perspective, &mut pos_features);
