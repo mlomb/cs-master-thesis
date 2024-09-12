@@ -131,6 +131,9 @@ fn check_changed(pos: &Chess, perspective: Color, feature_set: &FeatureSet) {
             &mut removed_features,
         );
 
+        // println!("Added: {:?}", added_features);
+        // println!("Removed: {:?}", removed_features);
+
         // add features and remove features should not intersect
         let mut actual_features = pos_features.clone();
         for &x in &added_features {

@@ -1,4 +1,4 @@
-use crate::feature_set::blocks::FeatureBlocks;
+use crate::feature_set::blocks::{pairwise::PairwiseBlock, FeatureBlocks};
 
 use super::FeatureSet;
 
@@ -50,6 +50,14 @@ pub fn build_feature_set(name: &str) -> FeatureSet {
             ],
         }),
         */
+        "hv+ph" => FeatureSet::sum_of(vec![
+            FeatureBlocks::AxesBlock(AxesBlock::product(Axis::Horizontal, Axis::Vertical)),
+            FeatureBlocks::PairwiseBlock(PairwiseBlock::new(Axis::Horizontal)),
+        ]),
+        "hv+pv" => FeatureSet::sum_of(vec![
+            FeatureBlocks::AxesBlock(AxesBlock::product(Axis::Horizontal, Axis::Vertical)),
+            FeatureBlocks::PairwiseBlock(PairwiseBlock::new(Axis::Vertical)),
+        ]),
         _ => panic!("Unknown NNUE model feature set: {}", name),
     }
 }
@@ -79,5 +87,8 @@ mod tests {
         hv_h_v: "hv+h+v",
         hv_d1_d2: "hv+d1+d2",
         hv_h_v_d1_d2: "hv+h+v+d1+d2",
+
+        hv_ph: "hv+ph",
+        hv_pv: "hv+pv",
     }
 }

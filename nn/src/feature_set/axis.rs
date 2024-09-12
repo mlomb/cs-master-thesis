@@ -1,4 +1,4 @@
-use shakmaty::Square;
+use shakmaty::{Bitboard, File, Rank, Square};
 
 #[derive(Debug)]
 pub enum Axis {
@@ -35,6 +35,15 @@ impl Axis {
             Self::Vertical => rank,
             Self::Diagonal1 => file + rank,
             Self::Diagonal2 => file + 7 - rank,
+        }
+    }
+
+    /// Bitboard of the axis
+    pub fn bitboard(&self, index: u16) -> Bitboard {
+        match self {
+            Self::Horizontal => Bitboard::from_file(File::new(index as u32)),
+            Self::Vertical => Bitboard::from_rank(Rank::new(index as u32)),
+            _ => todo!(),
         }
     }
 }

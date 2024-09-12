@@ -1,5 +1,5 @@
 use super::FeatureBlock;
-use crate::feature_set::{axis::Axis, blocks::correct_square};
+use crate::feature_set::axis::Axis;
 use shakmaty::{Board, Color, Role, Square};
 
 #[derive(Debug)]
@@ -23,6 +23,7 @@ impl AxesBlock {
         }
     }
 
+    /// Computes the index for a given piece. This can be done since the block is independent from anything else
     #[inline(always)]
     fn compute_indexes(
         &self,
@@ -112,5 +113,17 @@ impl FeatureBlock for AxesBlock {
             rem_feats, // ←
             offset,
         );
+    }
+}
+
+/// Correct square based on perspective
+#[inline(always)]
+pub fn correct_square(piece_square: Square, perspective: Color) -> Square {
+    if perspective == Color::Black {
+        // flip square vertically if black is to play, so it is on the bottom side
+        piece_square.flip_vertical()
+    } else {
+        // keep square as is, by default white is below
+        piece_square
     }
 }

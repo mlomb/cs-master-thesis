@@ -65,15 +65,3 @@ pub trait FeatureBlock {
         offset: u16,
     );
 }
-
-/// Correct square based on perspective
-#[inline(always)]
-pub fn correct_square(piece_square: Square, perspective: Color) -> Square {
-    if perspective == Color::Black {
-        // flip square vertically if black is to play, so it is on the bottom side
-        piece_square.flip_vertical()
-    } else {
-        // keep square as is, by default white is below
-        piece_square
-    }
-}

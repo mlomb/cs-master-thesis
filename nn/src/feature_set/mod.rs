@@ -4,7 +4,7 @@ pub mod build;
 mod checks;
 
 use blocks::{FeatureBlock, FeatureBlocks};
-use shakmaty::{Board, Color, File, Move, Role, Square};
+use shakmaty::{Board, Color, File, Move, Piece, Role, Square};
 
 #[derive(Debug)]
 /// A set of features for a neural network
@@ -66,13 +66,14 @@ impl FeatureSet {
         add_feats: &mut Vec<u16>,
         rem_feats: &mut Vec<u16>,
     ) {
+        let mut board = board.clone();
         let from = mov.from().unwrap();
         let to = mov.to();
         let who_plays = turn;
 
         if mov.is_en_passant() {
             self.remove_piece(
-                &board,
+                &mut board,
                 Square::from_coords(to.file(), from.rank()),
                 Role::Pawn,
                 who_plays.other(),
@@ -82,7 +83,7 @@ impl FeatureSet {
             );
         } else if let Some(captured) = mov.capture() {
             self.remove_piece(
-                &board,
+                &mut board,
                 to,
                 captured,
                 who_plays.other(),
@@ -97,7 +98,7 @@ impl FeatureSet {
                 let final_role = mov.promotion().unwrap_or(mov.role());
 
                 self.add_piece(
-                    &board,
+                    &mut board,
                     *to,
                     final_role,
                     who_plays,
@@ -106,7 +107,7 @@ impl FeatureSet {
                     rem_feats,
                 );
                 self.remove_piece(
-                    &board,
+                    &mut board,
                     *from,
                     mov.role(),
                     who_plays,
@@ -117,7 +118,7 @@ impl FeatureSet {
             }
             Move::Castle { king, rook } => {
                 self.remove_piece(
-                    &board,
+                    &mut board,
                     *king,
                     Role::King,
                     who_plays,
@@ -126,7 +127,7 @@ impl FeatureSet {
                     rem_feats,
                 );
                 self.remove_piece(
-                    &board,
+                    &mut board,
                     *rook,
                     Role::Rook,
                     who_plays,
@@ -144,7 +145,7 @@ impl FeatureSet {
                 };
 
                 self.add_piece(
-                    &board,
+                    &mut board,
                     Square::from_coords(king_file, king.rank()),
                     Role::King,
                     who_plays,
@@ -153,7 +154,7 @@ impl FeatureSet {
                     rem_feats,
                 );
                 self.add_piece(
-                    &board,
+                    &mut board,
                     Square::from_coords(rook_file, rook.rank()),
                     Role::Rook,
                     who_plays,
@@ -164,12 +165,18 @@ impl FeatureSet {
             }
             _ => unreachable!(),
         }
+
+        // hacky optimization: remove common features
+        // while rem_feats.last().is_some() && add_feats.last() == rem_feats.last() {
+        //     add_feats.pop();
+        //     rem_feats.pop();
+        // }
     }
 
     #[inline(always)]
     fn add_piece(
         &self,
-        board: &Board,
+        board: &mut Board,
         piece_square: Square,
         piece_role: Role,
         piece_color: Color,
@@ -193,13 +200,19 @@ impl FeatureSet {
             offset += block.size();
         }
 
-        // TODO: modify board
+        board.set_piece_at(
+            piece_square,
+            Piece {
+                role: piece_role,
+                color: piece_color,
+            },
+        );
     }
 
     #[inline(always)]
     fn remove_piece(
         &self,
-        board: &Board,
+        board: &mut Board,
         piece_square: Square,
         piece_role: Role,
         piece_color: Color,
@@ -223,6 +236,6 @@ impl FeatureSet {
             offset += block.size();
         }
 
-        // TODO: modify board
+        board.discard_piece_at(piece_square);
     }
 }
