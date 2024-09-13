@@ -182,11 +182,11 @@ def train(config: dict, use_wandb: bool):
         if config.puzzle_interval > 0 and (epoch % config.puzzle_interval == 0 or epoch == 1):
             puzzles_results, puzzles_move_accuracy = Puzzles().measure([ENGINE_BIN, f"--nn={nn_file.absolute()}"])
 
+            print(f"Epoch {epoch} - Puzzles move accuracy: {puzzles_move_accuracy}")
+
             if use_wandb:
                 wandb.log(step=epoch, data={"Puzzles/moveAccuracy": puzzles_move_accuracy})
                 wandb.log(step=epoch, data={f"Puzzles/{category}": accuracy for category, accuracy in puzzles_results})
-            else:
-                print(f"Epoch {epoch} - Puzzles move accuracy: {puzzles_move_accuracy}")
 
 
         # run perf

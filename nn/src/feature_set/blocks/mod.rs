@@ -1,9 +1,11 @@
 pub mod axes;
+pub mod king;
 pub mod pairwise;
 
 use crate::feature_set::blocks::axes::AxesBlock;
 use crate::feature_set::blocks::pairwise::PairwiseBlock;
 use enum_dispatch::enum_dispatch;
+use king::KingBlock;
 use shakmaty::{Board, Color, Move, Role, Square};
 
 /// A block of features
@@ -12,6 +14,7 @@ use shakmaty::{Board, Color, Move, Role, Square};
 pub enum FeatureBlocks {
     AxesBlock,
     PairwiseBlock,
+    KingBlock,
 }
 
 #[enum_dispatch(FeatureBlocks)]
