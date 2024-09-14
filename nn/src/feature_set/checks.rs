@@ -5,7 +5,8 @@ use shakmaty::{fen::Fen, Chess, Color, Position};
 /// Well crafted feature sets should be able to pass these checks
 #[allow(dead_code)]
 pub(super) fn fs_correctness_checks(feature_set: &FeatureSet) {
-    const FENS: [&str; 21] = [
+    const FENS: [&str; 22] = [
+        "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", // startpos
         "4nrk1/3q1pp1/2n1p1p1/8/1P2Q3/7P/PB1N1PP1/2R3K1 w - - 5 26",
         "5r2/1p2ppkp/p2p1nP1/qn6/4P3/2r2B2/1PPQ1PP1/2KR3R w - - 0 21",
         "2r2rk1/p2nqp2/1p1p1p1B/1bp5/3N4/8/PPPK1PPP/R2Q3R b - - 1 17",
