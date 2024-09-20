@@ -32,7 +32,7 @@ class NnueModel(nn.Module):
         self.quantized_one = 127
         self.weight_scale_hidden = 64
         self.weight_scale_output = 16
-        self.nnue2score = 600
+        self.nnue2score = 1
 
         self.num_features = num_features
         self.l1_size = l1_size
