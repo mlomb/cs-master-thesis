@@ -1,98 +1,33 @@
-use crate::feature_set::blocks::{
-    king::KingBlock, mobility::MobilityBlock, pairwise::PairwiseBlock, FeatureBlocks,
-};
-
 use super::FeatureSet;
+use crate::feature_set::blocks::{mobility::MobilityBlock, pairwise::PairwiseBlock, FeatureBlocks};
 
-/// Build a feature set from its name
+/// Build a feature set from its name.
+/// Feature set names are a list of feature block names separated by '+'.
 pub fn build_feature_set(name: &str) -> FeatureSet {
+    // split name by +
+    // each is a block
+    FeatureSet::sum_of(name.split('+').map(|block| get_block(block)).collect())
+}
+
+/// Get a feature block from its name
+fn get_block(name: &str) -> FeatureBlocks {
     use crate::feature_set::axis::Axis;
     use crate::feature_set::blocks::axes::*;
 
     match name {
-        "h+v" => FeatureSet::sum_of(vec![
-            FeatureBlocks::AxesBlock(AxesBlock::single(Axis::Horizontal)),
-            FeatureBlocks::AxesBlock(AxesBlock::single(Axis::Vertical)),
-        ]),
-        "d1+d2" => FeatureSet::sum_of(vec![
-            FeatureBlocks::AxesBlock(AxesBlock::single(Axis::Diagonal1)),
-            FeatureBlocks::AxesBlock(AxesBlock::single(Axis::Diagonal2)),
-        ]),
-        "h+v+d1+d2" => FeatureSet::sum_of(vec![
-            FeatureBlocks::AxesBlock(AxesBlock::single(Axis::Horizontal)),
-            FeatureBlocks::AxesBlock(AxesBlock::single(Axis::Vertical)),
-            FeatureBlocks::AxesBlock(AxesBlock::single(Axis::Diagonal1)),
-            FeatureBlocks::AxesBlock(AxesBlock::single(Axis::Diagonal2)),
-        ]),
-        "hv" => FeatureSet::sum_of(vec![
-            // Piece
-            FeatureBlocks::AxesBlock(AxesBlock::product(Axis::Horizontal, Axis::Vertical)),
-        ]),
-        "hv+h+v" => FeatureSet::sum_of(vec![
-            FeatureBlocks::AxesBlock(AxesBlock::product(Axis::Horizontal, Axis::Vertical)),
-            FeatureBlocks::AxesBlock(AxesBlock::single(Axis::Horizontal)),
-            FeatureBlocks::AxesBlock(AxesBlock::single(Axis::Vertical)),
-        ]),
-        "hv+d1+d2" => FeatureSet::sum_of(vec![
-            FeatureBlocks::AxesBlock(AxesBlock::product(Axis::Horizontal, Axis::Vertical)),
-            FeatureBlocks::AxesBlock(AxesBlock::single(Axis::Diagonal1)),
-            FeatureBlocks::AxesBlock(AxesBlock::single(Axis::Diagonal2)),
-        ]),
-        "hv+h+v+d1+d2" => FeatureSet::sum_of(vec![
-            FeatureBlocks::AxesBlock(AxesBlock::product(Axis::Horizontal, Axis::Vertical)),
-            FeatureBlocks::AxesBlock(AxesBlock::single(Axis::Horizontal)),
-            FeatureBlocks::AxesBlock(AxesBlock::single(Axis::Vertical)),
-            FeatureBlocks::AxesBlock(AxesBlock::single(Axis::Diagonal1)),
-            FeatureBlocks::AxesBlock(AxesBlock::single(Axis::Diagonal2)),
-        ]),
-        /*
-        "khv" => Box::new(AxesFeatureSet {
-            #[rustfmt::skip]
-            blocks: vec![
-                AxesBlock { axes: vec![King, Horizontal, Vertical], incl_king: false },
-            ],
-        }),
-        */
-        "hv+ph" => FeatureSet::sum_of(vec![
-            FeatureBlocks::AxesBlock(AxesBlock::product(Axis::Horizontal, Axis::Vertical)),
-            FeatureBlocks::PairwiseBlock(PairwiseBlock::new(Axis::Horizontal)),
-        ]),
-        "hv+pv" => FeatureSet::sum_of(vec![
-            FeatureBlocks::AxesBlock(AxesBlock::product(Axis::Horizontal, Axis::Vertical)),
-            FeatureBlocks::PairwiseBlock(PairwiseBlock::new(Axis::Vertical)),
-        ]),
-        "h+v+ph+pv" => FeatureSet::sum_of(vec![
-            FeatureBlocks::AxesBlock(AxesBlock::single(Axis::Horizontal)),
-            FeatureBlocks::AxesBlock(AxesBlock::single(Axis::Vertical)),
-            FeatureBlocks::PairwiseBlock(PairwiseBlock::new(Axis::Horizontal)),
-            FeatureBlocks::PairwiseBlock(PairwiseBlock::new(Axis::Vertical)),
-        ]),
-        "hv+ph+pv" => FeatureSet::sum_of(vec![
-            FeatureBlocks::AxesBlock(AxesBlock::product(Axis::Horizontal, Axis::Vertical)),
-            FeatureBlocks::PairwiseBlock(PairwiseBlock::new(Axis::Horizontal)),
-            FeatureBlocks::PairwiseBlock(PairwiseBlock::new(Axis::Vertical)),
-        ]),
-        //
-        "kr" => FeatureSet::sum_of(vec![
-            // -
-            FeatureBlocks::KingBlock(KingBlock::new()),
-        ]),
-        "kr+pv+ph" => FeatureSet::sum_of(vec![
-            // -
-            FeatureBlocks::KingBlock(KingBlock::new()),
-            FeatureBlocks::PairwiseBlock(PairwiseBlock::new(Axis::Horizontal)),
-            FeatureBlocks::PairwiseBlock(PairwiseBlock::new(Axis::Vertical)),
-        ]),
-        //
-        "mb" => FeatureSet::sum_of(vec![
-            // -
-            FeatureBlocks::MobilityBlock(MobilityBlock::new()),
-        ]),
-        "hv+mb" => FeatureSet::sum_of(vec![
-            FeatureBlocks::AxesBlock(AxesBlock::product(Axis::Horizontal, Axis::Vertical)),
-            FeatureBlocks::MobilityBlock(MobilityBlock::new()),
-        ]),
-        _ => panic!("Unknown NNUE model feature set: {}", name),
+        // axes
+        "h" => FeatureBlocks::AxesBlock(AxesBlock::single(Axis::Horizontal)),
+        "v" => FeatureBlocks::AxesBlock(AxesBlock::single(Axis::Vertical)),
+        "d1" => FeatureBlocks::AxesBlock(AxesBlock::single(Axis::Diagonal1)),
+        "d2" => FeatureBlocks::AxesBlock(AxesBlock::single(Axis::Diagonal2)),
+        "hv" => FeatureBlocks::AxesBlock(AxesBlock::product(Axis::Horizontal, Axis::Vertical)),
+        // pairwise
+        "ph" => FeatureBlocks::PairwiseBlock(PairwiseBlock::new(Axis::Horizontal)),
+        "pv" => FeatureBlocks::PairwiseBlock(PairwiseBlock::new(Axis::Vertical)),
+        // mobility
+        "mb" => FeatureBlocks::MobilityBlock(MobilityBlock::new()),
+
+        _ => panic!("Unknown NNUE model feature block: {}", name),
     }
 }
 
@@ -126,8 +61,6 @@ mod tests {
         hv_pv: "hv+pv",
         h_v_ph_pv: "h+v+ph+pv",
         hv_ph_pv: "hv+ph+pv",
-
-        kr: "kr",
 
         mb: "mb",
         hv_mb: "hv+mb",
