@@ -1,0 +1,25 @@
+program: train.py
+name: axes-sweep
+method: grid
+metric:
+  goal: minimize
+  name: Train/val_loss.min
+parameters:
+  feature_set:
+    values: ["h+v","d1+d2","h+v+d1+d2","hv","hv+h+v","hv+d1+d2","hv+h+v+d1+d2"]
+  batch_size:
+    values: [16384]
+  l2_size:
+    values: [32]
+  l1_size:
+    values: [512]
+  epochs:
+    values: [256]
+  wandb_project:
+    values: ["cs-master-thesis"]
+
+command:
+  - ${env}
+  - python3
+  - ${program}
+  - ${args}
