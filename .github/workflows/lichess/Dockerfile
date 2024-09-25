@@ -1,4 +1,4 @@
-FROM rust:alpine AS engine_builder
+FROM rust:1.81 AS engine_builder
 
 # use nightly fue unsupported features
 RUN rustup default nightly
