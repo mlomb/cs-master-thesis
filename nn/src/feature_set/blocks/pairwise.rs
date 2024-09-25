@@ -97,7 +97,7 @@ impl FeatureBlock for PairwiseBlock {
                     .map_windows(|[l, r]| {
                         Self::compute_index(
                             offset,
-                            index, // it *should* be equal to index
+                            index,
                             board.piece_at(l.clone()).unwrap(),
                             board.piece_at(r.clone()).unwrap(),
                         )
