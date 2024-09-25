@@ -1,7 +1,6 @@
+use super::FeatureBlock;
 use crate::feature_set::blocks::axes::correct_square;
-
-use super::{king::KingBlock, FeatureBlock};
-use shakmaty::{attacks, board, Board, Color, Move, MoveList, Piece, Role, Square};
+use shakmaty::{attacks, Board, Color, Role, Square};
 
 #[derive(Debug)]
 pub struct MobilityBlock {}
@@ -45,9 +44,9 @@ impl FeatureBlock for MobilityBlock {
     fn features_on_add(
         &self,
         board: &Board,
-        mut piece_square: Square,
-        piece_role: Role,
-        mut piece_color: Color,
+        piece_square: Square,
+        _piece_role: Role,
+        piece_color: Color,
         perspective: Color,
         add_feats: &mut Vec<u16>,
         rem_feats: &mut Vec<u16>,
@@ -97,7 +96,7 @@ impl FeatureBlock for MobilityBlock {
         &self,
         board: &Board,
         piece_square: Square,
-        piece_role: Role,
+        _piece_role: Role,
         piece_color: Color,
         perspective: Color,
         add_feats: &mut Vec<u16>,
