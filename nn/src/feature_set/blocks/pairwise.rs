@@ -1,5 +1,5 @@
 use super::FeatureBlock;
-use crate::feature_set::axis::Axis;
+use crate::feature_set::{axis::Axis, blocks::axes::correct_square};
 use shakmaty::{Board, Color, Piece, Role, Square};
 
 /// A feature block where the features are the pairs of pieces on a given axis
@@ -53,14 +53,19 @@ impl PairwiseBlock {
     }
 
     #[inline(always)]
-    fn compute_index(offset: u16, piece1: Piece, piece2: Piece) -> u16 {
+    fn compute_index(offset: u16, axis_index: u16, piece1: Piece, piece2: Piece) -> u16 {
         let piece1_role = piece1.role as u16 - 1;
         let piece1_color = piece1.color as u16;
 
         let piece2_role = piece2.role as u16 - 1;
         let piece2_color = piece2.color as u16;
 
-        offset + piece1_role * (2 * 6 * 2) + piece1_color * (6 * 2) + piece2_role * 2 + piece2_color
+        offset
+            + axis_index * (6 * 2) * (6 * 2)
+            + piece1_role * (2 * 6 * 2)
+            + piece1_color * (6 * 2)
+            + piece2_role * 2
+            + piece2_color
     }
 }
 
@@ -92,6 +97,7 @@ impl FeatureBlock for PairwiseBlock {
                     .map_windows(|[l, r]| {
                         Self::compute_index(
                             offset,
+                            index, // it *should* be equal to index
                             board.piece_at(l.clone()).unwrap(),
                             board.piece_at(r.clone()).unwrap(),
                         )
@@ -114,6 +120,7 @@ impl FeatureBlock for PairwiseBlock {
         // We assume there is no piece at the square
         debug_assert!(board.piece_at(piece_square).is_none());
 
+        let axis_index = self.axis.index(correct_square(piece_square, perspective));
         let triplet = self.find_pieces_on_axis(
             board,
             piece_square,
@@ -126,17 +133,17 @@ impl FeatureBlock for PairwiseBlock {
 
         // remove existing pair
         if let (Some(left), _, Some(right)) = triplet {
-            rem_feats.push(Self::compute_index(offset, left, right));
+            rem_feats.push(Self::compute_index(offset, axis_index, left, right));
         }
 
         // add left pair
         if let (Some(left), piece, _) = triplet {
-            add_feats.push(Self::compute_index(offset, left, piece));
+            add_feats.push(Self::compute_index(offset, axis_index, left, piece));
         }
 
         // add right pair
         if let (_, piece, Some(right)) = triplet {
-            add_feats.push(Self::compute_index(offset, piece, right));
+            add_feats.push(Self::compute_index(offset, axis_index, piece, right));
         }
     }
 
@@ -154,6 +161,7 @@ impl FeatureBlock for PairwiseBlock {
         // We assume there is a piece at the square
         debug_assert!(board.piece_at(piece_square).is_some());
 
+        let axis_index = self.axis.index(correct_square(piece_square, perspective));
         let triplet = self.find_pieces_on_axis(
             board,
             piece_square,
@@ -166,17 +174,17 @@ impl FeatureBlock for PairwiseBlock {
 
         // remove pair with left piece
         if let (Some(left), piece, _) = triplet {
-            rem_feats.push(Self::compute_index(offset, left, piece));
+            rem_feats.push(Self::compute_index(offset, axis_index, left, piece));
         }
 
         // remove pair with right piece
         if let (_, piece, Some(right)) = triplet {
-            rem_feats.push(Self::compute_index(offset, piece, right));
+            rem_feats.push(Self::compute_index(offset, axis_index, piece, right));
         }
 
         // join left and right pieces
         if let (Some(left), _, Some(right)) = triplet {
-            add_feats.push(Self::compute_index(offset, left, right));
+            add_feats.push(Self::compute_index(offset, axis_index, left, right));
         }
     }
 }
