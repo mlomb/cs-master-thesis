@@ -1,5 +1,7 @@
 use super::FeatureSet;
-use crate::feature_set::blocks::{mobility::MobilityBlock, pairwise::PairwiseBlock, FeatureBlocks};
+use crate::feature_set::blocks::{
+    all::AllBlock, mobility::MobilityBlock, pairwise::PairwiseBlock, FeatureBlocks,
+};
 
 /// Build a feature set from its name.
 /// Feature set names are a list of feature block names separated by '+'.
@@ -15,12 +17,14 @@ fn get_block(name: &str) -> FeatureBlocks {
     use crate::feature_set::blocks::axes::*;
 
     match name {
+        // all
+        "hv" => FeatureBlocks::AllBlock(AllBlock::new()),
+        "all" => FeatureBlocks::AllBlock(AllBlock::new()),
         // axes
-        "h" => FeatureBlocks::AxesBlock(AxesBlock::single(Axis::Horizontal)),
-        "v" => FeatureBlocks::AxesBlock(AxesBlock::single(Axis::Vertical)),
-        "d1" => FeatureBlocks::AxesBlock(AxesBlock::single(Axis::Diagonal1)),
-        "d2" => FeatureBlocks::AxesBlock(AxesBlock::single(Axis::Diagonal2)),
-        "hv" => FeatureBlocks::AxesBlock(AxesBlock::product(Axis::Horizontal, Axis::Vertical)),
+        "h" => FeatureBlocks::AxesBlock(AxesBlock::new(Axis::Horizontal)),
+        "v" => FeatureBlocks::AxesBlock(AxesBlock::new(Axis::Vertical)),
+        "d1" => FeatureBlocks::AxesBlock(AxesBlock::new(Axis::Diagonal1)),
+        "d2" => FeatureBlocks::AxesBlock(AxesBlock::new(Axis::Diagonal2)),
         // pairwise
         "ph" => FeatureBlocks::PairwiseBlock(PairwiseBlock::new(Axis::Horizontal)),
         "pv" => FeatureBlocks::PairwiseBlock(PairwiseBlock::new(Axis::Vertical)),

@@ -1,5 +1,4 @@
-use super::FeatureBlock;
-use crate::feature_set::blocks::axes::correct_square;
+use super::{all::correct_square, FeatureBlock};
 use shakmaty::{attacks, Board, Color, Role, Square};
 
 #[derive(Debug)]

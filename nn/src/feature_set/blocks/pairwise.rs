@@ -1,5 +1,5 @@
 use super::FeatureBlock;
-use crate::feature_set::{axis::Axis, blocks::axes::correct_square};
+use crate::feature_set::{axis::Axis, blocks::all::correct_square};
 use shakmaty::{Board, Color, Piece, Role, Square};
 
 /// A feature block where the features are the pairs of pieces on a given axis

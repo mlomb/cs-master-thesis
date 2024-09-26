@@ -1,16 +1,13 @@
-use super::{all::correct_square, FeatureBlock};
-use crate::feature_set::axis::Axis;
+use super::FeatureBlock;
 use shakmaty::{Board, Color, Role, Square};
 
-/// A block of features that computes the index of a piece based on the position (in a single axis), role and color.
+/// A block of features that computes the index of a piece based on the position, role and color.
 #[derive(Debug)]
-pub struct AxesBlock {
-    axis: Axis,
-}
+pub struct AllBlock {}
 
-impl AxesBlock {
-    pub fn new(axis: Axis) -> Self {
-        Self { axis }
+impl AllBlock {
+    pub fn new() -> Self {
+        Self {}
     }
 
     /// Computes the index for a given piece. This can be done since the block is piece-independent
@@ -28,13 +25,13 @@ impl AxesBlock {
         let piece_role = piece_role as u16 - 1;
         let piece_color = (piece_color != perspective) as u16;
 
-        features.push(offset + self.axis.index(piece_square) * 12 + piece_role * 2 + piece_color);
+        features.push(offset + piece_square as u16 * 12 + piece_role * 2 + piece_color);
     }
 }
 
-impl FeatureBlock for AxesBlock {
+impl FeatureBlock for AllBlock {
     fn size(&self) -> u16 {
-        self.axis.size() * 6 * 2
+        64 * 6 * 2
     }
 
     fn active_features(
@@ -97,5 +94,17 @@ impl FeatureBlock for AxesBlock {
             rem_feats, // ←
             offset,
         );
+    }
+}
+
+/// Correct square based on perspective
+#[inline(always)]
+pub fn correct_square(piece_square: Square, perspective: Color) -> Square {
+    if perspective == Color::Black {
+        // flip square vertically if black is to play, so it is on the bottom side
+        piece_square.flip_vertical()
+    } else {
+        // keep square as is, by default white is below
+        piece_square
     }
 }
