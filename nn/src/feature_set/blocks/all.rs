@@ -25,7 +25,12 @@ impl AllBlock {
         let piece_role = piece_role as u16 - 1;
         let piece_color = (piece_color != perspective) as u16;
 
-        features.push(offset + piece_square as u16 * 12 + piece_role * 2 + piece_color);
+        features.push(
+            offset
+                + (piece_square.file() as u16 * 8 + piece_square.rank() as u16) * 12
+                + piece_role * 2
+                + piece_color,
+        );
     }
 }
 
