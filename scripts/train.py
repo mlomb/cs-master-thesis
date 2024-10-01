@@ -226,8 +226,9 @@ def main():
     parser.add_argument("--gamma", default=0.99, type=float, help="Multiplier for learning rate decay")
 
     # misc
-    parser.add_argument("--checkpoint_interval", default=32, type=int, help="Save a checkpoint every N epochs. Will be saved in checkpoints/{arch}/")
-    parser.add_argument("--puzzle_interval", default=8, type=int)
+    parser.add_argument("--run", default=0, type=int, help="Run identifier")
+    parser.add_argument("--checkpoint_interval", default=16, type=int, help="Save a checkpoint every N epochs. Will be saved in checkpoints/{arch}/")
+    parser.add_argument("--puzzle_interval", default=64, type=int)
     parser.add_argument("--perf_interval", default=0, type=int)
 
     # wandb
@@ -239,6 +240,7 @@ def main():
     # compute feature size from feature set
     config.num_features = get_feature_set_size(config.feature_set)
     config.arch = f"{config.method}_{config.batch_size}_({config.feature_set}[{config.num_features}]→{config.l1_size})x2→{config.l2_size}→1"
+    config.arch = str(config.run) + "-" + config.arch
 
     print(config)
 
