@@ -1,5 +1,5 @@
 mod axis;
-mod blocks;
+pub mod blocks;
 pub mod build;
 mod checks;
 
@@ -98,6 +98,15 @@ impl FeatureSet {
             Move::Normal { from, to, .. } | Move::EnPassant { from, to } => {
                 let final_role = mov.promotion().unwrap_or(mov.role());
 
+                self.remove_piece(
+                    &mut board,
+                    *from,
+                    mov.role(),
+                    who_plays,
+                    perspective,
+                    add_feats,
+                    rem_feats,
+                );
                 self.add_piece(
                     &mut board,
                     *to,
@@ -107,15 +116,6 @@ impl FeatureSet {
                     add_feats,
                     rem_feats,
                 );
-                self.remove_piece(
-                    &mut board,
-                    *from,
-                    mov.role(),
-                    who_plays,
-                    perspective,
-                    add_feats,
-                    rem_feats,
-                )
             }
             Move::Castle { king, rook } => {
                 self.remove_piece(

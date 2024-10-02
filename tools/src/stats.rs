@@ -1,7 +1,8 @@
 use crate::{method::Sample, plain_format::PlainReader};
 use clap::Args;
 use indicatif::{HumanBytes, ProgressBar, ProgressStyle};
-use shakmaty::{Bitboard, Color, File, Position, Rank, Role};
+use nn::feature_set::blocks::mobility;
+use shakmaty::{attacks, Bitboard, Color, File, Position, Rank, Role};
 use std::io::Write;
 use std::{collections::HashMap, fs, io::BufWriter};
 
@@ -17,6 +18,8 @@ struct Stats {
 
     files: HashMap<(File, ((Role, Color), (Role, Color))), u64>,
     ranks: HashMap<(Rank, ((Role, Color), (Role, Color))), u64>,
+
+    mobility: HashMap<(Role, usize), u64>,
 }
 
 impl Stats {
@@ -25,6 +28,8 @@ impl Stats {
             count: 0,
             files: HashMap::new(),
             ranks: HashMap::new(),
+
+            mobility: HashMap::new(),
         }
     }
 
@@ -71,6 +76,43 @@ impl Stats {
                 })
                 .for_each(|p| *self.ranks.entry((rank.clone(), p)).or_default() += 1);
         }
+
+        let occupied = board.occupied();
+        let unoccupied = !occupied;
+
+        let mut per_type = [0; 6];
+
+        for (piece_square, piece) in board.clone().into_iter() {
+            if piece.color == Color::White {
+                per_type[piece.role as usize - 1] +=
+                    mobility::mobility(board, piece_square).count();
+            }
+        }
+
+        for (role, count) in per_type.iter().enumerate() {
+            if role == Role::Pawn as usize - 1 && *count >= 15 {
+                println!(
+                    "Very high mobility {} FEN: {}",
+                    *count,
+                    shakmaty::fen::Fen(
+                        sample
+                            .position
+                            .clone()
+                            .into_setup(shakmaty::EnPassantMode::Always)
+                    )
+                );
+
+                for (piece_square, piece) in board.clone().into_iter() {
+                    if piece.color == Color::White && piece.role == Role::Pawn {
+                        let attack = attacks::attacks(piece_square, piece, occupied);
+                        let accesible = unoccupied.with(board.by_color(piece.color.other()));
+
+                        println!("{:?}", (attack & accesible));
+                    }
+                }
+            }
+            *self.mobility.entry((Role::ALL[role], *count)).or_default() += 1;
+        }
     }
 
     fn save(&self) -> std::io::Result<()> {
@@ -91,6 +133,17 @@ impl Stats {
         writeln!(writer, "Ranks:")?;
         for ((rank, p), count) in &ranks {
             writeln!(writer, "{:?} {:?} {}", rank, p, count)?;
+        }
+
+        writeln!(writer, "Mobility:")?;
+        let mut sorted = self
+            .mobility
+            .iter()
+            .map(|((role, k), count)| (role, *k, *count))
+            .collect::<Vec<_>>();
+        sorted.sort();
+        for (role, k, count) in sorted {
+            writeln!(writer, "{:?} {} {}", role, k, count)?;
         }
 
         Ok(())
