@@ -1,12 +1,12 @@
 program: train.py
-name: pairwise-sweep
+name: pairwise-sweep2
 method: grid
 metric:
   goal: minimize
   name: Train/val_loss.min
 parameters:
   feature_set:
-    values: ["hv+ph","hv+pv","h+v+ph+pv","hv+ph+pv"]
+    values: ["all+ph","all+pv","all+ph+pv"]
   batch_size:
     values: [16384]
   l2_size:
@@ -17,6 +17,8 @@ parameters:
     values: [256]
   wandb_project:
     values: ["cs-master-thesis"]
+  run:
+    values: [1,2,3,4]
 
 command:
   - ${env}
