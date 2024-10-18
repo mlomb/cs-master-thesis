@@ -21,18 +21,18 @@ canvas {
 <script type="module" src="render.ts"></script>
 <script type="module">
 import { NN } from "./nn.ts";
-import { drawWeights, drawNeurons, drawBoard, drawHalfPiece } from "./render.ts";
+import { drawWeights, drawNeurons, drawBoard, drawAllFS } from "./render.ts";
 
 const canvas = document.querySelector('canvas');
 const ctx = canvas.getContext('2d');
-
-let models = new Array(150 + 1).fill(null);
-let loading = -1; // currently loading model
 
 let max_step = 150;
 let step = max_step;
 let neuron = 0;
 let max_neuron = 0;
+
+let models = new Array(max_step + 1).fill(null);
+let loading = -1; // currently loading model
 
 async function tryLoadModel(index) {
     if (models[index] || loading != -1) return;
@@ -80,7 +80,7 @@ async function draw(){
         const L1_HEIGHT = (256 / 4) * 15;
 
         drawNeurons(ctx, 400, FEATURES_HEIGHT / 2 - L1_HEIGHT / 2, model.ft, neuron);
-        drawHalfPiece(ctx, model.ft, neuron);
+        drawAllFS(ctx, model.ft, neuron);
     } else {
         // try to load selected model
         tryLoadModel(step);

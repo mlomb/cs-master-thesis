@@ -23,6 +23,15 @@ export class NN {
         this.layers.push(Layer.read(reader, 2 * FT, L1, 8, 32));
         this.layers.push(Layer.read(reader, L1, L2, 8, 32));
         this.layers.push(Layer.read(reader, L2, 1, 8, 32));
+        
+        //this.num_features = reader.readU32();
+        //let num_l1 = reader.readU32();
+        //let num_l2 = reader.readU32();
+        //let num_out = 1;
+        //
+        //this.layers.push(Layer.read(reader, this.num_features, num_l1, 16, 16));
+        //this.layers.push(Layer.read(reader, 2 * num_l1, num_l2, 8, 32));
+        //this.layers.push(Layer.read(reader, num_l2, num_out, 8, 32));
 
         console.assert(reader.isEOF(), "Failed to read entire NN file");
     }
@@ -92,6 +101,12 @@ class Reader {
         }
         this.offset++; // consume null byte
         return str;
+    }
+
+    readU32() {
+        let val = this.dv.getUint32(this.offset, true);
+        this.offset += 4;
+        return val;
     }
 
     readInt8Array(len: number) {

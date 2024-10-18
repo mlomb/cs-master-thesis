@@ -159,7 +159,7 @@ export function drawBoard(ctx: CanvasRenderingContext2D, offset_x: number, offse
     }
 }
 
-export function drawHalfPiece(ctx: CanvasRenderingContext2D, layer: Layer, neuron: number) {
+export function drawAllFS(ctx: CanvasRenderingContext2D, layer: Layer, neuron: number) {
     for (let channel = 0; channel < 12; channel++) {
         let color = COLORS[Number(channel >= 6)];
         let role = ROLES[channel % 6];
