@@ -195,7 +195,7 @@ export function drawAllFS(ctx: CanvasRenderingContext2D, layer: Layer, neuron: n
     ctx.font = "20px monospace";
     ctx.textAlign = "center";
     ctx.fillStyle = "white";
-    ctx.fillText("Half-Piece", (BOARD_CELL_SIZE * 8) / 2, -30);
+    ctx.fillText("All", (BOARD_CELL_SIZE * 8) / 2, -30);
     ctx.fillText("[768]", (BOARD_CELL_SIZE * 8) / 2, -10);
 }
 
