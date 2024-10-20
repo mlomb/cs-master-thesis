@@ -1,0 +1,27 @@
+program: train.py
+name: mobility-sweep
+method: grid
+metric:
+  goal: minimize
+  name: Train/val_loss.min
+parameters:
+  feature_set:
+    values: ["all+mb","all+mc"]
+  batch_size:
+    values: [16384]
+  l2_size:
+    values: [32]
+  l1_size:
+    values: [512]
+  epochs:
+    values: [256]
+  wandb_project:
+    values: ["cs-master-thesis"]
+  run:
+    values: [1,2,3,4]
+
+command:
+  - ${env}
+  - python3
+  - ${program}
+  - ${args}
