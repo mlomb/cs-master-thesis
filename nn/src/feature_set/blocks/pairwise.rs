@@ -4,6 +4,9 @@ use shakmaty::{Board, Color, Piece, Role, Square};
 
 /// A feature block where the features are the pairs of pieces on a given axis
 /// (based on the order [not position] in the axis, the role and color)
+///
+/// Horizontal axis: vertical pairs
+/// Vertical axis: horizontal pairs
 #[derive(Debug)]
 pub struct PairwiseBlock {
     axis: Axis,
@@ -186,5 +189,134 @@ impl FeatureBlock for PairwiseBlock {
         if let (Some(left), _, Some(right)) = triplet {
             add_feats.push(Self::compute_index(offset, axis_index, left, right));
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use shakmaty::{fen::Fen, Board, CastlingMode, Chess, Position};
+
+    fn num_pairs(board: &Board, perspective: Color, axis: Axis) -> usize {
+        let block = PairwiseBlock::new(axis);
+        let mut features = Vec::new();
+        block.active_features(board, Color::White, perspective, &mut features, 0);
+        features.len()
+    }
+
+    #[test]
+    fn test_default() {
+        let board = Board::default();
+
+        assert_eq!(num_pairs(&board, Color::White, Axis::Horizontal), 3 * 8);
+        assert_eq!(num_pairs(&board, Color::Black, Axis::Horizontal), 3 * 8);
+        assert_eq!(num_pairs(&board, Color::White, Axis::Vertical), 4 * 7);
+        assert_eq!(num_pairs(&board, Color::Black, Axis::Vertical), 4 * 7);
+    }
+
+    #[test]
+    fn test_fen1() {
+        let pos =
+            Fen::from_ascii(b"r2b1rk1/3p1ppp/ppnqp1P1/2p5/2P1Q1P1/8/PP1PPP2/2RNBKR1 w - - 2 12")
+                .unwrap()
+                .into_position::<Chess>(CastlingMode::Standard)
+                .unwrap();
+
+        let vert = PairwiseBlock::new(Axis::Vertical);
+        let horz = PairwiseBlock::new(Axis::Horizontal);
+
+        let (l, _, r) = vert.find_pieces_on_axis(
+            pos.board(),
+            Square::C6,
+            Piece {
+                color: Color::Black,
+                role: Role::Knight,
+            },
+            Color::White,
+        );
+        let (b, _, a) = horz.find_pieces_on_axis(
+            pos.board(),
+            Square::C6,
+            Piece {
+                color: Color::Black,
+                role: Role::Knight,
+            },
+            Color::White,
+        );
+
+        // println!("L: {:?} R: {:?} A: {:?} B: {:?}", l, r, a, b);
+
+        assert_eq!(
+            l,
+            Some(Piece {
+                color: Color::Black,
+                role: Role::Pawn
+            })
+        );
+        assert_eq!(
+            r,
+            Some(Piece {
+                color: Color::Black,
+                role: Role::Queen
+            })
+        );
+        assert_eq!(a, None);
+        assert_eq!(
+            b,
+            Some(Piece {
+                color: Color::Black,
+                role: Role::Pawn
+            })
+        );
+
+        assert_eq!(num_pairs(&pos.board(), Color::White, Axis::Horizontal), 21);
+        assert_eq!(num_pairs(&pos.board(), Color::Black, Axis::Horizontal), 21);
+        assert_eq!(num_pairs(&pos.board(), Color::White, Axis::Vertical), 20);
+        assert_eq!(num_pairs(&pos.board(), Color::Black, Axis::Vertical), 20);
+    }
+
+    #[test]
+    fn test_fen2() {
+        let pos = Fen::from_ascii(b"6k1/1p3p2/pQq2bp1/3p3p/P3r3/2P1B1P1/1P3P2/R5K1 w - - 2 19")
+            .unwrap()
+            .into_position::<Chess>(CastlingMode::Standard)
+            .unwrap();
+
+        let vert = PairwiseBlock::new(Axis::Vertical);
+        let horz = PairwiseBlock::new(Axis::Horizontal);
+
+        let (l, _, r) = vert.find_pieces_on_axis(
+            pos.board(),
+            Square::D5,
+            Piece {
+                color: Color::Black,
+                role: Role::Pawn,
+            },
+            Color::White,
+        );
+        let (b, _, a) = horz.find_pieces_on_axis(
+            pos.board(),
+            Square::D5,
+            Piece {
+                color: Color::Black,
+                role: Role::Pawn,
+            },
+            Color::White,
+        );
+        assert_eq!(l, None);
+        assert_eq!(
+            r,
+            Some(Piece {
+                color: Color::Black,
+                role: Role::Pawn
+            })
+        );
+        assert_eq!(a, None);
+        assert_eq!(b, None);
+
+        assert_eq!(num_pairs(&pos.board(), Color::White, Axis::Horizontal), 11);
+        assert_eq!(num_pairs(&pos.board(), Color::Black, Axis::Horizontal), 11);
+        assert_eq!(num_pairs(&pos.board(), Color::White, Axis::Vertical), 11);
+        assert_eq!(num_pairs(&pos.board(), Color::Black, Axis::Vertical), 11);
     }
 }
