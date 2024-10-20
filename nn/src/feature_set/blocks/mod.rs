@@ -5,11 +5,12 @@ pub mod mobility;
 pub mod pairwise;
 
 use crate::feature_set::blocks::axes::AxesBlock;
+use crate::feature_set::blocks::mobility::MobilityBitsetBlock;
+use crate::feature_set::blocks::mobility::MobilityCountsBlock;
 use crate::feature_set::blocks::pairwise::PairwiseBlock;
 use all::AllBlock;
 use enum_dispatch::enum_dispatch;
 use king::KingBlock;
-use mobility::MobilityBlock;
 use shakmaty::{Board, Color, Move, Role, Square};
 
 /// A block of features
@@ -20,7 +21,8 @@ pub enum FeatureBlocks {
     AxesBlock,
     PairwiseBlock,
     KingBlock,
-    MobilityBlock,
+    MobilityBitsetBlock,
+    MobilityCountsBlock,
 }
 
 #[enum_dispatch(FeatureBlocks)]

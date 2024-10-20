@@ -2,9 +2,9 @@ use super::{all::correct_square, FeatureBlock};
 use shakmaty::{attacks, Bitboard, Board, ByColor, ByRole, Color, Piece, Role, Square};
 
 #[derive(Debug)]
-pub struct MobilityBlock {}
+pub struct MobilityBitsetBlock {}
 
-impl MobilityBlock {
+impl MobilityBitsetBlock {
     pub fn new() -> Self {
         Self {}
     }
@@ -54,7 +54,7 @@ impl MobilityBlock {
     }
 }
 
-impl FeatureBlock for MobilityBlock {
+impl FeatureBlock for MobilityBitsetBlock {
     fn size(&self) -> u16 {
         64 * 6 * 2
     }
@@ -76,6 +76,153 @@ impl FeatureBlock for MobilityBlock {
 
                     features.push(index);
                 }
+            }
+        }
+    }
+
+    fn features_on_add(
+        &self,
+        board: &Board,
+        piece_square: Square,
+        piece_role: Role,
+        piece_color: Color,
+        perspective: Color,
+        add_feats: &mut Vec<u16>,
+        rem_feats: &mut Vec<u16>,
+        offset: u16,
+    ) {
+        let mut next_board = board.clone();
+        next_board.set_piece_at(
+            piece_square,
+            Piece {
+                role: piece_role,
+                color: piece_color,
+            },
+        );
+
+        Self::update_features(
+            &board,
+            &next_board,
+            perspective,
+            add_feats,
+            rem_feats,
+            offset,
+        );
+    }
+
+    fn features_on_remove(
+        &self,
+        board: &Board,
+        piece_square: Square,
+        _piece_role: Role,
+        _piece_color: Color,
+        perspective: Color,
+        add_feats: &mut Vec<u16>,
+        rem_feats: &mut Vec<u16>,
+        offset: u16,
+    ) {
+        let mut next_board = board.clone();
+        next_board.discard_piece_at(piece_square);
+
+        Self::update_features(
+            &board,
+            &next_board,
+            perspective,
+            add_feats,
+            rem_feats,
+            offset,
+        );
+    }
+}
+
+const MOBILITY_COUNTS: [u16; 6] = [8, 15, 16, 25, 25, 8];
+const MOBILITY_OFFSETS: [u16; 6] = [0, 9, 25, 42, 68, 94];
+
+#[derive(Debug)]
+pub struct MobilityCountsBlock {}
+
+impl MobilityCountsBlock {
+    pub fn new() -> Self {
+        Self {}
+    }
+
+    pub fn compute_index(
+        value: usize,
+        role: Role,
+        color: Color,
+        perspective: Color,
+        offset: u16,
+    ) -> u16 {
+        let role = role as u16 - 1;
+        let color = (color != perspective) as u16;
+        let bucket = (value as u16).min(MOBILITY_COUNTS[role as usize]);
+
+        offset + MOBILITY_OFFSETS[role as usize] * 2 + bucket * 2 + color
+    }
+
+    #[inline(always)]
+    pub fn update_features(
+        prev_board: &Board,
+        next_board: &Board,
+        perspective: Color,
+        add_feats: &mut Vec<u16>,
+        rem_feats: &mut Vec<u16>,
+        offset: u16,
+    ) {
+        let mobility_prev = mobility_by_role(prev_board);
+        let mobility_next = mobility_by_role(next_board);
+
+        for &role in Role::ALL.iter() {
+            for &color in Color::ALL.iter() {
+                let mobility_prev = (*mobility_prev.get(role).get(color)).count();
+                let mobility_next = (*mobility_next.get(role).get(color)).count();
+
+                if mobility_prev != mobility_next {
+                    add_feats.push(Self::compute_index(
+                        mobility_next,
+                        role,
+                        color,
+                        perspective,
+                        offset,
+                    ));
+                    rem_feats.push(Self::compute_index(
+                        mobility_prev,
+                        role,
+                        color,
+                        perspective,
+                        offset,
+                    ));
+                }
+            }
+        }
+    }
+}
+
+impl FeatureBlock for MobilityCountsBlock {
+    fn size(&self) -> u16 {
+        2 * (MOBILITY_COUNTS[0]
+            + MOBILITY_COUNTS[1]
+            + MOBILITY_COUNTS[2]
+            + MOBILITY_COUNTS[3]
+            + MOBILITY_COUNTS[4]
+            + MOBILITY_COUNTS[5]
+            + 6)
+    }
+
+    fn active_features(
+        &self,
+        board: &Board,
+        _turn: Color,
+        perspective: Color,
+        features: &mut Vec<u16>,
+        offset: u16,
+    ) {
+        let mobility = mobility_by_role(board);
+
+        for &role in Role::ALL.iter() {
+            for &color in Color::ALL.iter() {
+                let count = (*mobility.get(role).get(color)).count();
+                features.push(Self::compute_index(count, role, color, perspective, offset));
             }
         }
     }

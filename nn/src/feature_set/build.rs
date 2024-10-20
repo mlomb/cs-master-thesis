@@ -1,6 +1,9 @@
 use super::FeatureSet;
 use crate::feature_set::blocks::{
-    all::AllBlock, mobility::MobilityBlock, pairwise::PairwiseBlock, FeatureBlocks,
+    all::AllBlock,
+    mobility::{MobilityBitsetBlock, MobilityCountsBlock},
+    pairwise::PairwiseBlock,
+    FeatureBlocks,
 };
 
 /// Build a feature set from its name.
@@ -18,7 +21,7 @@ fn get_block(name: &str) -> FeatureBlocks {
 
     match name {
         // all
-        "hv" => FeatureBlocks::AllBlock(AllBlock::new()),
+        "hv" => FeatureBlocks::AllBlock(AllBlock::new()), // legacy name
         "all" => FeatureBlocks::AllBlock(AllBlock::new()),
         // axes
         "h" => FeatureBlocks::AxesBlock(AxesBlock::new(Axis::Horizontal)),
@@ -29,7 +32,8 @@ fn get_block(name: &str) -> FeatureBlocks {
         "ph" => FeatureBlocks::PairwiseBlock(PairwiseBlock::new(Axis::Horizontal)),
         "pv" => FeatureBlocks::PairwiseBlock(PairwiseBlock::new(Axis::Vertical)),
         // mobility
-        "mb" => FeatureBlocks::MobilityBlock(MobilityBlock::new()),
+        "mb" => FeatureBlocks::MobilityBitsetBlock(MobilityBitsetBlock::new()),
+        "mc" => FeatureBlocks::MobilityCountsBlock(MobilityCountsBlock::new()),
 
         _ => panic!("Unknown NNUE model feature block: {}", name),
     }
@@ -56,17 +60,19 @@ mod tests {
         h_v: "h+v",
         d1_d2: "d1+d2",
         h_v_d1_d2: "h+v+d1+d2",
-        hv: "hv",
-        hv_h_v: "hv+h+v",
-        hv_d1_d2: "hv+d1+d2",
-        hv_h_v_d1_d2: "hv+h+v+d1+d2",
+        all: "all",
+        all_h_v: "all+h+v",
+        all_d1_d2: "all+d1+d2",
+        all_h_v_d1_d2: "all+h+v+d1+d2",
 
-        hv_ph: "hv+ph",
-        hv_pv: "hv+pv",
+        all_ph: "all+ph",
+        all_pv: "all+pv",
         h_v_ph_pv: "h+v+ph+pv",
-        hv_ph_pv: "hv+ph+pv",
+        all_ph_pv: "all+ph+pv",
 
         mb: "mb",
-        hv_mb: "hv+mb",
+        mc: "mc",
+        all_mb: "all+mb",
+        all_mc: "all+mc",
     }
 }
