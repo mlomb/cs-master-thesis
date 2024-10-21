@@ -2,9 +2,13 @@ use crate::{method::Sample, plain_format::PlainReader};
 use clap::Args;
 use indicatif::{HumanBytes, ProgressBar, ProgressStyle};
 use nn::feature_set::blocks::mobility;
+use nn::feature_set::build::build_feature_set;
 use shakmaty::{attacks, Bitboard, Color, File, Position, Rank, Role};
+use std::hash::Hash;
 use std::io::Write;
 use std::{collections::HashMap, fs, io::BufWriter};
+
+const FEATURE_SETS: [&str; 9] = ["all", "h", "v", "d1", "d2", "ph", "pv", "mb", "mc"];
 
 #[derive(Args)]
 pub struct StatsCommand {
@@ -20,6 +24,11 @@ struct Stats {
     ranks: HashMap<(Rank, ((Role, Color), (Role, Color))), u64>,
 
     mobility: HashMap<(Role, usize), u64>,
+
+    features_count: HashMap<String, u64>,
+    features_adds_count: HashMap<String, u64>,
+    features_rems_count: HashMap<String, u64>,
+    features_updates_total: HashMap<String, u64>,
 }
 
 impl Stats {
@@ -28,8 +37,11 @@ impl Stats {
             count: 0,
             files: HashMap::new(),
             ranks: HashMap::new(),
-
             mobility: HashMap::new(),
+            features_count: HashMap::new(),
+            features_adds_count: HashMap::new(),
+            features_rems_count: HashMap::new(),
+            features_updates_total: HashMap::new(),
         }
     }
 
@@ -113,6 +125,46 @@ impl Stats {
             }
             *self.mobility.entry((Role::ALL[role], *count)).or_default() += 1;
         }
+
+        for name in FEATURE_SETS {
+            let mut features = vec![];
+            let fs = build_feature_set(name);
+
+            // count features
+            fs.active_features(
+                sample.position.board(),
+                sample.position.turn(),
+                Color::White,
+                &mut features,
+            );
+
+            *self.features_count.entry(name.to_owned()).or_default() += features.len() as u64;
+
+            for m in sample.position.legal_moves() {
+                // count changed features
+                let mut add_feats = vec![];
+                let mut rem_feats = vec![];
+
+                fs.changed_features(
+                    sample.position.board(),
+                    &m,
+                    sample.position.turn(),
+                    sample.position.turn(),
+                    &mut add_feats,
+                    &mut rem_feats,
+                );
+
+                *self.features_adds_count.entry(name.to_owned()).or_default() +=
+                    add_feats.len() as u64;
+                *self.features_rems_count.entry(name.to_owned()).or_default() +=
+                    rem_feats.len() as u64;
+
+                *self
+                    .features_updates_total
+                    .entry(name.to_owned())
+                    .or_default() += 1;
+            }
+        }
     }
 
     fn save(&self) -> std::io::Result<()> {
@@ -146,6 +198,20 @@ impl Stats {
             writeln!(writer, "{:?} {} {}", role, k, count)?;
         }
 
+        writeln!(writer, "Features:")?;
+        for name in FEATURE_SETS {
+            writeln!(
+                writer,
+                "{} {} {} {}",
+                name,
+                (*self.features_count.get(name).unwrap_or(&0) as f64) / self.count as f64,
+                (*self.features_adds_count.get(name).unwrap_or(&0) as f64)
+                    / (*self.features_updates_total.get(name).unwrap_or(&0) as f64),
+                (*self.features_rems_count.get(name).unwrap_or(&0) as f64)
+                    / (*self.features_updates_total.get(name).unwrap_or(&0) as f64),
+            )?;
+        }
+
         Ok(())
     }
 }
@@ -169,7 +235,7 @@ pub fn stats(cmd: StatsCommand) {
         for sample in samples {
             stats.add(sample);
 
-            if bar.position() % 1_000_000 == 0 {
+            if bar.position() % 100_000 == 0 {
                 stats.save().expect("can't save stats");
 
                 bar.set_message(format!(
