@@ -121,6 +121,41 @@ impl NnueAccumulator {
             }
         }
 
+        // remove easy cases
+        while !added_rows.is_empty() {
+            if added_rows.last() == removed_rows.last() {
+                added_rows.pop();
+                removed_rows.pop();
+            } else if added_rows.first() == removed_rows.first() {
+                added_rows.swap_remove(0);
+                removed_rows.swap_remove(0);
+            } else {
+                break;
+            }
+        }
+
+        /*
+        added_rows.sort_unstable();
+        removed_rows.sort_unstable();
+
+        // take advantage on the fact that features are sorted
+        let mut i: i32 = added_rows.len() as i32 - 1;
+        let mut j: i32 = removed_rows.len() as i32 - 1;
+
+        while i >= 0 && j >= 0 {
+            if added_rows[i as usize] == removed_rows[j as usize] {
+                added_rows.swap_remove(i as usize);
+                removed_rows.swap_remove(j as usize);
+                i -= 1;
+                j -= 1;
+            } else if added_rows[i as usize] > removed_rows[j as usize] {
+                i -= 1;
+            } else {
+                j -= 1;
+            }
+        }
+        */
+
         // do the math
         nnue_model.update_accumulator(
             &self.accumulation[perspective as usize],

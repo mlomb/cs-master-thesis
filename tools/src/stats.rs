@@ -137,6 +137,11 @@ impl Stats {
                 Color::White,
                 &mut features,
             );
+            let mut counts = Vec::new();
+            counts.resize(fs.num_features() as usize, 0);
+            for f in features.clone() {
+                counts[f as usize] += 1;
+            }
 
             *self.features_count.entry(name.to_owned()).or_default() += features.len() as u64;
 
@@ -154,10 +159,59 @@ impl Stats {
                     &mut rem_feats,
                 );
 
+                let mut counts = counts.clone();
+                let mut added_rows = vec![];
+                let mut removed_rows = vec![];
+
+                for &f in add_feats.iter() {
+                    if counts[f as usize] == 0 {
+                        added_rows.push(f);
+                    }
+                    counts[f as usize] += 1;
+                }
+                for &f in rem_feats.iter() {
+                    counts[f as usize] -= 1;
+                    if counts[f as usize] == 0 {
+                        removed_rows.push(f);
+                    }
+                }
+
+                while !added_rows.is_empty() {
+                    if added_rows.last() == removed_rows.last() {
+                        added_rows.pop();
+                        removed_rows.pop();
+                    } else if added_rows.first() == removed_rows.first() {
+                        added_rows.swap_remove(0);
+                        removed_rows.swap_remove(0);
+                    } else {
+                        break;
+                    }
+                }
+
+                added_rows.sort();
+                removed_rows.sort();
+
+                // take advantage on the fact that features are sorted
+                let mut i: i32 = added_rows.len() as i32 - 1;
+                let mut j: i32 = removed_rows.len() as i32 - 1;
+
+                while i >= 0 && j >= 0 {
+                    if added_rows[i as usize] == removed_rows[j as usize] {
+                        added_rows.swap_remove(i as usize);
+                        removed_rows.swap_remove(j as usize);
+                        i -= 1;
+                        j -= 1;
+                    } else if added_rows[i as usize] > removed_rows[j as usize] {
+                        i -= 1;
+                    } else {
+                        j -= 1;
+                    }
+                }
+
                 *self.features_adds_count.entry(name.to_owned()).or_default() +=
-                    add_feats.len() as u64;
+                    added_rows.len() as u64;
                 *self.features_rems_count.entry(name.to_owned()).or_default() +=
-                    rem_feats.len() as u64;
+                    removed_rows.len() as u64;
 
                 *self
                     .features_updates_total
@@ -176,6 +230,20 @@ impl Stats {
 
         files.sort_by_key(|(_, count)| -(**count as i64));
         ranks.sort_by_key(|(_, count)| -(**count as i64));
+
+        writeln!(writer, "Features:")?;
+        for name in FEATURE_SETS {
+            writeln!(
+                writer,
+                "{} {} {} {}",
+                name,
+                (*self.features_count.get(name).unwrap_or(&0) as f64) / self.count as f64,
+                (*self.features_adds_count.get(name).unwrap_or(&0) as f64)
+                    / (*self.features_updates_total.get(name).unwrap_or(&0) as f64),
+                (*self.features_rems_count.get(name).unwrap_or(&0) as f64)
+                    / (*self.features_updates_total.get(name).unwrap_or(&0) as f64),
+            )?;
+        }
 
         writeln!(writer, "Files:")?;
         for ((file, p), count) in &files {
@@ -196,20 +264,6 @@ impl Stats {
         sorted.sort();
         for (role, k, count) in sorted {
             writeln!(writer, "{:?} {} {}", role, k, count)?;
-        }
-
-        writeln!(writer, "Features:")?;
-        for name in FEATURE_SETS {
-            writeln!(
-                writer,
-                "{} {} {} {}",
-                name,
-                (*self.features_count.get(name).unwrap_or(&0) as f64) / self.count as f64,
-                (*self.features_adds_count.get(name).unwrap_or(&0) as f64)
-                    / (*self.features_updates_total.get(name).unwrap_or(&0) as f64),
-                (*self.features_rems_count.get(name).unwrap_or(&0) as f64)
-                    / (*self.features_updates_total.get(name).unwrap_or(&0) as f64),
-            )?;
         }
 
         Ok(())
