@@ -14,7 +14,7 @@ STOCKFISH_BIN = rel_to_abs("../bin/stockfish-ubuntu-x86-64-avx2")
 DEFAULT_DATASET = "/mnt/c/datasets/compact.plain"
 PUZZLES_DATA_100 = rel_to_abs("../data/puzzles-100.csv")
 PUZZLES_DATA_1000 = rel_to_abs("../data/puzzles-1000.csv")
-OPENING_BOOK = rel_to_abs("../data/noob_3moves.epd")
+OPENING_BOOK = rel_to_abs("../data/UHO_Lichess_4852_v1.epd") # https://github.com/official-stockfish/books/blob/master/UHO_Lichess_4852_v1.epd.zip
 
 # tools
 TOOLS_BIN = rel_to_abs("../../tools/target/release/tools")

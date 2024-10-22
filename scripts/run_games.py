@@ -5,7 +5,7 @@ import os
 import argparse
 from glob import glob
 
-from lib.paths import ENGINE_BIN
+from lib.paths import ENGINE_BIN, STOCKFISH_BIN
 from lib.games import Engine, run_games
 
 def main():
@@ -35,6 +35,8 @@ def main():
         )
         for nn in networks
     ]
+
+    # engines.append(Engine(name="stockfish-elo2650", cmd=STOCKFISH_BIN, elo=2650))
 
     run_games(
         engines,

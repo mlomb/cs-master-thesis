@@ -41,7 +41,7 @@ def run_games(
         '-srand', str(seed),
         '-games', '2', # due repeat
         '-repeat',
-        '-pgnout', f'{pgn_file}',
+        '-pgnout', f'{pgn_file}', 'min',
         '-recover', # recover from crashes
         '-draw', 'movenumber=40', 'movecount=8', 'score=10', # adjudicate draws
         '-each', 'timemargin=2000',
