@@ -52,7 +52,7 @@ def compute_error(fen: str, nn: str):
 
 
 model = NnueModel(768, l1_size=512)
-model.load_state_dict(torch.load('../data/1024.pth'))
+model.load_state_dict(torch.load('../data/256-4-eval_16384_(hv[768]→512)x2→32→1.pth'))
 model.clip_weights()
 
 writer = NnueWriter(model, "hv")
