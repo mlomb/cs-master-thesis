@@ -29,6 +29,10 @@ struct Stats {
     features_adds_count: HashMap<String, u64>,
     features_rems_count: HashMap<String, u64>,
     features_updates_total: HashMap<String, u64>,
+
+    diff_x: u64,
+    diff_y: u64,
+    diff_total: u64,
 }
 
 impl Stats {
@@ -42,6 +46,10 @@ impl Stats {
             features_adds_count: HashMap::new(),
             features_rems_count: HashMap::new(),
             features_updates_total: HashMap::new(),
+
+            diff_x: 0,
+            diff_y: 0,
+            diff_total: 0,
         }
     }
 
@@ -159,6 +167,17 @@ impl Stats {
                     &mut rem_feats,
                 );
 
+                if let Some(from) = m.from() {
+                    let to = m.to();
+
+                    let diff_x = (from.file() as i32 - to.file() as i32).abs();
+                    let diff_y = (from.rank() as i32 - to.rank() as i32).abs();
+
+                    self.diff_x += diff_x as u64;
+                    self.diff_y += diff_y as u64;
+                    self.diff_total += 1;
+                }
+
                 let mut counts = counts.clone();
                 let mut added_rows = vec![];
                 let mut removed_rows = vec![];
@@ -230,6 +249,10 @@ impl Stats {
 
         files.sort_by_key(|(_, count)| -(**count as i64));
         ranks.sort_by_key(|(_, count)| -(**count as i64));
+
+        writeln!(writer, "Diff:")?;
+        writeln!(writer, "x: {}", self.diff_x as f64 / self.diff_total as f64)?;
+        writeln!(writer, "y: {}", self.diff_y as f64 / self.diff_total as f64)?;
 
         writeln!(writer, "Features:")?;
         for name in FEATURE_SETS {
