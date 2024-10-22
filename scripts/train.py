@@ -210,8 +210,8 @@ def main():
     parser = argparse.ArgumentParser(description="Train the network")
 
     # model
-    parser.add_argument("--feature_set", default="hv", type=str)
-    parser.add_argument("--l1_size", default=256, type=int)
+    parser.add_argument("--feature_set", default="all", type=str)
+    parser.add_argument("--l1_size", default=512, type=int)
     parser.add_argument("--l2_size", default=32, type=int)
 
     # training
