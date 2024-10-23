@@ -50,6 +50,9 @@ impl SampleEncoder for PQREncoding {
             break p_position.clone().play(&r_move).unwrap();
         };
 
+        assert_eq!(p_position.turn().other(), q_position.turn());
+        assert_eq!(p_position.turn().other(), r_position.turn());
+
         encode_position(&p_position, feature_set, write_x);
         encode_position(&q_position, feature_set, write_x);
         encode_position(&r_position, feature_set, write_x);
