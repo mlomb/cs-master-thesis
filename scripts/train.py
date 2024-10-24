@@ -166,7 +166,15 @@ def train(config: dict, use_wandb: bool):
             print(f"Epoch {epoch} - loss: {train_loss}, val_loss: {val_loss}, lr: {scheduler._last_lr[0]}")
 
 
-        base = f"checkpoints/{start_time}_{config.arch}/{epoch}-{config.arch}"
+        root = f"checkpoints/{start_time}_{config.arch}"
+        base = f"{root}/{epoch}-{config.arch}"
+
+        # create folder
+        Path(root).mkdir(parents=True, exist_ok=True)
+
+        # write notes
+        notes = f"Note: {config.notes}"
+        (Path(root) / "notes.txt").write_text(notes)
         
         # write checkpoint
         pth_file = Path(base + ".pth")
