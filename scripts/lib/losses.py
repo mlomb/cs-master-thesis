@@ -26,8 +26,11 @@ class PQRLoss(torch.nn.Module):
         super(PQRLoss, self).__init__()
 
     def forward(self, output, _target):
-        # to WDL
-        output = output / out_scaling
+        # to WDL [0, 0.5, 1]
+        output = (output / out_scaling).sigmoid()
+
+        # to [-1, 0, 1]
+        output = 2 * output - 1
 
         output = output.reshape(-1, 3)
 
@@ -41,9 +44,9 @@ class PQRLoss(torch.nn.Module):
         r = output[:,2]
 
         a = -torch.log(torch.sigmoid(r - q)).mean()
-        b = -torch.log(torch.sigmoid(kappa * ( p + q))).mean()
-        c = -torch.log(torch.sigmoid(kappa * (-p - q))).mean()
-
+        b = -kappa * torch.log(torch.sigmoid(( p + q))).mean()
+        c = -kappa * torch.log(torch.sigmoid((-p - q))).mean()
+        
         loss = a + b + c
         
         return loss

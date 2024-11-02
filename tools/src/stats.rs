@@ -4,8 +4,8 @@ use indicatif::{HumanBytes, ProgressBar, ProgressStyle};
 use nn::feature_set::blocks::mobility;
 use nn::feature_set::build::build_feature_set;
 use shakmaty::{attacks, Bitboard, Color, File, Position, Rank, Role};
-use std::hash::Hash;
 use std::io::Write;
+use std::ops::Add;
 use std::{collections::HashMap, fs, io::BufWriter};
 
 const FEATURE_SETS: [&str; 9] = ["all", "h", "v", "d1", "d2", "ph", "pv", "mb", "mc"];
@@ -33,6 +33,8 @@ struct Stats {
     diff_x: u64,
     diff_y: u64,
     diff_total: u64,
+
+    avg_moves_available: HashMap<(Color, u64, u64), u64>, // (color, fullmove, legal moves) -> count
 }
 
 impl Stats {
@@ -50,6 +52,8 @@ impl Stats {
             diff_x: 0,
             diff_y: 0,
             diff_total: 0,
+
+            avg_moves_available: HashMap::new(),
         }
     }
 
@@ -96,6 +100,16 @@ impl Stats {
                 })
                 .for_each(|p| *self.ranks.entry((rank.clone(), p)).or_default() += 1);
         }
+
+        // count average moves available
+        *self
+            .avg_moves_available
+            .entry((
+                sample.position.turn(),
+                u32::from(sample.position.fullmoves()) as u64,
+                sample.position.legal_moves().len() as u64,
+            ))
+            .or_default() += 1;
 
         let occupied = board.occupied();
         let unoccupied = !occupied;
@@ -287,6 +301,15 @@ impl Stats {
         sorted.sort();
         for (role, k, count) in sorted {
             writeln!(writer, "{:?} {} {}", role, k, count)?;
+        }
+
+        writeln!(writer, "Avg moves:")?;
+        for ((color, fullturns, legal_moves), total) in &self.avg_moves_available {
+            writeln!(
+                writer,
+                "{:?},{},{},{}",
+                color, fullturns, legal_moves, total
+            )?;
         }
 
         Ok(())

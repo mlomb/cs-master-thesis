@@ -210,7 +210,7 @@ fn build_samples_thread(
             while let Ok(Some(samples)) = reader.read_samples_line() {
                 for sample in samples {
                     // smart fen skipping
-                    if smart_filter(&sample) {
+                    if smart_filter(&sample, &cmd.method) {
                         continue;
                     }
 
@@ -271,10 +271,15 @@ fn build_samples_thread(
     }
 }
 
-fn smart_filter(sample: &Sample) -> bool {
-    sample.score.abs() > 5000 || // skip very extreme scores
-    sample.bestmove.is_capture() || // skip capture moves
-    sample.position.is_check() // skip check positions
+fn smart_filter(sample: &Sample, method: &Method) -> bool {
+    match method {
+        Method::Eval => {
+            sample.score.abs() > 5000 || // skip very extreme scores
+            sample.bestmove.is_capture() || // skip capture moves
+            sample.position.is_check() // skip check positions
+        }
+        Method::PQR => sample.score.abs() > 5000,
+    }
 }
 
 fn build_method(cmd: &BatchLoaderCommand) -> Box<dyn SampleEncoder> {
