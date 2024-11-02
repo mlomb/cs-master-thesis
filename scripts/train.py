@@ -237,6 +237,8 @@ def main():
     parser.add_argument("--run", default=0, type=int, help="Run identifier")
     parser.add_argument("--checkpoint_interval", default=16, type=int, help="Save a checkpoint every N epochs. Will be saved in checkpoints/{arch}/")
     parser.add_argument("--puzzle_interval", default=64, type=int)
+    parser.add_argument("--checkpoint_interval", default=1, type=int, help="Save a checkpoint every N epochs. Will be saved in checkpoints/{arch}/")
+    parser.add_argument("--puzzle_interval", default=16, type=int)
     parser.add_argument("--perf_interval", default=0, type=int)
 
     # wandb

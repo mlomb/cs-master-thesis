@@ -5,7 +5,7 @@ use rand::seq::SliceRandom;
 use shakmaty::{Color, Position};
 use std::io::Write;
 
-const P: u32 = 75; // 0, 25, 50, 75
+const P: u32 = 50; // 0, 25, 50, 75
 
 pub struct PQREncoding;
 
@@ -130,5 +130,11 @@ fn get_m(color: Color, fullmoves: u32) -> u32 {
         },
     };
 
-    v[fullmoves as usize].max(2)
+    let m = if fullmoves < v.len() as u32 {
+        v[fullmoves as usize]
+    } else {
+        v[v.len() - 1]
+    };
+
+    m.max(2)
 }
