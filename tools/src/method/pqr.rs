@@ -5,7 +5,7 @@ use rand::seq::SliceRandom;
 use shakmaty::{Color, Position};
 use std::io::Write;
 
-const P: u32 = 50; // 0, 25, 50, 75
+const P: u32 = 0; // 0, 25, 50, 75
 
 pub struct PQREncoding;
 
@@ -37,7 +37,7 @@ impl SampleEncoder for PQREncoding {
         );
 
         if (moves.len() as u32) < m {
-            // not enough moves to choose from
+            // filter out or not enough moves to choose from
             return;
         }
 
