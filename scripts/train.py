@@ -28,6 +28,9 @@ def train(config: dict, use_wandb: bool):
         l1_size=config.l1_size,
         l2_size=config.l2_size
     )
+    if config.checkpoint is not None:
+        print(f"Loading checkpoint from {config.checkpoint}")
+        chessmodel.load_state_dict(torch.load(config.checkpoint))
     chessmodel.cuda()
 
     # datasets
@@ -223,6 +226,7 @@ def main():
     parser.add_argument("--l2_size", default=32, type=int)
 
     # training
+    parser.add_argument("--checkpoint", default=None, type=str, help="Path to a .pth checkpoint to resume training")
     parser.add_argument("--method", default="eval", type=str)
     parser.add_argument("--dataset", default=DEFAULT_DATASET, type=str, help="Path to the .plain dataset. The first 100MB are used as validation set")
 
@@ -235,8 +239,6 @@ def main():
 
     # misc
     parser.add_argument("--run", default=0, type=int, help="Run identifier")
-    parser.add_argument("--checkpoint_interval", default=16, type=int, help="Save a checkpoint every N epochs. Will be saved in checkpoints/{arch}/")
-    parser.add_argument("--puzzle_interval", default=64, type=int)
     parser.add_argument("--checkpoint_interval", default=1, type=int, help="Save a checkpoint every N epochs. Will be saved in checkpoints/{arch}/")
     parser.add_argument("--puzzle_interval", default=16, type=int)
     parser.add_argument("--perf_interval", default=0, type=int)
