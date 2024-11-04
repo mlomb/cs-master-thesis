@@ -5,7 +5,6 @@ use nn::feature_set::blocks::mobility;
 use nn::feature_set::build::build_feature_set;
 use shakmaty::{attacks, Bitboard, Color, File, Position, Rank, Role};
 use std::io::Write;
-use std::ops::Add;
 use std::{collections::HashMap, fs, io::BufWriter};
 
 const FEATURE_SETS: [&str; 9] = ["all", "h", "v", "d1", "d2", "ph", "pv", "mb", "mc"];
