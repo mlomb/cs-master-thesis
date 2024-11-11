@@ -7,7 +7,6 @@ The bot can be challenged on Lichess: [https://lichess.org/@/LimboBot](https://l
 
 [![lichess-bullet](https://lichess-shield.vercel.app/api?username=LimboBot&format=bullet)](https://lichess.org/@/LimboBot/perf/bullet)
 [![lichess-blitz](https://lichess-shield.vercel.app/api?username=LimboBot&format=blitz)](https://lichess.org/@/LimboBot/perf/blitz)
-[![lichess-rapid](https://lichess-shield.vercel.app/api?username=LimboBot&format=rapid)](https://lichess.org/@/LimboBot/perf/rapid)
 
 # Code
 
