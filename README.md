@@ -1,4 +1,4 @@
-# Analysis of feature sets in NNUE networks for chess
+# Feature set analysis for chess NNUE networks
 
 ### **Abstract**
 
@@ -47,7 +47,7 @@ info depth 5 time 16 nodes 3046 evals 2518 score cp 53 pv e2e4 e7e5 b1c3 b8c6 g1
 ...
 ```
 
-You can specify another network using `--nn`.
+You can specify a network using `--nn`.
 
 # Training
 
