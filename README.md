@@ -1,10 +1,10 @@
-ar# Analysis of feature sets in NNUE networks for chess
+# Analysis of feature sets in NNUE networks for chess
 
 ### **Abstract**
 
 > Historically, chess engines have used highly complex functions to evaluate chess positions. Recently, efficiently updatable neural networks (NNUE) have displaced these functions without the need of human knowledge. The input of these networks are called feature sets and they take advantage of the order in which positions are evaluated in a depth-first search to save computation.
 > 
-> In this thesis, I develop a classical chess engine, where the evaluation function is replaced by a NNUE network trained with a pipeline created from scratch. The main goal of this thesis is to test novel feature sets that can improve performance. Additionally, a way of training the networks is tested using a method proposed years ago but with a higher volume and quality of data available in the post-NNUE era.
+> In this thesis, I develop a classical chess engine, where the evaluation function is replaced by a NNUE network trained with a pipeline created from scratch. The main goal of this thesis is to test novel feature sets that can improve performance. Additionally, a way of training the networks is tried using a method proposed years ago but with a higher volume and quality of data available in the post-NNUE era.
 
 **The dissertation document can be found here: [thesis.pdf](https://mlomb.github.io/cs-master-thesis-doc/thesis.pdf).**
 
