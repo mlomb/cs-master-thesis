@@ -44,6 +44,9 @@ info depth 2 time 14 nodes 192 evals 168 score cp 63 pv d2d4 d7d5
 info depth 3 time 14 nodes 460 evals 369 score cp 76 pv d2d4 d7d5 g1f3 
 info depth 4 time 15 nodes 1126 evals 928 score cp 54 pv e2e4 e7e5 b1c3 b8c6 
 info depth 5 time 16 nodes 3046 evals 2518 score cp 53 pv e2e4 e7e5 b1c3 b8c6 g1f3 
+info depth 6 time 18 nodes 6132 evals 4978 score cp 58 pv d2d4 d7d5 g1f3 b8c6 c1f4 g8f6 
+info depth 7 time 26 nodes 20422 evals 17096 score cp 60 pv e2e4 e7e5 b1c3 b8c6 g1f3 g8f6 d2d4 
+info depth 8 time 48 nodes 55899 evals 47152 score cp 60 pv e2e4 e7e5 b1c3 b8c6 g1f3 g8f6 d2d4 e5d4 
 ...
 ```
 
